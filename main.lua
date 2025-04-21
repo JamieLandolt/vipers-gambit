@@ -134,7 +134,22 @@ mouse_over_playing_field = nil
 characters = {"Alem", "Gabe", "Jamie", "Darcy", "Josh", "Michael"}
 played_cards = {}
 
-venom = 100
+turn = "Player"
+venom = 10
+player_venom = 10
+opponent_venom = 10
+
+venom_sprites = {lg.newImage("assets/Sprites/Venom_0.png"),
+                 lg.newImage("assets/Sprites/Venom_1.png"),
+                 lg.newImage("assets/Sprites/Venom_2.png"),
+                 lg.newImage("assets/Sprites/Venom_3.png"),
+                 lg.newImage("assets/Sprites/Venom_4.png"),
+                 lg.newImage("assets/Sprites/Venom_5.png"),
+                 lg.newImage("assets/Sprites/Venom_6.png"),
+                 lg.newImage("assets/Sprites/Venom_7.png"),
+                 lg.newImage("assets/Sprites/Venom_8.png"),
+                 lg.newImage("assets/Sprites/Venom_9.png"),
+                 lg.newImage("assets/Sprites/Venom_10.png")}
 
 animation_time = 0 -- how long it has been playing
 animation_length = 0.1 -- how long it lasts
@@ -481,6 +496,12 @@ local function render_playing_state()
     lg.setColor(1, 1, 1)
     lg.draw(playing_field, 245, 15)
 
+    local scale = 2
+    lg.scale(scale)
+    lg.draw(venom_sprites[opponent_venom+1], (245 - scale*36)/2, 15/2)
+    lg.draw(venom_sprites[player_venom+1], (245 - scale*36)/2, (555 - scale*36)/2)
+    lg.scale(1/scale)
+
     if held_card then
         buttons.playing["Info"]:draw()
     end
@@ -516,6 +537,7 @@ local function render_info()
     renderBackground()
     buttons.info["Back"]:draw()
     buttons.info["Info Background"]:draw()
+
     if info_card then
         info_card:draw(reference_window_width * 0.8/6 + 5, reference_window_height * 1/6, 0, 2.65)
     end
@@ -525,6 +547,7 @@ local function render_info()
     else
         lg.setColor(g1, g2, g3)
     end
+
     local info_card_stats = get_stats(info_card)
     if info_card then
         lg.print("Cost: " .. tostring(info_card_stats.cost), font, reference_window_width / 2, info_background_y + reference_window_height * 0.7/10)
@@ -550,7 +573,11 @@ local function is_hitbox(x, y, hitbox)
 end
 
 local function can_play(card, sector)
-    return get_stats(card).cost <= venom and sector > 4
+    if turn == "Player" then
+        return get_stats(card).cost <= player_venom and sector > 4
+    else
+        return get_stats(card).cost <= opponent_venom and sector < 5
+    end
 end
 
 local function get_playing_field_hitbox()
@@ -570,11 +597,8 @@ function love.update(dt)
         -- Width is too wide, so adjust height
         h = w / aspect_ratio
         love.window.setMode(w, h, {resizable=true})
-    elseif abs(w / h - aspect_ratio) > 0.008 then
-        -- Height is too tall, so adjust width
-        w = h * aspect_ratio
-        love.window.setMode(w, h, {resizable=true})
     end
+
     w = lg.getWidth()
     h = lg.getHeight()
 
@@ -596,6 +620,7 @@ function love.update(dt)
     else
         animation_time = 0
     end
+
     if game.state["info"] then
         if buttons.info["Info Background"]:hover() then
             mouse_over_info_background = true
@@ -603,6 +628,7 @@ function love.update(dt)
             mouse_over_info_background = false
         end
     end
+
     if game.state["playing"] then
         if buttons.playing["Info"]:hover() then
             mouse_over_info = true
@@ -617,7 +643,6 @@ function love.update(dt)
         end
     end
 
-
     -- If mouse is let go when a card is in hand put it back in the hand
     if not love.mouse.isDown(1) and held_card then
         -- If card is dropped onto info button
@@ -628,7 +653,12 @@ function love.update(dt)
         elseif playing_field_sector and can_play(held_card, playing_field_sector) then
             -- If card is dropped onto playing field
             played_cards[playing_field_sector] = held_card
-            venom = venom - get_stats(held_card).cost
+            print(playing_field_sector)
+            if turn == "Player" then
+                player_venom = player_venom - get_stats(held_card).cost
+            else
+                opponent_venom = opponent_venom - get_stats(held_card).cost
+            end
             held_card = nil
             play_sound(hover_sound)
         end
