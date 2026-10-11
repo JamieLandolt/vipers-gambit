@@ -27,6 +27,7 @@ held_card = nil
 info_card = nil
 -- Set by play.new_game: turn, health, max_venom, venom, winner
 audio = true
+unlocked = 1 -- highest level the player can pick, saved in progress.txt
 animation_time = 0 -- how long it has been playing
 animation_length = 0.1 -- how long it lasts
 animation = false
@@ -149,6 +150,7 @@ function love.load()
 	hover_sound = la.newSource("assets/audio/hover.mp3", "static")
 
 	love.window.setMode(reference_window_width, reference_window_height, { resizable = true, vsync = 0 })
+	unlocked = tonumber(love.filesystem.read("progress.txt") or "") or 1
 	build_ui()
 end
 
@@ -198,7 +200,7 @@ function love.mousepressed(x, y, button)
 
 	if game.state["level_select"] then
 		local level = render.level_at(x, y)
-		if level then
+		if level and level <= unlocked then
 			play.new_game(level)
 			animation, animation_time = true, 0
 			update_animation_screen("playing")

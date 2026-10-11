@@ -1,6 +1,5 @@
 local love = require("love")
 local lg = love.graphics
-local scandir = require("scandir")
 
 local function numbered(prefix, suffix, first, last)
 	local images = {}
@@ -35,10 +34,9 @@ for _, name in ipairs({ "gabe", "jamie", "alem", "josh", "michael", "darcy" }) d
 	assets.avatars[name] = lg.newImage("assets/characters/" .. name .. ".jpg")
 end
 
--- scandir lists ".", ".." and ".DS_Store" first
-for i, file in pairs(scandir("/Users/jameslandolt/IdeaProjects/SnakeGame/assets/Snake_Cards")) do
-	if i > 3 then
-		assets.cards[i - 3] = lg.newImage("assets/Snake_Cards/" .. file)
+for _, file in ipairs(love.filesystem.getDirectoryItems("assets/Snake_Cards")) do
+	if file:match("%.png$") then
+		table.insert(assets.cards, lg.newImage("assets/Snake_Cards/" .. file))
 	end
 end
 

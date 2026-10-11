@@ -92,7 +92,7 @@ function render.level_select()
 	local hovered = render.level_at(mouse.x, mouse.y)
 	for i, opponent in ipairs(opponents) do
 		local x, y = level_node(i)
-		lg.setColor(hovered == i and green or purple)
+		lg.setColor(i > unlocked and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple))
 		lg.circle("fill", x, y, NODE_RADIUS)
 		lg.setColor(0, 0, 0)
 		lg.setLineWidth(5)

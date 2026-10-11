@@ -51,6 +51,7 @@ function play.start_turn()
 end
 
 function play.new_game(level)
+	play.level = level
 	profile = opponents[level] or opponents[1]
 	turn = "Player"
 	health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
@@ -89,6 +90,10 @@ function play.end_turn()
 		health[side] = math.max(hp, 0)
 		if hp <= 0 then
 			winner = side == "Player" and "Opponent" or "Player"
+			if winner == "Player" and play.level >= unlocked then
+				unlocked = math.min(play.level + 1, #opponents)
+				love.filesystem.write("progress.txt", tostring(unlocked))
+			end
 			update_game_state("ended")
 			return
 		end
