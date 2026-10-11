@@ -185,7 +185,7 @@ function render.playing()
 		lg.setColor(0, 0, 0)
 		lg.rectangle("fill", 1210, y, 210, 40)
 		lg.setColor(0.8, 0.1, 0.1)
-		lg.rectangle("fill", 1215, y + 5, 200 * health[side] / 20, 30)
+		lg.rectangle("fill", 1215, y + 5, 200 * health[side] / max_health[side], 30)
 		lg.setColor(1, 1, 1)
 		lg.printf(health[side] .. " HP", assets.debug_font, 1215, y + 8, 200, "center")
 	end

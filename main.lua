@@ -25,7 +25,7 @@ player_hand = {}
 opponent_hand = {}
 held_card = nil
 info_card = nil
--- Set by play.new_game: turn, health, max_venom, venom, winner
+-- Set by play.new_game: turn, health, max_health, max_venom, venom, winner
 audio = true
 unlocked = 1 -- highest level the player can pick, saved in progress.txt
 animation_time = 0 -- how long it has been playing

@@ -54,8 +54,9 @@ function play.new_game(level)
 	play.level = level
 	profile = opponents[level] or opponents[1]
 	turn = "Player"
-	health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
-	max_venom = { Player = 1, Opponent = 1 } -- start_turn adds the first point, so turn 1 has 2
+	max_health = { Player = STARTING_HEALTH, Opponent = profile.health }
+	health = { Player = STARTING_HEALTH, Opponent = profile.health }
+	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
 	held_card, winner = nil, nil
