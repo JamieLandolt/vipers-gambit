@@ -57,7 +57,7 @@ function play.new_game(level)
 	max_venom = { Player = 1, Opponent = 1 } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
-	held_card = nil
+	held_card, winner = nil, nil
 	play.start_turn()
 end
 
@@ -85,6 +85,14 @@ end
 
 function play.end_turn()
 	play.resolve_combat(turn)
+	for side, hp in pairs(health) do
+		health[side] = math.max(hp, 0)
+		if hp <= 0 then
+			winner = side == "Player" and "Opponent" or "Player"
+			update_game_state("ended")
+			return
+		end
+	end
 	turn = turn == "Player" and "Opponent" or "Player"
 	play.start_turn()
 end

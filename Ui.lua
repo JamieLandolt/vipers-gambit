@@ -80,6 +80,8 @@ return function()
 	end
 	buttons.playing["End Turn"] = b("End Turn", end_player_turn, nil, 1215, 255, button_width, button_height, 19, false)
 
+	buttons.ended["Continue"] = b("Continue", update_animation_screen, "level_select", w / 2 - button_width / 2, h / 2 + 100, button_width, button_height, 19)
+
 	buttons.info["Back"] = b("Back", update_animation_screen, "playing", 5, 5, back_width, button_height, 19)
 	buttons.info["Info Background"] = b(
 		"Card Stats:",

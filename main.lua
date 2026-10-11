@@ -25,7 +25,7 @@ player_hand = {}
 opponent_hand = {}
 held_card = nil
 info_card = nil
--- Set by play.new_game: turn, health, max_venom, venom
+-- Set by play.new_game: turn, health, max_venom, venom, winner
 audio = true
 animation_time = 0 -- how long it has been playing
 animation_length = 0.1 -- how long it lasts

@@ -180,6 +180,19 @@ function render.playing()
 		end
 	end
 
+	-- Health bars and turn indicator on the right of the field
+	for side, y in pairs({ Opponent = 30, Player = 500 }) do
+		lg.setColor(0, 0, 0)
+		lg.rectangle("fill", 1210, y, 210, 40)
+		lg.setColor(0.8, 0.1, 0.1)
+		lg.rectangle("fill", 1215, y + 5, 200 * health[side] / 20, 30)
+		lg.setColor(1, 1, 1)
+		lg.printf(health[side] .. " HP", assets.debug_font, 1215, y + 8, 200, "center")
+	end
+	lg.setColor(1, 1, 1)
+	lg.printf(turn == "Player" and "Your Turn" or "Opponent's Turn", assets.font, 1200, 190, 230, "center")
+	lg.setColor(1, 1, 1)
+
 	if held_card then
 		held_card:draw(
 			mouse.x * reference_window_width / lg.getWidth() - img_widths / 2,
@@ -187,6 +200,13 @@ function render.playing()
 			0
 		)
 	end
+end
+
+function render.ended()
+	background()
+	lg.setColor(1, 1, 1)
+	lg.printf(winner == "Player" and "Victory!" or "Defeat", assets.font, 0, 250, reference_window_width / 3, "center", 0, 3, 3)
+	buttons.ended["Continue"]:draw()
 end
 
 function render.info()
