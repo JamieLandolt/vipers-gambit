@@ -1,1 +1,5 @@
 /assets/aseprite_files alias
+/.idea/checkstyle-idea.xml
+.DS_Store
+.claude/
+art_sheet*.png
