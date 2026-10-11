@@ -34,6 +34,14 @@ local card_stats = {
 	Ghost_Snake = stats(3, 4, 8, "N/A", "Basic", 2, nil, "N/A"),
 	Toxic_Snake = stats(3, 8, 4, "N/A", "Basic", 2, nil, "N/A"),
 	Corn_Snake = stats(2, 4, 3, "N/A", "Basic", 1, nil, "N/A"),
+	Grass_Snake = stats(1, 1, 2, "N/A", "Basic", 1, nil, "N/A"),
+	Brown_Snake = stats(1, 2, 1, "N/A", "Basic", 1, nil, "N/A"),
+	Grey_Snake = stats(1, 1, 3, "N/A", "Basic", 1, nil, "N/A"),
+	Dirt_Snake = stats(2, 2, 3, "N/A", "Basic", 1, nil, "N/A"),
+	Sand_Snake = stats(1, 2, 2, "N/A", "Basic", 1, nil, "N/A"),
+	Mud_Snake = stats(2, 2, 4, "N/A", "Basic", 1, nil, "N/A"),
+	Pale_Snake = stats(1, 1, 1, "N/A", "Basic", 1, nil, "N/A"),
+	Worm_Snake = stats(1, 1, 2, "N/A", "Basic", 1, nil, "N/A"),
 }
 
 local deck = {}
