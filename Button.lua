@@ -1,18 +1,37 @@
 local love = require("love")
 local lg = love.graphics
 
-local BLUE = { 15 / 255, 140 / 255, 220 / 255 }
+-- Buttons are snakeskin: dark green scales inside a gold rim, drawn by this shader over a 1x1 image
+local pixel = lg.newImage(love.image.newImageData(1, 1))
+local scales = lg.newShader([[
+	uniform vec2 size;
+	uniform float rim;
+	uniform float radius;
+	uniform vec3 body;
+	uniform vec3 rim_colour;
+	float box(vec2 p, vec2 half_size, float r) {
+		vec2 q = abs(p) - half_size + r;
+		return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+	}
+	vec4 effect(vec4 color, Image tex, vec2 uv, vec2 sc) {
+		vec2 p = uv * size;
+		float d = box(p - size / 2.0, size / 2.0, radius);
+		if (d > 0.0) return vec4(0.0);
+		if (d > -rim) return vec4(rim_colour, 1.0);
+		float row = floor(p.y / 7.0);
+		vec2 f = vec2(fract(p.x / 14.0 + 0.5 * mod(row, 2.0)), fract(p.y / 7.0));
+		float edge = smoothstep(0.38, 0.5, length(vec2(f.x - 0.5, (f.y - 1.0) * 0.8)));
+		float shine = 0.12 * (1.0 - smoothstep(0.0, 0.6, length(vec2(f.x - 0.5, f.y - 0.35))));
+		return vec4(body * (0.72 + 0.28 * (1.0 - edge)) + shine, 1.0);
+	}
+]])
+local SKIN, SKIN_HOVER = { 0.13, 0.36, 0.2 }, { 0.22, 0.55, 0.25 }
+local GOLD, LIME = { 0.82, 0.66, 0.25 }, { 0.62, 0.9, 0.25 }
+local CREAM = { 0.98, 0.94, 0.7 }
 
 -- Buttons with bound functions show the hover effect. Text and icon are centred in the button;
 -- set top_text on a button to put its text at the top instead (for panels).
 function Button(text, func, func_params, x, y, width, height, font, debugger, colour_variation, icon, icon_scale)
-	local function colour_scaling(val)
-		if colour_variation then
-			return val + (25 * (math.sin(3 * time) + 1) / 255)
-		end
-		return val
-	end
-
 	-- Is the window position (in screen pixels) over the button?
 	local function over(self, screen_x, screen_y)
 		local rx, ry = screen_x * reference_window_width / lg.getWidth(), screen_y * reference_window_height / lg.getHeight()
@@ -43,8 +62,6 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 		end,
 
 		draw = function(self)
-			local green = { colour_scaling(116 / 255), colour_scaling(182 / 255), colour_scaling(82 / 255) }
-			local purple = { colour_scaling(101 / 255), colour_scaling(52 / 255), colour_scaling(150 / 255) }
 			local hovered = self:hover()
 
 			-- Border grows outwards by `outer`, the fill by `-inset` (an inset > 0 shrinks it).
@@ -58,11 +75,21 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 					outer, inset = mid_animation and 5 or 13, mid_animation and 0 or -5
 				end
 			end
-			local r = self.border_radius
-			lg.setColor(BLUE)
-			lg.rectangle("fill", self.x - outer, self.y - outer, self.width + outer * 2, self.height + outer * 2, r, r)
-			lg.setColor(hovered and green or purple)
-			lg.rectangle("fill", self.x + inset, self.y + inset, self.width - inset * 2, self.height - inset * 2, r, r)
+			local body = hovered and SKIN_HOVER or SKIN
+			local rim = hovered and LIME or GOLD
+			if colour_variation then
+				local pulse = (math.sin(3 * time) + 1) / 2
+				body = { body[1] + 0.1 * pulse, body[2] + 0.1 * pulse, body[3] + 0.05 * pulse }
+			end
+			scales:send("size", { self.width + outer * 2, self.height + outer * 2 })
+			scales:send("rim", outer + inset)
+			scales:send("radius", 12)
+			scales:send("body", body)
+			scales:send("rim_colour", rim)
+			lg.setShader(scales)
+			lg.setColor(1, 1, 1)
+			lg.draw(pixel, self.x - outer, self.y - outer, 0, self.width + outer * 2, self.height + outer * 2)
+			lg.setShader()
 
 			lg.setColor(1, 1, 1)
 			if self.icon then
@@ -75,7 +102,9 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 			if self.text ~= "" then
 				local text_x = self.x + (self.width - self.font:getWidth(self.text)) / 2
 				local text_y = self.top_text and self.y + 10 or self.y + (self.height - self.font:getHeight()) / 2
-				lg.setColor(hovered and purple or green)
+				lg.setColor(0, 0, 0, 0.5)
+				lg.print(self.text, self.font, math.floor(text_x) + 2, math.floor(text_y) + 3)
+				lg.setColor(hovered and { 1, 1, 1 } or CREAM)
 				lg.print(self.text, self.font, math.floor(text_x), math.floor(text_y))
 			end
 		end,
