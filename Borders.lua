@@ -10,6 +10,9 @@ local borders = {
 	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Phantom: ignores the first hit it takes" },
 	Gold = { colour = { 1, 0.85, 0.2 }, text = "Wealth: +1 venom each turn while on the field" },
 	Rainbow = { text = "Prismatic: gains +1 attack and +1 defense every turn" },
+	-- Support cards (brews and spells) have their own frames: a double line with flask-shaped or star-shaped corners
+	Brew = { colour = { 0.3, 0.95, 0.7 }, text = "Support: a brew, drunk by one of your snakes" },
+	Spell = { colour = { 0.5, 0.65, 1 }, text = "Support: a spell, cast over the field" },
 }
 
 function borders.text(name)
@@ -163,7 +166,32 @@ end
 
 -- Frame drawn just inside the card's edge; the corners pulse so each border reads at a glance.
 -- tier (rarity, optional): 5 adds the legendary treatment on top.
+-- The support frame: a double line, with a round flask corner for brews and a four-point star for spells
+local function support(name, x, y, w, h)
+	local c, pulse = colour(name), 0.5 + 0.5 * math.sin(time * 3)
+	lg.setColor(c[1], c[2], c[3], 0.8 + 0.2 * pulse)
+	lg.setLineWidth(3)
+	lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, 10, 10)
+	lg.setLineWidth(1)
+	lg.setColor(c[1], c[2], c[3], 0.45)
+	lg.rectangle("line", x + 9, y + 9, w - 18, h - 18, 6, 6)
+	lg.setColor(c[1], c[2], c[3], 0.7 + 0.3 * pulse)
+	for _, corner in ipairs({ { 9, 9 }, { w - 9, 9 }, { 9, h - 9 }, { w - 9, h - 9 } }) do
+		local cx, cy = x + corner[1], y + corner[2]
+		if name == "Brew" then
+			lg.circle("fill", cx, cy, 6)
+		else
+			lg.polygon("fill", cx, cy - 8, cx + 3, cy - 3, cx + 8, cy, cx + 3, cy + 3, cx, cy + 8, cx - 3, cy + 3, cx - 8, cy, cx - 3, cy - 3)
+		end
+	end
+	lg.setColor(1, 1, 1)
+end
+
 function borders.draw(name, x, y, w, h, tier)
+	if name == "Brew" or name == "Spell" then
+		support(name, x, y, w, h)
+		return
+	end
 	if borders[name] and name ~= "Basic" then
 		local c, pulse = colour(name), 0.5 + 0.5 * math.sin(time * 4)
 		lg.setColor(c[1], c[2], c[3], 0.75 + 0.25 * pulse)

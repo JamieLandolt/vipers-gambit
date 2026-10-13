@@ -40,6 +40,12 @@ for _, c in ipairs(require("Charmers").list) do
 	assets.avatars[c.name] = lg.newImage("assets/characters/" .. c.portrait)
 end
 
+-- Each campaign opponent (and the tutorial's) has its own portrait
+local campaign = { require("Tutorial").profile, unpack(require("Opponents")) }
+for _, o in ipairs(campaign) do
+	assets.avatars[o.name] = assets.avatars[o.name] or lg.newImage("assets/" .. o.portrait)
+end
+
 for _, file in ipairs(love.filesystem.getDirectoryItems("assets/Snake_Cards")) do
 	if file:match("%.png$") then
 		local image, name = lg.newImage("assets/Snake_Cards/" .. file), file:sub(1, -5)

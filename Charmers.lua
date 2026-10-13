@@ -35,10 +35,10 @@ local function defense(card)
 end
 
 charmers.list = {
-	{ name = "Raja Kaal", portrait = "raja.png", charm = "Poison Piper", cost = 4, text = "Poison every enemy snake.",
+	{ name = "Raja Kaal", portrait = "raja.png", charm = "Poison Piper", cost = 3, text = "Poison every enemy snake for 3 turns.",
 		apply = function(play, side)
 			return each(foe(side), function(slot, card)
-				card.poison = 2
+				card.poison = 3
 				play.float(slot, "poison")
 			end)
 		end },
@@ -69,16 +69,16 @@ charmers.list = {
 			end)
 			return healed
 		end },
-	{ name = "Dr. Fang", portrait = "fang.png", charm = "Venom Surge", cost = 1, text = "Pay 1 venom, gain 3.",
+	{ name = "Dr. Fang", portrait = "fang.png", charm = "Venom Surge", cost = 1, text = "Pay 1 venom, gain 4.",
 		apply = function(play, side)
 			if venom[side] >= play.MAX_VENOM then
 				return false
 			end
-			venom[side] = math.min(venom[side] + 3, play.MAX_VENOM)
-			play.float_bar(side, "+3 venom")
+			venom[side] = math.min(venom[side] + 4, play.MAX_VENOM)
+			play.float_bar(side, "+4 venom")
 			return true
 		end },
-	{ name = "Madame Zora", portrait = "zora.png", charm = "Mesmerise", cost = 3, text = "Enemy snakes shuffle one lane over.",
+	{ name = "Madame Zora", portrait = "zora.png", charm = "Mesmerise", cost = 1, text = "Enemy snakes shuffle one lane over and take 2 damage.",
 		apply = function(play, side)
 			local base = side == "Player" and 1 or 5
 			local moved = {}
@@ -94,6 +94,11 @@ charmers.list = {
 					play.float(base + i, "mesmerised")
 				end
 			end
+			for i = 0, 3 do
+				if played_cards[base + i] then
+					play.wound(base + i, 2)
+				end
+			end
 			return true
 		end },
 	{ name = "Baba Jaro", portrait = "baba.png", charm = "Snake Cloak", cost = 4, text = "Give all your snakes a 2 point shield.",
@@ -103,32 +108,6 @@ charmers.list = {
 				play.float(slot, "+2 shield")
 			end)
 		end },
-	{ name = "Jamie", portrait = "jamie.jpg", charm = "Gambit", cost = 2, text = "Discard your hand and draw a new one.",
-		apply = function(play, side)
-			play.redraw(side)
-			return true
-		end },
-	{ name = "Alem", portrait = "alem.jpg", charm = "Sharpen", cost = 4, text = "All your snakes gain +1 attack for good.",
-		apply = function(play, side)
-			return each(side, function(slot, card)
-				card.bonus = (card.bonus or 0) + 1
-				play.float(slot, "+1 atk")
-			end)
-		end },
-	{ name = "Gabe", portrait = "gabe.jpg", charm = "Cheap Shot", cost = 3, text = "Deal 4 damage to the enemy snake charmer.",
-		apply = function(play, side)
-			play.hurt(foe(side), 4)
-			return true
-		end },
-	{ name = "Darcy", portrait = "darcy.jpg", charm = "Rejuvenate", cost = 3, text = "Heal yourself for 8.",
-		apply = function(play, side)
-			if health[side] >= max_health[side] then
-				return false
-			end
-			health[side] = math.min(health[side] + 8, max_health[side])
-			play.float_bar(side, "+8")
-			return true
-		end },
 	{ name = "Josh", portrait = "josh.jpg", charm = "Fury", cost = 3, text = "All your snakes get +3 attack this turn.",
 		apply = function(play, side)
 			return each(side, function(slot, card)
@@ -136,7 +115,7 @@ charmers.list = {
 				play.float(slot, "+3 atk")
 			end)
 		end },
-	{ name = "Michael", portrait = "michael.jpg", charm = "Bile Spray", cost = 5, text = "Hit every enemy snake for 2.",
+	{ name = "Michael", portrait = "michael.jpg", charm = "Bile Spray", cost = 4, text = "Hit every enemy snake for 2.",
 		apply = function(play, side)
 			return each(foe(side), function(slot)
 				play.wound(slot, 2)
@@ -149,14 +128,14 @@ for _, c in ipairs(charmers.list) do
 	charmers.by_name[c.name] = c
 end
 
--- Who each campaign opponent fights with, by level
-charmers.opponent_charmers = {
-	"Brother Moss", "Yuki Frostveil", "Dr. Fang", "Baba Jaro", "Madame Zora",
-	"Josh", "Alem", "Michael", "Gabe", "Raja Kaal",
-}
-
+-- The charmer (and so the charm) an opponent fights with comes from its entry in Opponents.lua
 function charmers.of(side, level)
-	return charmers.by_name[side == "Player" and chosen_avatar or charmers.opponent_charmers[level] or "Brother Moss"] or charmers.list[1]
+	local name = chosen_avatar
+	if side ~= "Player" then
+		local opponent = level == 0 and require("Tutorial").profile or require("Opponents")[level]
+		name = opponent and opponent.charmer
+	end
+	return charmers.by_name[name] or charmers.list[1]
 end
 
 -- The player's pick is remembered in its own file so save.txt keeps its format
@@ -164,10 +143,16 @@ function charmers.save()
 	love.filesystem.write("charmer.txt", chosen_avatar)
 end
 
+-- Only the first PICKABLE charmers can be chosen; the rest only appear as campaign opponents
+charmers.PICKABLE = 6
+
 function charmers.load()
 	local saved = love.filesystem.read("charmer.txt")
-	if saved and charmers.by_name[saved] then
-		chosen_avatar = saved
+	chosen_avatar = charmers.list[1].name
+	for i = 1, charmers.PICKABLE do
+		if charmers.list[i].name == saved then
+			chosen_avatar = saved
+		end
 	end
 end
 

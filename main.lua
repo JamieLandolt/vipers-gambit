@@ -4,6 +4,8 @@ local la = love.audio
 local assets = require("Assets")
 local build_ui = require("Ui")
 local play = require("Play")
+local challenges = require("Challenges")
+local hub = require("Hub")
 local render = require("Render")
 local collection = require("Collection")
 local charmers = require("Charmers")
@@ -17,13 +19,13 @@ time = 0
 
 -- Shared state (global because Button, Avatar, Play and Render read it)
 mouse = {}
-chosen_avatar = "Jamie"
+chosen_avatar = "Raja Kaal"
 chosen_opponent = "Ice King"
 scroll_offset_y = 0
 count = 0
 mouse_over_info = false
 mouse_over_info_background = false
-characters = { "Alem", "Gabe", "Jamie", "Darcy", "Josh", "Michael" }
+characters = { "Josh", "Michael" }
 played_cards = {}
 card_hitboxes = {} -- x, y, width, height
 player_hand = {}
@@ -52,11 +54,19 @@ buttons = {
 	playing = {},
 	paused = {},
 	pack = {},
+	shop = {},
+	altar = {},
 	ended = {},
 	info = {},
 	universal = {},
 	reset_confirm = {},
+	hub_popup = {},
+	level_choice = {},
+	sac_tutorial = {},
 }
+sac_tutorial = nil -- step (1-3) of the Sacrifice tutorial while it is showing
+shop_return = "menu" -- where Back goes from the pack shop: the menu, or the collection when opened from there
+level_choice = nil -- the beaten level whose Play/Challenge dialog is open
 game = {
 	state = {
 		menu = true,
@@ -68,6 +78,8 @@ game = {
 		playing = false,
 		paused = false,
 		pack = false,
+		shop = false,
+		altar = false,
 		ended = false,
 		info = false,
 	},
@@ -220,6 +232,32 @@ function love.mousepressed(x, y, button)
 		return
 	end
 
+	if game.state["level_select"] and level_choice then -- only the choice dialog responds while it is open
+		for _, name in ipairs({ "Play", "Challenge", "Cancel" }) do
+			buttons.level_choice[name]:checkPressed(x, y)
+		end
+		return
+	end
+
+	if game.state["collection"] and sac_tutorial then -- only Next responds during the Sacrifice tutorial
+		buttons.sac_tutorial["Next"]:checkPressed(x, y)
+		return
+	end
+
+	if game.state["menu"] then
+		if hub.popup then -- only the Deck & Lanes popup responds while it is open
+			for _, name in ipairs({ "Deck", "Lanes", "Cancel" }) do
+				buttons.hub_popup[name]:checkPressed(x, y)
+			end
+			return
+		end
+		local item = hub.at(x, y)
+		if item then
+			hub.click(item)
+			return
+		end
+	end
+
 	-- Check if button on screen is clicked
 	local pressed = false
 	for _, b in pairs(buttons[get_game_state()]) do
@@ -236,16 +274,35 @@ function love.mousepressed(x, y, button)
 	end
 
 	if game.state["collection"] and not pressed then
-		local name = render.collection_card_at(x, y)
-		if name and collection.deck_mode then
+		local group, key = render.filter_icon_at(x, y)
+		local name = not group and render.collection_card_at(x, y)
+		if group then
+			if group == "reset" then
+				collection.clear_filters()
+			else
+				collection.toggle_filter(group, key)
+			end
+			play_sound(hover_sound)
+		elseif name and collection.deck_mode then
 			-- Editing the deck: a click adds or removes the snake (the message says why it didn't work)
 			collection.message, collection.message_t = collection.toggle_deck(name), time
+			play_sound(hover_sound)
+		elseif name and collection.sacrifice_mode then
+			collection.message, collection.message_t = collection.pick_sacrifice(name), time
 			play_sound(hover_sound)
 		elseif name then
 			info_card, info_return = require("Card")(name .. ".png", img_widths, img_heights), "collection"
 			play_sound(hover_sound)
 			animation, animation_time = true, 0
 			update_animation_screen("info")
+		end
+	end
+
+	if game.state["altar"] and not pressed then
+		local target = render.altar_row_at(x, y)
+		if target then
+			collection.altar_target = target
+			play_sound(hover_sound)
 		end
 	end
 
@@ -265,14 +322,11 @@ function love.mousepressed(x, y, button)
 	if game.state["level_select"] and not pressed then
 		local level = render.level_at(x, y)
 		if level and level <= unlocked then
-			play.new_game(level)
 			if level == 0 then
-				tutorial.start()
+				play.begin(level)
 			else
-				tutorial.active = false
+				level_choice = level -- the briefing: reward, challenge, charmers and decks
 			end
-			animation, animation_time = true, 0
-			update_animation_screen("playing")
 		end
 	end
 

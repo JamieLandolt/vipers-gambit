@@ -8,10 +8,12 @@ local tutorial = { active = false, step = 1, done = love.filesystem.getInfo("tut
 -- The tutorial opponent: a cheap defensive deck and only 10 health, so the match is quick
 tutorial.profile = {
 	name = "Tutorial Snake",
+	portrait = "characters/Star_Wizard.png",
+	charmer = "Brother Moss",
 	style = { attack = 0, defense = 2, cost = 0.5, block = 3, open = 0 },
 	venom = 0,
 	health = 10,
-	deck = { "Garter_Snake", "Corn_Snake", "Vine_Snake", "Snake", "Pond_Snake", "Leaf_Snake" },
+	deck = { "Garter_Snake", "Corn_Snake", "Vine_Snake", "Sand_Snake", "Pond_Snake", "Leaf_Snake" },
 }
 
 local ended_turns = 0 -- how many times the player has pressed End Turn
@@ -36,7 +38,7 @@ local steps = {
 		done = function()
 			for slot = 5, 8 do
 				local c = played_cards[slot]
-				if c and require("CardData").get_stats(c).border ~= "Basic" then
+				if c and require("CardData").border_of(c) ~= "Basic" then
 					return true
 				end
 			end

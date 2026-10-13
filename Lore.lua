@@ -4,8 +4,6 @@ local lore = {
 	tiers = { "Hatchling", "Fanged", "Ancient", "Royal", "Mythic" },
 
 	-- Land: the Dustwild
-	Snake = "The plain, original snake, the one every Charmer starts with.",
-	Big_Snake = "Grew too large for its burrow and has been blocking the road since.",
 	Cannibal_Snake = "Eats other snakes; the Court bans it from banquets.",
 	Cobra = "The Court's guard animal, hood flared to show the way out.",
 	King_Cobra = "Rules the Dustwild dens and expects bows.",
@@ -16,7 +14,6 @@ local lore = {
 	Sand_Snake = "Moves like a ripple through the dunes.",
 
 	-- Water: the Drowned Reaches
-	Anaconda = "Rules the deepest river and swallows what disagrees.",
 	Extra_Long_Python = "Measured once, then the tape ran out.",
 	Frost_Cobra = "A royal cobra frozen mid-hiss in a glacier, now thawed and cross.",
 	Sea_Snake = "The reef's quiet guard; its venom is stronger than it looks.",

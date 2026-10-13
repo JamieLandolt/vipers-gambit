@@ -1,10 +1,10 @@
 -- Snake abilities. A card's ability_code is "kind:arg:arg", several joined with "|".
---   Activated (pay venom, once per turn): strike:N:C  heal:N:C  shield:N:C  empower:N:C  drain:N:C  bolster:N:C
+--   Activated (pay venom, once per turn): strike:N:C  heal:N:C  shield:N:C  empower:N:C  drain:N:C  bolster:N:C  refresh:1:C
 --   Passive combos: pack:N  adj:Type:N  lone:N  first:N  lane:Type:N  guard:N  armor:N  thorns:N
 -- N is the strength and C the venom cost. Rules live here; Play.lua applies them and shows the effects.
 local abilities = {}
 
-local ACTIVE = { strike = true, heal = true, shield = true, empower = true, drain = true, bolster = true }
+local ACTIVE = { strike = true, heal = true, shield = true, empower = true, drain = true, bolster = true, refresh = true }
 
 local DESCRIPTIONS = {
 	strike = function(a) return ("Pay %d venom: hit the card ahead for %d"):format(a[2], a[1]) end,
@@ -13,6 +13,7 @@ local DESCRIPTIONS = {
 	empower = function(a) return ("Pay %d venom: +%d attack for good"):format(a[2], a[1]) end,
 	drain = function(a) return ("Pay %d venom: hit the card ahead for %d and heal that much"):format(a[2], a[1]) end,
 	bolster = function(a) return ("Pay %d venom: neighbours get +%d attack this turn"):format(a[2], a[1]) end,
+	refresh = function(a) return ("Pay %d venom: your other snakes can use their abilities again this turn"):format(a[2]) end,
 	pack = function(a) return ("+%d attack for each other snake you have"):format(a[1]) end,
 	adj = function(a) return ("+%d attack next to %s"):format(a[2], a[1] == "Any" and "any snake" or ("a " .. a[1] .. " snake")) end,
 	lone = function(a) return ("+%d attack with no neighbours"):format(a[1]) end,
@@ -98,16 +99,23 @@ function abilities.attack(card, slot)
 			total = total + b
 		end
 	end
+	local ahead = played_cards[slot > 4 and slot - 4 or slot + 4]
+	if ahead and ahead.brew == "smoke" then -- the enemy snake opposite drank a Smoke Draught: its smoke covers this lane
+		total = total - 2
+	end
 	return math.max(total + require("Powers").attack_bonus(card, slot), 0)
 end
 
 -- Damage that gets through armor, guards, shields and the Shadow border's free dodge
 function abilities.mitigate(defender, slot, damage)
-	if require("CardData").get_stats(defender).border == "Shadow" and not defender.phased then
+	if (require("CardData").border_of(defender) == "Shadow" or defender.brew == "phase") and not defender.phased then
 		defender.phased = true
 		return 0
 	end
 	damage = require("Powers").reduce(defender, slot, damage)
+	if defender.brew == "stone" then
+		damage = math.max(damage - 2, 1)
+	end
 	for _, ab in ipairs(abilities.of(defender)) do
 		if ab.kind == "armor" then
 			damage = math.max(damage - ab.args[1], 1)
@@ -147,6 +155,15 @@ end
 function abilities.ready(card, side)
 	local ab = abilities.active(card)
 	if not ab or card.used or venom[side] < ab.args[2] then
+		return false
+	end
+	if ab.kind == "refresh" then -- only worth using once another snake of yours has spent its ability
+		for slot = side == "Player" and 5 or 1, side == "Player" and 8 or 4 do
+			local other = played_cards[slot]
+			if other and other ~= card and other.used then
+				return true
+			end
+		end
 		return false
 	end
 	local defense = require("CardData").get_stats(card).defense

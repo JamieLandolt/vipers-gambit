@@ -6,10 +6,17 @@ local play = require("Play")
 local collection = require("Collection")
 local tutorial = require("Tutorial")
 local title = require("Title")
+local hub = require("Hub")
+local challenges = require("Challenges")
 local settings = require("Settings")
 
 local font = assets.font
 local button_width, button_height = 200, 60
+
+-- The collection screen's toolbar buttons use the smaller font
+local function small(text, func, params, x, y, w, h)
+	return button(text, func, params, x, y, w, h, assets.small_font, debugger)
+end
 
 -- Shared defaults: font and debugger
 local function b(text, func, params, x, y, w, h, ...)
@@ -20,7 +27,6 @@ end
 return function()
 	local w, h = lg.getWidth(), lg.getHeight()
 	local back_width = button_width * 5 / 8
-	local bg_width, bg_height = resize(240, 1), resize(425, 2)
 
 	local hand = {
 		x = reference_window_width / 6 + 5,
@@ -33,20 +39,20 @@ return function()
 	local info_height = reference_window_height * 5 / 6
 	info_background_y = reference_window_height / 12
 
-	local menu = {
-		{ "Play Game", "level_select", -150 },
-		{ "Collection", "collection", -50 },
-		{ "Charmers", "character_select", 50 },
-		{ "Settings", "settings", 150 },
-	}
-	for _, m in ipairs(menu) do
-		buttons.menu[m[1]] =
-			b(m[1], update_animation_screen, m[2], w / 2 - button_width / 2, h / 2 + m[3] + title.MENU_DROP, button_width, button_height)
-	end
-	buttons.menu["Button Background"] =
-		b("", nil, nil, w / 2 - bg_width / 2, h / 2 - bg_height / 2 + resize(30, 2) + title.MENU_DROP, bg_width, bg_height)
+	-- The main menu is the Hub (icons around a temple); only its Deck & Lanes popup uses buttons
+	buttons.hub_popup["Deck"] = b("Deck", function()
+		hub.popup = false
+		collection.deck_mode = true
+		collection.start_deck_edit()
+		update_animation_screen("collection")
+	end, nil, w / 2 - button_width - 20, h / 2 - 40, button_width, button_height)
+	buttons.hub_popup["Lanes"] = b("Lanes", function()
+		hub.popup = false
+		update_animation_screen("lanes")
+	end, nil, w / 2 + 20, h / 2 - 40, button_width, button_height)
+	buttons.hub_popup["Cancel"] = b("Cancel", function() hub.popup = false end, nil, w / 2 - button_width / 2, h / 2 + 50, button_width, button_height)
 
-	buttons.collection["Collection Header"] = b("Collection", nil, nil, w / 2 - button_width / 2, 5, button_width, button_height)
+	buttons.collection["Collection Header"] = b("Collection", nil, nil, w / 2 - 170, 5, 340, button_height)
 	buttons.universal["Back"] = b("Back", update_animation_screen, "menu", 5, 5, back_width, button_height)
 
 	for _, item in ipairs(settings.items) do
@@ -59,32 +65,98 @@ return function()
 	buttons.reset_confirm["Yes"] = b("Yes", settings.reset_progress, nil, w / 2 - button_width - 20, h / 2, button_width, button_height)
 	buttons.reset_confirm["No"] = b("No", function() settings.confirm_reset = false end, nil, w / 2 + 20, h / 2, button_width, button_height)
 
-	buttons.collection["Open Pack"] = b("Open Pack", function()
-		if collection.pack_ready() then
-			pack_cards = collection.open_pack()
+	buttons.collection["Open Pack"] = b("Packs", function()
+		shop_return = "collection"
+		update_animation_screen("shop")
+	end, nil, w - 140, 5, 135, button_height)
+	buttons.collection["Sacrifice"] = small("Imbue", function()
+		if collection.deck_mode then -- in deck editing this button is Auto-fill
+			collection.auto_deck()
+			return
+		end
+		if not collection.sacrifice_unlocked() then
+			collection.message, collection.message_t = "Beat the second opponent to unlock Imbue", time
+			return
+		end
+		collection.sacrifice_mode = not collection.sacrifice_mode
+		collection.sacrificing = {}
+		collection.deck_mode = false
+	end, nil, 215, 70, 190, 44)
+	buttons.sac_tutorial["Next"] = b("Next", function() sac_tutorial = sac_tutorial < 3 and sac_tutorial + 1 or nil end, nil, w / 2 - button_width / 2, h / 2 + 150, button_width, button_height)
+	buttons.collection["Summon"] = b("Summon", function()
+		if collection.can_summon() then
+			pack_cards = collection.summon()
+			buttons.pack["Done"].func_params = "collection"
 			update_animation_screen("pack")
 		end
-	end, nil, w - button_width * 1.4 - 5, 5, button_width * 1.4, button_height)
-	buttons.collection["Sort"] = b("Sort: " .. collection.sort_name(), function()
+	end, nil, 20, 790, button_width, button_height)
+	-- The altar: back to the main screen, and offer the chosen recipe's snakes
+	buttons.altar["Offer"] = b("Offer", function()
+		local _, by_target = collection.recipes()
+		local recipe = by_target[collection.altar_target or ""]
+		local names = recipe and collection.sacrifice_recipe(recipe)
+		if names then
+			pack_cards = names
+			buttons.pack["Done"].func_params = "altar"
+			update_animation_screen("pack")
+		else
+			collection.message, collection.message_t = "You don't have everything the Snake God asks for", time
+		end
+	end, nil, 880, 790, 360, button_height)
+	buttons.shop["Back"] = b("Back", function() update_animation_screen(shop_return) end, nil, 5, 5, back_width, button_height)
+	for i = 1, #collection.PACKS do
+		buttons.shop["Pack " .. i] = b("Open", function()
+			local names, message = collection.open_pack(i)
+			if names then
+				pack_cards = names
+				buttons.pack["Done"].func_params = "shop"
+				update_animation_screen("pack")
+			else
+				collection.message, collection.message_t = message, time
+			end
+		end, nil, 110 + (i - 1) * 420 + 65, 650, 250, button_height)
+	end
+	-- Buy the same pack again from the pack screen (replays the opening)
+	buttons.pack["Again"] = b("Open Another", function()
+		local pack = collection.PACKS[collection.pack_kind]
+		if not pack or not collection.pack_revealed then
+			return -- only after a bought pack has been fully shown
+		end
+		local names, message = collection.open_pack(collection.pack_kind)
+		if names then
+			pack_cards = names
+		else
+			collection.message, collection.message_t = message, time
+		end
+	end, nil, w / 2 - button_width, 800, button_width * 2, button_height)
+	buttons.collection["Sort"] = small("Sort: " .. collection.sort_name(), function()
 		collection.next_sort()
 		buttons.collection["Sort"]:update_text("Sort: " .. collection.sort_name())
-	end, nil, 850, 5, button_width * 1.3, button_height)
-	buttons.collection["Edit Deck"] = b("Edit Deck", function()
+	end, nil, w - 220, 70, 200, 44)
+	buttons.collection["Edit Deck"] = small("Edit Deck", function()
 		collection.deck_mode = not collection.deck_mode
+		collection.sacrifice_mode, collection.sacrificing = false, {}
 		if collection.deck_mode then
 			collection.start_deck_edit()
 		end
-	end, nil, 150, 5, button_width * 1.2, button_height)
-	buttons.pack["Done"] = b("Done", update_animation_screen, "collection", 5, 5, back_width, button_height)
+	end, nil, 15, 70, 190, 44)
+	buttons.pack["Done"] = b("Done", update_animation_screen, "shop", 5, 5, back_width, button_height)
 
-	-- Set up a match before picking an opponent
-	buttons.level_select["Deck"] = b("Deck", function()
-		collection.deck_mode = true
-		collection.start_deck_edit()
-		update_animation_screen("collection")
-	end, nil, w - button_width - 10, 5, button_width, button_height)
-	buttons.level_select["Lanes"] = b("Lanes", update_animation_screen, "lanes", w - button_width - 10, 80, button_width, button_height)
-	buttons.lanes["Back"] = b("Back", update_animation_screen, "level_select", 5, 5, back_width, button_height)
+	-- Beaten levels ask first: the plain match or that level's challenge
+	buttons.level_choice["Play"] = b("Play", function()
+		local level = level_choice
+		level_choice = nil
+		play.begin(level)
+	end, nil, w / 2 - button_width * 1.5 - 20, h - 100, button_width, button_height)
+	buttons.level_choice["Challenge"] = b("Challenge", function()
+		local level = level_choice
+		if play.challenge_open(level) then
+			level_choice = nil
+			play.begin(level, challenges[level])
+		end
+	end, nil, w / 2 - button_width / 2, h - 100, button_width, button_height)
+	buttons.level_choice["Cancel"] = b("Cancel", function() level_choice = nil end, nil, w / 2 + button_width / 2 + 20, h - 100, button_width, button_height)
+	buttons.lanes["Back"] = b("Back", update_animation_screen, "menu", 5, 5, back_width, button_height)
 	buttons.lanes["Reset"] = b("Reset", function() play.reset_lanes() end, nil, w / 2 - button_width / 2, h - 110, button_width, button_height)
 
 	buttons.level_select["Select Opponent"] = b("Select Opponent", nil, nil, 5, 5, back_width, button_height)
@@ -126,7 +198,7 @@ return function()
 		update_animation_screen(info_return)
 	end, nil, 5, 5, back_width, button_height)
 	buttons.info["Info Background"] = b(
-		"Card Stats:",
+		"",
 		function() end,
 		nil,
 		reference_window_width * 0.7 / 6 + 5,

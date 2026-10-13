@@ -1,28 +1,69 @@
 local love = require("love")
 local data = require("CardData")
 
-local collection = { unlock_all = false, pack_size = 3 }
+local collection = { unlock_all = false, pack_size = 3, eyes = 0, pack_new = {}, sacrifice_mode = false, sacrificing = {} }
+
+-- Three packs. Serpent (snakes) and Support (brews and spells) share one free pick a day; Elite holds only 3 to 5 star snakes.
+-- The chance of each rarity (1 to 5, out of 100) and of a bordered snake slide from `early` (no opponent beaten) to `late`
+-- (all beaten); see collection.odds.
+collection.PACKS = {
+	{ name = "Serpent Pack", kind = "snake", cost = 40, daily = true, colour = { 0.3, 0.75, 0.35 },
+		early = { 70, 25, 5, 0, 0 }, late = { 30, 35, 25, 9, 1 }, border = { 0.06, 0.3 } },
+	{ name = "Support Pack", kind = "support", cost = 30, daily = true, colour = { 0.5, 0.6, 1 },
+		early = { 65, 30, 5, 0, 0 }, late = { 30, 40, 22, 8, 0 }, border = { 0, 0 } },
+	{ name = "Elite Pack", kind = "snake", cost = 250, floor = 3, colour = { 1, 0.8, 0.2 },
+		early = { 0, 0, 80, 19, 1 }, late = { 0, 0, 40, 45, 15 }, border = { 0.25, 0.6 } },
+}
+collection.SACRIFICE = 3 -- same-tier snakes given up for one snake of the next tier
+collection.pack_kind = 0 -- the pack just opened (an index in PACKS), or 0 for a summon
 
 -- Snakes you can never pull from a pack (only the unlock-all override shows them)
 local UNOBTAINABLE = { "Cobra", "King_Cobra", "Albino_Cobra", "Blood_Cobra", "Frost_Cobra", "Golden_Snake" }
 -- Only T1 snakes, covering every lane type; the other T1s and everything else come from packs
-local STARTERS = { "Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
+local STARTERS = { "Sand_Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
 
 collection.MIN_DECK, collection.MAX_DECK = 8, 20
 collection.deck_mode = false -- the collection screen is editing the deck
 
 local owned, last_pack = {}, "-"
+local recipe_open = {} -- targets of the sacrifice recipes discovered so far
+-- variants[name][border] = how many of your copies of a snake carry a border other than its own (they are counted in owned[name] too)
+local variants = {}
+local BORDERS = { "Venom", "Fire", "Frost", "Shadow", "Gold", "Rainbow" }
+local BORDERS_SET = {}
+for _, border in ipairs(BORDERS) do
+	BORDERS_SET[border] = true
+end
 local deck_set -- names in the player's chosen deck; nil until they first edit it (then every owned snake is the deck)
+
+-- How far through the campaign you are: 0 with nothing beaten, 1 with every opponent beaten
+local function progress()
+	return math.min(math.max((unlocked - 1) / (#require("Opponents") - 1), 0), 1)
+end
+
+-- The pack's current rarity weights (percent, rarity 1 to 5) and chance of a bordered snake
+function collection.odds(pack)
+	local p, weights = progress(), {}
+	for r = 1, 5 do
+		weights[r] = math.floor(pack.early[r] + (pack.late[r] - pack.early[r]) * p + 0.5)
+	end
+	return weights, pack.border[1] + (pack.border[2] - pack.border[1]) * p
+end
 
 local function today()
 	return os.date("%Y-%m-%d")
 end
 
--- save.txt lines: highest level, unlock-all flag, date of the last pack, then owned snakes
+-- save.txt lines: highest level, unlock-all flag, date of the last pack, snake eyes, then "name count" per owned snake
 function collection.save()
-	local lines = { tostring(unlocked), collection.unlock_all and "1" or "0", last_pack }
-	for name in pairs(owned) do
-		table.insert(lines, name)
+	local lines = { tostring(unlocked), collection.unlock_all and "1" or "0", last_pack, tostring(collection.eyes) }
+	for name, count in pairs(owned) do
+		table.insert(lines, name .. " " .. count)
+	end
+	for name, kinds in pairs(variants) do
+		for border, count in pairs(kinds) do
+			table.insert(lines, name .. "@" .. border .. " " .. count) -- (variant copies are also counted in the snake's total above)
+		end
 	end
 	love.filesystem.write("save.txt", table.concat(lines, "\n"))
 end
@@ -35,13 +76,41 @@ function collection.load()
 	unlocked = tonumber(lines[1]) or 1
 	collection.unlock_all = lines[2] == "1"
 	last_pack = lines[3] or "-"
-	owned = {}
+	owned, variants = {}, {}
+	local first = 5
+	collection.eyes = tonumber(lines[4]) or 0
+	if not tonumber(lines[4]) then
+		first = 4 -- older saves list one snake per line and have no snake eyes
+	end
+	for i = first, #lines do
+		local name, count = lines[i]:match("^(%S+) ?(%d*)$")
+		local base, border = (name or ""):match("^(.-)@(.+)$")
+		if base then
+			if data.stats_by_name[base] and BORDERS_SET[border] then
+				variants[base] = variants[base] or {}
+				variants[base][border] = tonumber(count) or 1
+			end
+		elseif name and data.stats_by_name[name] then -- (names of removed snakes are dropped)
+			owned[name] = tonumber(count) or 1
+		end
+	end
 	for _, name in ipairs(STARTERS) do
-		owned[name] = true
+		owned[name] = owned[name] or 1
 	end
-	for i = 4, #lines do
-		owned[lines[i]] = data.stats_by_name[lines[i]] and true or nil -- (names of removed snakes are dropped)
+	for name, kinds in pairs(variants) do -- a variant copy must be one of the copies owned
+		local room = owned[name] or 0
+		for border, count in pairs(kinds) do
+			kinds[border] = math.min(count, room)
+			room = room - kinds[border]
+		end
 	end
+
+	-- recipes.txt: the sacrifice recipes you have discovered, one snake name per line
+	recipe_open = {}
+	for name in (love.filesystem.read("recipes.txt") or ""):gmatch("[^\n]+") do
+		recipe_open[name] = true
+	end
+	collection.update_recipes()
 
 	-- deck.txt: one snake name per line
 	local saved = love.filesystem.read("deck.txt")
@@ -49,31 +118,83 @@ function collection.load()
 	if saved then
 		deck_set = {}
 		for name in saved:gmatch("[^\n]+") do
-			deck_set[name] = data.stats_by_name[name] and true or nil
+			local base, count = name:match("^(%S+) ?(%d*)$")
+			deck_set[base] = data.stats_by_name[base] and (tonumber(count) or 1) or nil
 		end
 	end
 end
 
 local function save_deck()
 	local names = {}
-	for name in pairs(deck_set) do
-		table.insert(names, name)
+	for name, count in pairs(deck_set) do
+		table.insert(names, name .. " " .. count)
 	end
 	love.filesystem.write("deck.txt", table.concat(names, "\n"))
 end
 
 -- Wipes progress back to a new game (settings are kept)
 function collection.reset()
-	unlocked, collection.unlock_all, last_pack, owned, deck_set = 1, false, "-", {}, nil
+	unlocked, collection.unlock_all, last_pack, owned, variants, deck_set, collection.eyes = 1, false, "-", {}, {}, nil, 0
 	love.filesystem.remove("deck.txt")
+	love.filesystem.remove("finale.txt")
+	love.filesystem.remove("hints.txt")
+	love.filesystem.remove("recipes.txt")
+	recipe_open = {}
+	love.filesystem.remove("challenges.txt")
+	collection.seen, collection.beaten = nil, nil
 	for _, name in ipairs(STARTERS) do
-		owned[name] = true
+		owned[name] = 1
 	end
 	collection.save()
 end
 
+-- How many copies of a snake you own (unlock-all shows one of every snake)
+function collection.count(name)
+	return owned[name] or (collection.unlock_all and 1 or 0)
+end
+
 function collection.has(name)
-	return collection.unlock_all or owned[name] == true
+	return collection.count(name) > 0
+end
+
+-- Copies of a snake that carry a border other than its natural one, and how many that is in all
+local function variant_total(name)
+	local n = 0
+	for _, count in pairs(variants[name] or {}) do
+		n = n + count
+	end
+	return n
+end
+
+-- The borders you own copies of for a snake, as { border, count } (its own border first); with unlock-all you "own" one natural copy
+function collection.variant_list(name)
+	local list = {}
+	local natural = data.stats_by_name[name].border
+	if collection.count(name) - variant_total(name) > 0 then
+		table.insert(list, { natural, collection.count(name) - variant_total(name) })
+	end
+	for _, border in ipairs(BORDERS) do
+		local count = (variants[name] or {})[border]
+		if count and count > 0 then
+			table.insert(list, { border, count })
+		end
+	end
+	return list
+end
+
+-- One border per copy for k copies of a snake in a deck or hand: variant copies first, then false for natural ones
+local function copy_borders(name, k)
+	local pool = {}
+	for _, border in ipairs(BORDERS) do
+		for _ = 1, (variants[name] or {})[border] or 0 do
+			table.insert(pool, border)
+		end
+	end
+	local list = {}
+	for i = 1, k do
+		list[i] = pool[i] or false
+	end
+	return list
 end
 
 function collection.toggle_unlock_all()
@@ -86,19 +207,30 @@ local function stat(name, field)
 	return stats and stats[field] or 0
 end
 
--- Owned snakes that are in the chosen deck
+-- The chosen deck as a list of names, one entry per copy
 local function chosen()
-	local list = {}
+	local list, list_borders = {}, {}
 	for _, name in ipairs(data.deck) do
-		if deck_set[name] and collection.has(name) then
+		local k = math.min(deck_set[name] or 0, collection.count(name))
+		for i, border in ipairs(copy_borders(name, k)) do
 			table.insert(list, name)
+			table.insert(list_borders, border)
 		end
 	end
-	return list
+	return list, list_borders
 end
 
+collection.chosen = chosen
+
+-- Rebuilds the deck from the strongest snakes you own
+function collection.auto_deck()
+	deck_set = nil
+	collection.start_deck_edit()
+end
+
+-- Copies of a snake in the deck (before a deck is chosen, every copy you own is in it)
 function collection.in_deck(name)
-	return collection.has(name) and (deck_set == nil or deck_set[name] == true)
+	return deck_set == nil and collection.count(name) or math.min(deck_set[name] or 0, collection.count(name))
 end
 
 function collection.deck_count()
@@ -120,45 +252,53 @@ function collection.start_deck_edit()
 		return stat(a, "rarity") > stat(b, "rarity") or (stat(a, "rarity") == stat(b, "rarity") and a < b)
 	end)
 	deck_set = {}
-	for i = 1, math.min(#names, collection.MAX_DECK) do
-		deck_set[names[i]] = true
+	local size = 0
+	for _, name in ipairs(names) do
+		for _ = 1, collection.count(name) do
+			if size < collection.MAX_DECK then
+				deck_set[name] = (deck_set[name] or 0) + 1
+				size = size + 1
+			end
+		end
 	end
 	save_deck()
 end
 
--- Adds or removes a snake; returns a message when the change isn't allowed
+-- A click adds a copy, or removes them all once every copy you own is in; returns a message when it isn't allowed
 function collection.toggle_deck(name)
-	if deck_set[name] and collection.has(name) then
-		if collection.deck_count() <= collection.MIN_DECK then
+	local copies, size = collection.in_deck(name), collection.deck_count()
+	if copies < collection.count(name) then
+		if size >= collection.MAX_DECK then
+			return "Your deck is full (" .. collection.MAX_DECK .. " snakes)"
+		end
+		deck_set[name] = copies + 1
+	else
+		if size - copies < collection.MIN_DECK then
 			return "A deck needs at least " .. collection.MIN_DECK .. " snakes"
 		end
 		deck_set[name] = nil
-	else
-		if collection.deck_count() >= collection.MAX_DECK then
-			return "Your deck is full (" .. collection.MAX_DECK .. " snakes)"
-		end
-		deck_set[name] = true
 	end
 	save_deck()
 end
 
--- The snakes the player draws their hand from: the chosen deck, or every owned snake before one is chosen
+-- The snakes the player draws their hand from (one entry per copy): the chosen deck, or everything owned before one is chosen.
+-- The second result lists each copy's border (false for a snake's own).
 function collection.deck()
 	if deck_set then
-		local list = chosen()
+		local list, list_borders = chosen()
 		if #list >= collection.MIN_DECK then
-			return list
+			return list, list_borders
 		end
 	end
-	local deck = {}
+	local deck, deck_borders = {}, {}
 	for _, name in ipairs(data.deck) do
-		if collection.has(name) then
+		for _, border in ipairs(copy_borders(name, collection.count(name))) do
 			table.insert(deck, name)
+			table.insert(deck_borders, border)
 		end
 	end
-	return deck
+	return deck, deck_borders
 end
-
 
 local SORTS = {
 	{ "Name", function(name) return name end },
@@ -197,33 +337,351 @@ function collection.order(names)
 	return order
 end
 
+-- Collection filters: each icon on the collection screen switches one kind of card on or off
+collection.FILTER_GROUPS = {
+	{ id = "kind", keys = { "snake", "brew", "spell" } },
+	{ id = "type", keys = { "Land", "Water", "Tree", "Spirit", "Rainbow" } },
+	{ id = "tier", keys = { 1, 2, 3, 4, 5 } },
+	{ id = "own", keys = { "owned", "missing" } },
+}
+local filter_off = {} -- ["kind:brew"] = true while switched off
+
+function collection.filter_on(group, key)
+	return not filter_off[group .. ":" .. key]
+end
+
+function collection.toggle_filter(group, key)
+	local id = group .. ":" .. key
+	filter_off[id] = not filter_off[id] or nil
+end
+
+function collection.filtering()
+	return next(filter_off) ~= nil
+end
+
+function collection.clear_filters()
+	filter_off = {}
+end
+
+-- Is the card shown with the current filters? (the lane type filter only applies to snakes)
+function collection.shown(name)
+	local kind = stat(name, "kind")
+	if not collection.filter_on("kind", kind) or not collection.filter_on("tier", stat(name, "rarity")) then
+		return false
+	end
+	if kind == "snake" and not collection.filter_on("type", data.card_types[name]) then
+		return false
+	end
+	return collection.filter_on("own", collection.has(name) and "owned" or "missing")
+end
+
+function collection.owned_count()
+	local n = 0
+	for _, name in ipairs(data.deck) do
+		n = n + (collection.has(name) and 1 or 0)
+	end
+	return n
+end
+
+-- Challenges you have beaten (challenges.txt: one level number per line); each reveals the next
+function collection.challenge_done(level)
+	if not collection.beaten then
+		collection.beaten = {}
+		for line in (love.filesystem.read("challenges.txt") or ""):gmatch("%d+") do
+			collection.beaten[tonumber(line)] = true
+		end
+	end
+	return collection.beaten[level] == true
+end
+
+function collection.mark_challenge(level)
+	collection.challenge_done(level)
+	collection.beaten[level] = true
+	local lines = {}
+	for l in pairs(collection.beaten) do
+		table.insert(lines, l)
+	end
+	love.filesystem.write("challenges.txt", table.concat(lines, "\n"))
+end
+
+-- Sacrifice opens up once you have beaten the second opponent
+function collection.sacrifice_unlocked()
+	return collection.unlock_all or unlocked >= 3
+end
+
+-- One-time tips: hints.txt lists the ones already shown
+function collection.hint_seen(key)
+	if not collection.seen then
+		collection.seen = {}
+		for line in (love.filesystem.read("hints.txt") or ""):gmatch("[^\n]+") do
+			collection.seen[line] = true
+		end
+	end
+	return collection.seen[key]
+end
+
+function collection.mark_hint(key)
+	collection.hint_seen(key)
+	collection.seen[key] = true
+	local keys = {}
+	for k in pairs(collection.seen) do
+		table.insert(keys, k)
+	end
+	love.filesystem.write("hints.txt", table.concat(keys, "\n"))
+end
+
 function collection.pack_ready()
 	return last_pack ~= today()
 end
 
--- One pack per day: pack_size new snakes you don't own yet. Returns their names (empty if none are left).
-function collection.open_pack()
-	local pool = {}
+-- Snake eyes the pack costs right now: the first Serpent or Support pack each day is free
+function collection.price(index)
+	local pack = collection.PACKS[index]
+	return pack.daily and collection.pack_ready() and 0 or pack.cost
+end
+
+local function add_copy(name, border)
+	owned[name] = (owned[name] or 0) + 1
+	collection.update_recipes()
+	if border and border ~= data.stats_by_name[name].border then
+		variants[name] = variants[name] or {}
+		variants[name][border] = (variants[name][border] or 0) + 1
+	end
+	if deck_set and collection.deck_count() < collection.MAX_DECK then
+		deck_set[name] = (deck_set[name] or 0) + 1 -- new copies join the deck while it has room
+	end
+end
+
+-- Cards that can be pulled or summoned, by rarity: snakes, or (kind "support") brews and spells
+local function obtainable(kind)
+	local pool = { {}, {}, {}, {}, {} }
 	for _, name in ipairs(data.deck) do
-		if not owned[name] and not contains(UNOBTAINABLE, name) then
-			table.insert(pool, name)
+		if not contains(UNOBTAINABLE, name) and (stat(name, "kind") == "snake") == (kind == "snake") then
+			table.insert(pool[stat(name, "rarity")], name)
 		end
 	end
-	local pulled = {}
-	while #pulled < collection.pack_size and #pool > 0 do
-		local name = table.remove(pool, math.random(#pool))
-		owned[name] = true
+	return pool
+end
+
+-- A random snake of the rarity, or the nearest lower one that has any
+-- A random border for a snake that is not the one it already has
+local function random_border(name)
+	local choices = {}
+	for _, border in ipairs(BORDERS) do
+		if border ~= data.stats_by_name[name].border then
+			table.insert(choices, border)
+		end
+	end
+	return choices[math.random(#choices)]
+end
+
+local function random_of(pool, rarity, floor)
+	while #pool[rarity] == 0 and rarity > (floor or 1) do
+		rarity = rarity - 1
+	end
+	return pool[rarity][math.random(#pool[rarity])]
+end
+
+-- Opens pack number index (duplicates are fine) and returns the snakes pulled, or nil and the reason it can't be opened.
+function collection.open_pack(index)
+	local pack = collection.PACKS[index]
+	local price = collection.price(index)
+	if collection.eyes < price then
+		return nil, "Not enough snake eyes"
+	end
+	local weights, border_chance = collection.odds(pack)
+	local pool, pulled = obtainable(pack.kind), {}
+	collection.pack_new, collection.pack_borders = {}, {}
+	for _ = 1, collection.pack_size do
+		local roll, rarity = math.random() * 100, pack.floor or 1
+		for r, weight in ipairs(weights) do
+			if roll < weight then
+				rarity = r
+				break
+			end
+			roll = roll - weight
+		end
+		local name = random_of(pool, rarity, pack.floor)
+		collection.pack_new[name] = collection.pack_new[name] or not collection.has(name) or nil
+		local border = math.random() < border_chance and stat(name, "kind") == "snake" and random_border(name) or nil
+		add_copy(name, border)
 		table.insert(pulled, name)
-		if deck_set and collection.deck_count() < collection.MAX_DECK then
-			deck_set[name] = true -- new snakes join the deck while it has room
-		end
+		table.insert(collection.pack_borders, border or data.stats_by_name[name].border)
 	end
+	collection.eyes = collection.eyes - price
+	if pack.daily and price == 0 then
+		last_pack = today()
+	end
+	collection.pack_kind = index
 	if deck_set then
 		save_deck()
 	end
-	last_pack = today()
 	collection.save()
 	return pulled
+end
+
+-- Snake eyes for finishing a match
+function collection.payout(won, level, mult)
+	return won and math.floor((20 + 10 * level) * (mult or 1)) or 5
+end
+
+function collection.reward(won, level, mult)
+	local eyes = collection.payout(won, level, mult)
+	collection.eyes = collection.eyes + eyes
+	collection.save()
+	return eyes
+end
+
+-- Sacrifice: pick SACRIFICE snakes of one tier (clicking again takes one back), then summon a snake a tier higher
+local function selected(name)
+	local n = 0
+	for _, picked in ipairs(collection.sacrificing) do
+		n = n + (picked == name and 1 or 0)
+	end
+	return n
+end
+collection.selected = selected
+
+function collection.pick_sacrifice(name)
+	local list = collection.sacrificing
+	local spare = (owned[name] or 0) - (contains(STARTERS, name) and 1 or 0) - selected(name)
+	if selected(name) > 0 and spare <= 0 then
+		for i, picked in ipairs(list) do
+			if picked == name then
+				table.remove(list, i)
+				return
+			end
+		end
+	end
+	if stat(name, "kind") ~= "snake" then
+		return "Only snakes can be imbued"
+	elseif stat(name, "rarity") >= 5 then
+		return "Mythic snakes can't be imbued"
+	elseif #list >= collection.SACRIFICE then
+		return "Already " .. collection.SACRIFICE .. " chosen: press Imbue"
+	elseif #list > 0 and list[1] ~= name then
+		return "Imbue needs " .. collection.SACRIFICE .. " copies of the same snake"
+	elseif spare <= 0 then
+		return "You need a spare copy to imbue with this one"
+	end
+	table.insert(list, name)
+end
+
+function collection.can_summon()
+	return #collection.sacrificing == collection.SACRIFICE
+end
+
+-- Three copies of the same snake are imbued instead: they become one copy with a guaranteed random new border
+function collection.is_imbue()
+	local list = collection.sacrificing
+	return #list == collection.SACRIFICE and list[1] == list[2] and list[2] == list[3] and stat(list[1], "kind") == "snake"
+end
+
+-- Gives up a copy of a snake (a plain one first, then a variant)
+local function remove_copy(name)
+	local had_plain = owned[name] - variant_total(name) > 0
+	owned[name] = owned[name] - 1
+	if not had_plain then
+		for _, border in ipairs(BORDERS) do
+			local kinds = variants[name]
+			if kinds and (kinds[border] or 0) > 0 then
+				kinds[border] = kinds[border] - 1
+				break
+			end
+		end
+	end
+	if owned[name] == 0 then
+		owned[name], variants[name] = nil, nil
+	end
+end
+
+-- Imbue: gives up three copies of one snake for one copy of it with a random new border; returns its name
+function collection.summon()
+	local list = collection.sacrificing
+	local result = list[1]
+	local border = random_border(result)
+	for _, name in ipairs(list) do
+		remove_copy(name)
+		if deck_set and (deck_set[name] or 0) > (owned[name] or 0) then
+			deck_set[name] = owned[name]
+		end
+	end
+	collection.pack_new = {}
+	collection.pack_borders = { border }
+	add_copy(result, border)
+	collection.sacrificing, collection.pack_kind = {}, 0
+	if deck_set then
+		save_deck()
+	end
+	collection.save()
+	return { result }
+end
+
+-- The Snake God's recipes: specific snakes in, one specific snake out. A recipe is discovered once you own everything it asks for.
+local recipes, recipe_for
+function collection.recipes()
+	if not recipes then
+		local exclude = {}
+		for _, name in ipairs(STARTERS) do
+			table.insert(exclude, name)
+		end
+		for _, name in ipairs(UNOBTAINABLE) do
+			table.insert(exclude, name)
+		end
+		recipes, recipe_for = require("Recipes")(data, exclude)
+	end
+	return recipes, recipe_for
+end
+
+function collection.can_sacrifice(recipe)
+	for _, name in ipairs(recipe.give) do
+		if (owned[name] or 0) < 1 then
+			return false
+		end
+	end
+	return true
+end
+
+function collection.recipe_known(recipe)
+	return collection.unlock_all or recipe_open[recipe.get] == true
+end
+
+function collection.update_recipes()
+	local changed = false
+	for _, recipe in ipairs(collection.recipes()) do
+		if not recipe_open[recipe.get] and collection.can_sacrifice(recipe) then
+			recipe_open[recipe.get], changed = true, true
+		end
+	end
+	if changed then
+		local lines = {}
+		for name in pairs(recipe_open) do
+			table.insert(lines, name)
+		end
+		love.filesystem.write("recipes.txt", table.concat(lines, "\n"))
+	end
+end
+
+-- Performs a recipe: gives up its snakes for its reward; returns { reward } or nil if you no longer own what it asks for
+function collection.sacrifice_recipe(recipe)
+	if not collection.can_sacrifice(recipe) then
+		return nil
+	end
+	for _, name in ipairs(recipe.give) do
+		remove_copy(name)
+		if deck_set and (deck_set[name] or 0) > (owned[name] or 0) then
+			deck_set[name] = owned[name]
+		end
+	end
+	collection.pack_new = { [recipe.get] = not collection.has(recipe.get) or nil }
+	collection.pack_borders = { data.stats_by_name[recipe.get].border }
+	add_copy(recipe.get)
+	collection.pack_kind = 0
+	if deck_set then
+		save_deck()
+	end
+	collection.save()
+	return { recipe.get }
 end
 
 return collection

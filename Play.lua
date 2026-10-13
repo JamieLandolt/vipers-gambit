@@ -3,6 +3,7 @@ local lg = love.graphics
 local card = require("Card")
 local data = require("CardData")
 local opponents = require("Opponents")
+local challenges = require("Challenges")
 local collection = require("Collection")
 local effects = require("Effects")
 local abilities = require("Abilities")
@@ -109,12 +110,13 @@ end
 
 local profile = opponents[1]
 
-local function fill_hand(hand, deck, size)
+-- Draws random cards from `deck` (names) into the hand; deck_borders[i] is that copy's border if it is a variant
+local function fill_hand(hand, deck, size, deck_borders)
 	local chosen = {}
 	while #hand < (size or HAND_SIZE) do
 		local index = math.random(1, #deck)
 		if not contains(chosen, index) then
-			table.insert(hand, card(deck[index] .. ".png", img_widths, img_heights))
+			table.insert(hand, card(deck[index] .. ".png", img_widths, img_heights, deck_borders and deck_borders[index] or nil))
 			table.insert(chosen, index)
 		end
 	end
@@ -151,6 +153,7 @@ function play.check_end()
 		if hp <= 0 then
 			winner = side == "Player" and "Opponent" or "Player"
 			level_unlocked = nil -- set when this win opens the next level
+			local replayed_tutorial = play.level == 0 and tutorial.done -- the tutorial only pays the first time
 			if winner == "Player" and play.level == 0 then
 				tutorial.finish()
 			end
@@ -158,6 +161,13 @@ function play.check_end()
 				unlocked, level_unlocked = unlocked + 1, unlocked + 1
 				collection.save()
 			end
+			if winner == "Player" and play.level == #opponents then
+				love.filesystem.write("finale.txt", "1") -- the last level has no \"next level\" to show it was beaten
+			end
+			if winner == "Player" and play.challenge then
+				collection.mark_challenge(play.level)
+			end
+			collection.last_reward = replayed_tutorial and 0 or collection.reward(winner == "Player", play.level, play.challenge and play.challenge.mult)
 			update_game_state("ended")
 			return true
 		end
@@ -173,7 +183,12 @@ function play.start_turn()
 	if play.level == 0 and turn == "Player" then
 		fill_hand(player_hand, tutorial.player_deck, #tutorial.player_deck) -- the tutorial hand is fixed and small
 	else
-		fill_hand(hand_of(turn), turn == "Player" and collection.deck() or profile.deck)
+		if turn == "Player" then
+			local deck, deck_borders = collection.deck()
+			fill_hand(player_hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
+		else
+			fill_hand(opponent_hand, profile.deck)
+		end
 	end
 
 	for slot = turn == "Player" and 5 or 1, turn == "Player" and 8 or 4 do
@@ -181,7 +196,8 @@ function play.start_turn()
 		if c then
 			c.used = nil
 			powers.trigger("turn", c, slot)
-			local border = data.get_stats(c).border
+			require("Brews").turn(play, c, slot)
+			local border = data.border_of(c)
 			if border == "Gold" then
 				venom[turn] = math.min(venom[turn] + 1, MAX_VENOM)
 				float(slot, "+1 venom")
@@ -201,18 +217,46 @@ function play.start_turn()
 	end
 end
 
-function play.new_game(level)
-	play.level = level
+-- A challenge needs its level beaten for real (unlock-all doesn't count)
+function play.can_challenge(level)
+	return level > 0 and (level < unlocked or (level == #opponents and love.filesystem.getInfo("finale.txt") ~= nil))
+end
+
+-- A level's challenge needs the level beaten and the previous level's challenge cleared
+function play.challenge_open(level)
+	return play.can_challenge(level) and (level == 1 or collection.challenge_done(level - 1))
+end
+
+-- Starts a match from the level screen
+function play.begin(level, challenge)
+	play.new_game(level, challenge)
+	if level == 0 then
+		tutorial.start()
+	else
+		tutorial.active = false
+	end
+	animation, animation_time = true, 0
+	update_animation_screen("playing")
+end
+
+-- `challenge` (an entry of Challenges.lua) is only passed for levels already beaten
+function play.new_game(level, challenge)
+	play.level, play.challenge = level, challenge
+	local c = challenge or {}
 	profile = level == 0 and tutorial.profile or opponents[level] or opponents[1]
 	turn = "Player"
-	max_health = { Player = STARTING_HEALTH, Opponent = profile.health or STARTING_HEALTH }
-	health = { Player = STARTING_HEALTH, Opponent = profile.health or STARTING_HEALTH }
-	max_venom = { Player = level == 0 and 3 or 1, Opponent = 1 + (profile.venom or 0) } -- start_turn adds the first point, so turn 1 has 2
+	local mine, theirs = math.floor(STARTING_HEALTH * (c.player_health or 1)), math.floor((profile.health or STARTING_HEALTH) * (c.opp_health or 1))
+	max_health = { Player = mine, Opponent = theirs }
+	health = { Player = mine, Opponent = theirs }
+	max_venom = { Player = level == 0 and 3 or 1, Opponent = 1 + (profile.venom or 0) + (c.opp_venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
 	held_card, winner, confirm_forfeit = nil, nil, false
 	play.charm_used = { Player = false, Opponent = false }
 	effects.clear()
+	for i, name in ipairs(c.opp_start or {}) do -- challenge: the opponent begins with snakes already in play
+		played_cards[i] = card(name .. ".png", img_widths, img_heights)
+	end
 	play.start_turn()
 end
 
@@ -236,6 +280,19 @@ function play.wound(slot, amount)
 end
 
 -- Discards a side's hand and draws a fresh one
+-- Draws one more card into a side's hand (hands hold up to 8)
+function play.draw_extra(side)
+	local hand = hand_of(side)
+	if #hand < 8 then
+		local deck, deck_borders = profile.deck, nil
+		if side == "Player" then
+			deck, deck_borders = collection.deck()
+		end
+		local index = math.random(#deck)
+		table.insert(hand, card(deck[index] .. ".png", img_widths, img_heights, deck_borders and deck_borders[index] or nil))
+	end
+end
+
 function play.redraw(side)
 	local hand = hand_of(side)
 	for i = #hand, 1, -1 do
@@ -245,7 +302,12 @@ function play.redraw(side)
 	if play.level == 0 and side == "Player" then
 		fill_hand(hand, tutorial.player_deck, #tutorial.player_deck) -- the tutorial hand stays the four lesson snakes
 	else
-		fill_hand(hand, side == "Player" and collection.deck() or profile.deck)
+		if side == "Player" then
+			local deck, deck_borders = collection.deck()
+			fill_hand(hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
+		else
+			fill_hand(hand, profile.deck)
+		end
 	end
 end
 
@@ -267,11 +329,11 @@ function play.hit(attacker, slot, attack, delay)
 		powers.trigger("hurt", defender, slot, attacker)
 	end
 
-	local border = data.get_stats(attacker).border
+	local border = data.border_of(attacker)
 	if damage > 0 then
-		if border == "Venom" then
+		if border == "Venom" or attacker.brew == "venom" then
 			defender.poison = 2
-		elseif border == "Frost" then
+		elseif border == "Frost" or attacker.brew == "frost" then
 			defender.frozen = true
 		end
 	end
@@ -350,6 +412,14 @@ function play.activate(slot)
 		card.shield = (card.shield or 0) + n
 	elseif kind == "empower" then
 		card.bonus = (card.bonus or 0) + n
+	elseif kind == "refresh" then -- other snakes may use their abilities again (not other refreshers, so it can't loop)
+		for other = side == "Player" and 5 or 1, side == "Player" and 8 or 4 do
+			local c = played_cards[other]
+			if c and c ~= card and c.used and abilities.active(c).kind ~= "refresh" then
+				c.used = nil
+				float(other, "ready again")
+			end
+		end
 	elseif kind == "bolster" then
 		for _, f in ipairs(abilities.neighbours(slot)) do
 			f.card.temp = (f.card.temp or 0) + n
@@ -364,7 +434,7 @@ end
 
 -- Can this side use its charmer's charm right now?
 function play.charm_ready(side)
-	return turn == side and not play.charm_used[side] and venom[side] >= charmers.of(side, play.level).cost
+	return turn == side and not play.charm_used[side] and not (side == "Player" and play.challenge and play.challenge.no_charm) and venom[side] >= charmers.of(side, play.level).cost
 		and (side ~= "Player" or tutorial.allows("charm"))
 end
 
@@ -460,6 +530,41 @@ local function field_sector_under_mouse()
 	end
 end
 
+-- A brew is drunk by the player's snake it is dropped on; a spell works wherever it is dropped over the field.
+-- Returns true if the card was used up.
+local function use_consumable(held, sector)
+	local st = data.get_stats(held)
+	local def = require("Brews").by_name[held.card_path:sub(1, -5)]
+	local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+	local function refuse(text)
+		effects.add("float", { x = mx, y = my - 40, text = text })
+	end
+	if st.cost > venom.Player then
+		refuse("not enough venom")
+		return false
+	end
+	if st.kind == "brew" then
+		if not (sector and sector > 4 and played_cards[sector]) then
+			refuse("drop it on one of your snakes")
+			return false
+		end
+		require("Brews").drink(play, def, sector)
+	else
+		if not (sector or (mx > 245 and my < 560)) then
+			return false -- dropped away from the field
+		end
+		if def.cast(play, "Player") == false then
+			refuse("no effect")
+			return false
+		end
+		play.flash = { colour = def.colour, t = time }
+		effects.add("float", { x = 720, y = 300, text = def.name:gsub("_", " ") })
+	end
+	venom.Player = venom.Player - st.cost
+	play.check_end()
+	return true
+end
+
 -- If mouse is let go while a card is held, play it or put it back in the hand
 function play.place_card()
 	if love.mouse.isDown(1) or not held_card then
@@ -469,6 +574,12 @@ function play.place_card()
 	if mouse_over_info then
 		update_game_state("info")
 		info_card, info_return = held_card, "playing"
+	elseif data.get_stats(held_card).kind ~= "snake" then
+		if use_consumable(held_card, sector) then
+			held_card = nil
+			play_sound(hover_sound)
+			return
+		end
 	elseif sector and can_play(held_card, sector) then
 		played_cards[sector] = held_card
 		place_effect(held_card, sector)

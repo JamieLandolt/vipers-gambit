@@ -118,7 +118,6 @@ end
 local P = powers.of
 
 -- Tier 1
-P.Snake = { text = "Heals 1 defense at the start of your turn", turn = function(c) heal(c.card, 1) end }
 P.Coral_Snake = {
 	text = "Whatever hits it permanently loses 1 attack",
 	hurt = function(_, attacker)
@@ -170,7 +169,6 @@ P.Pale_Snake = { text = "Deals 1 damage to the enemy's health when played", play
 P.Worm_Snake = { text = "Gain 1 venom when it is destroyed", death = function(c) add_venom(c.side, 1) end }
 
 -- Tier 2
-P.Big_Snake = { text = "Grows: +1 attack at the start of your turn", turn = function(c) buff(c.card, 1, 0) end }
 P.Zombie_Snake = {
 	text = "Returns to your hand when destroyed",
 	death = function(c)
@@ -224,16 +222,6 @@ P.Toxic_Snake = {
 }
 
 -- Tier 3
-P.Anaconda = {
-	text = "Swallows the card ahead when played if it has 6 or less defense",
-	play = function(c)
-		local foe = played_cards[c.foe]
-		if foe and (foe.hp or defense_of(foe)) <= 6 then
-			float(c.foe, "swallowed")
-			require("Play").destroy(c.foe)
-		end
-	end,
-}
 P.Copperhead = { text = "Deals 3 damage to the enemy's health when it destroys a snake", kill = function(c) hurt_side(other(c.side), 3) end }
 P.Extra_Long_Python = {
 	text = "Squeezes: the card ahead permanently loses 2 attack each turn",

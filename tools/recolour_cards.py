@@ -1,7 +1,8 @@
 """Gives every card in assets/Snake_Cards a background and frame by the lane type it fits, and writes CardStyles.lua
-(the colours the board shader cuts out). Works on the original purple cards (git revision 1b9c4a9 and earlier).
+(the colours the board shader cuts out). Run on the ORIGINAL purple cards (git revision 1b9c4a9 and earlier) after tools/redraw_stats.py has put the real numbers on them;
+running it on its own output would add the panel twice.
 Cards are 33x48 art pixels at 5x, so patterns are computed on the art grid.
-Usage: python3 tools/recolour_cards.py [OUT_DIR]   (default assets/Snake_Cards, in place)"""
+Usage: python3 tools/recolour_cards.py SRC_DIR [OUT_DIR]   (OUT_DIR defaults to assets/Snake_Cards)"""
 import re, sys, os
 from PIL import Image
 
@@ -19,6 +20,10 @@ STYLES = {
     "Tree": ((26, 62, 38), [(54, 122, 72), (44, 104, 62)], lambda x, y: 1 if (x * 7 + y * 13) % 11 == 0 or (x * 5 + y * 3) % 17 == 0 else 0),
     # mist: soft violet with pale sparkles
     "Spirit": ((48, 42, 98), [(96, 84, 152), (112, 100, 170)], lambda x, y: 1 if (x * 11 + y * 7) % 19 == 0 else 0),
+    # brews: amber with rising bubbles
+    "Brew": ((92, 52, 22), [(196, 122, 52), (214, 142, 66)], lambda x, y: 1 if (x * 5 + y * 9) % 23 == 0 or (x * 3 + y * 7) % 29 == 0 else 0),
+    # spells: night sky with stars
+    "Spell": ((30, 22, 84), [(52, 42, 134), (240, 230, 160)], lambda x, y: 1 if (x * 13 + y * 7) % 37 == 0 else 0),
     # rainbow: muted diagonal stripes
     "Rainbow": ((46, 46, 60), [(176, 84, 84), (192, 140, 70), (180, 168, 80), (84, 150, 96), (80, 120, 180), (130, 96, 170)],
                 lambda x, y: ((x + y) // 4) % 6),
@@ -33,6 +38,8 @@ def type_of_cards():
             types[n.lower()] = t
     for n, t in re.findall(r'name = "(\w+)".*?type = "(\w+)"', open("NewCards.lua").read()):
         types[n.lower()] = t
+    for n, kind in re.findall(r'name = "(\w+)", kind = "(\w+)"', open("Brews.lua").read()):
+        types[n.lower()] = kind.capitalize()
     return types
 
 def recolour(img, kind):
@@ -66,12 +73,13 @@ def recolour(img, kind):
     return img
 
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else "assets/Snake_Cards"
+    src = sys.argv[1]
+    out = sys.argv[2] if len(sys.argv) > 2 else "assets/Snake_Cards"
     os.makedirs(out, exist_ok=True)
     types = type_of_cards()
-    for f in sorted(os.listdir("assets/Snake_Cards")):
+    for f in sorted(os.listdir(src)):
         if f.endswith(".png"):
-            recolour(Image.open("assets/Snake_Cards/" + f), types[f[:-4].lower()]).save(os.path.join(out, f))
+            recolour(Image.open(os.path.join(src, f)), types[f[:-4].lower()]).save(os.path.join(out, f))
     if out == "assets/Snake_Cards":
         rows = []
         for kind, (frame, bgs, _) in STYLES.items():

@@ -8,6 +8,8 @@ local abilities = require("Abilities")
 local borders = require("Borders")
 local collection = require("Collection")
 local opponents = require("Opponents")
+local challenges = require("Challenges")
+local hub = require("Hub")
 local shader = require("Shader")
 local title = require("Title")
 local charmers = require("Charmers")
@@ -43,70 +45,391 @@ function render.menu()
 	local t = time - menu_start
 
 	title.draw(t)
-	local slide = math.max(0, math.min(1, (t - 0.3) / 1.5))
-	local offset = -(1 - slide * slide * (3 - 2 * slide)) * title.MENU_DROP
-	for _, name in ipairs({ "Button Background", "Play Game", "Collection", "Charmers", "Settings" }) do
-		-- Move the button itself (not just the drawing) so its hitbox follows it while it slides
-		local button = buttons.menu[name]
-		button.rest_y = button.rest_y or button.y
-		button.y = button.rest_y + offset
-		button:draw()
-	end
+	hub.draw(t)
 end
 
--- Calls fn(index, x, y) for each card in the collection grid, in the current sort order
+local eye_icon -- the snake-eye currency icon (loaded on first use)
+
+-- Draws "<prefix><amount>" followed by the snake-eye icon, aligned left, center or right within x .. x + w; the caller sets the text colour
+local function draw_eyes(prefix, amount, x, y, w, align, font)
+	font = font or assets.small_font
+	if not eye_icon then
+		eye_icon = lg.newImage("assets/icons/snake_eye.png")
+		eye_icon:setFilter("nearest", "nearest")
+	end
+	local r, g, b, a = lg.getColor()
+	local text = prefix .. amount
+	local icon_h = font:getHeight() * 0.7
+	local scale = icon_h / eye_icon:getHeight()
+	local total = font:getWidth(text) + 8 + eye_icon:getWidth() * scale
+	local left = align == "right" and x + w - total or align == "center" and x + (w - total) / 2 or x
+	lg.print(text, font, left, y)
+	lg.setColor(1, 1, 1, a)
+	lg.draw(eye_icon, left + font:getWidth(text) + 8, y + (font:getHeight() - icon_h) / 2 + 2, 0, scale)
+	lg.setColor(r, g, b, a)
+end
+
+local RARITY_COLOUR = { { 0.75, 0.75, 0.75 }, { 0.4, 0.85, 0.4 }, { 0.4, 0.6, 1 }, { 0.75, 0.4, 1 }, { 1, 0.85, 0.2 } }
+
+-- A titled block of wrapped text at (x, y); returns the y just below it
+local function info_section(title, body, x, y, w, title_colour, body_colour)
+	lg.setColor(title_colour)
+	lg.print(title, assets.small_font, x, y)
+	lg.setColor(body_colour)
+	local _, lines = assets.small_font:getWrap(body, w)
+	lg.printf(body, assets.small_font, x, y + 32, w)
+	return y + 32 + #lines * assets.small_font:getHeight() + 22
+end
+
+-- A rounded stat box: small label above a big number or word
+local function stat_chip(label, value, x, y, w, colour)
+	lg.setColor(colour[1] * 0.25, colour[2] * 0.25, colour[3] * 0.25, 0.9)
+	lg.rectangle("fill", x, y, w, 84, 10, 10)
+	lg.setColor(colour)
+	lg.setLineWidth(3)
+	lg.rectangle("line", x, y, w, 84, 10, 10)
+	lg.setLineWidth(1)
+	lg.printf(label, assets.card_name_font, x, y + 6, w, "center")
+	lg.setColor(1, 1, 1)
+	lg.printf(tostring(value), assets.font, x, y + 28, w, "center")
+end
+
+
+-- The collection screen: filter icons along the top, the card grid on the left (about 60% of the screen)
+-- and the hovered card's details in the pane on the right.
+local GRID_X, GRID_Y, GRID_W, GRID_BOTTOM = 30, 125, 840, 862
+local CARD_SCALE, CELL_GAP = 0.66, 8
+local function cell_size()
+	return img_widths * CARD_SCALE, img_heights * CARD_SCALE
+end
+
+-- Calls fn(index, x, y) for each shown card in the grid (x, y = top-left corner), in the current sort order
 local function each_collection_card(fn)
-	local per_row = math.floor((reference_window_width - 69) / img_widths)
-	local rows = math.ceil(#assets.card_names / per_row)
-	local x, y = 69, math.max(math.min(scroll_offset_y * 5, 0), reference_window_height - 140 - rows * img_heights) + 70
+	local cw, ch = cell_size()
+	local per_row = math.floor((GRID_W + CELL_GAP) / (cw + CELL_GAP))
+	local shown = 0
+	for _, name in ipairs(assets.card_names) do
+		shown = shown + (collection.shown(name) and 1 or 0)
+	end
+	local rows = math.ceil(shown / per_row)
+	local top = math.max(math.min(scroll_offset_y * 5, 0), GRID_BOTTOM - GRID_Y - rows * (ch + CELL_GAP)) + GRID_Y
+	local n = 0
 	for _, i in ipairs(collection.order(assets.card_names)) do
-		if x + img_widths > reference_window_width then
-			x, y = 69, y + img_heights
+		if collection.shown(assets.card_names[i]) then
+			fn(i, GRID_X + (n % per_row) * (cw + CELL_GAP), top + math.floor(n / per_row) * (ch + CELL_GAP))
+			n = n + 1
 		end
-		fn(i, x, y)
-		x = x + img_widths
 	end
 end
 
--- Name of the owned snake under the given window position, if any
-function render.collection_card_at(window_x, window_y)
-	local rx, ry = window_x * reference_window_width / lg.getWidth(), window_y * reference_window_height / lg.getHeight()
-	local found
-	each_collection_card(function(i, x, y)
-		if collection.has(assets.card_names[i]) and rx >= x and rx < x + img_widths and ry >= y and ry < y + img_heights then
-			found = assets.card_names[i]
+-- A tip shown for a few seconds the first time a screen is used (never again after that)
+local hint_since = {}
+local function show_hint(key, text)
+	if collection.hint_seen(key) and not hint_since[key] then
+		return
+	end
+	if not hint_since[key] then
+		hint_since[key] = time
+		collection.mark_hint(key)
+		require("Sounds").play("hint")
+	end
+	local age = time - hint_since[key]
+	if age < 9 then
+		local alpha = math.min(1, (9 - age) * 2)
+		lg.setColor(0.1, 0.05, 0.2, 0.9 * alpha)
+		lg.rectangle("fill", 20, 740, 950, 90, 10, 10)
+		lg.setColor(1, 0.85, 0.2, alpha)
+		lg.rectangle("line", 20, 740, 950, 90, 10, 10)
+		lg.setColor(1, 1, 1, alpha)
+		lg.printf(text, assets.small_font, 40, 752, 910, "center")
+		lg.setColor(1, 1, 1)
+	end
+end
+
+-- Bars of how many snakes in the deck cost 1, 2, ... 8+ venom
+local function draw_curve()
+	local counts, top, total = {}, 1, 0
+	for i = 1, 8 do
+		counts[i] = 0
+	end
+	for _, name in ipairs(collection.chosen()) do
+		local cost = math.min(math.max(data.stats_by_name[name].cost, 1), 8)
+		counts[cost] = counts[cost] + 1
+		top, total = math.max(top, counts[cost]), total + data.stats_by_name[name].cost
+	end
+	local n = collection.deck_count()
+	local x, y, w, h = 890, 762, 535, 100
+	local step = (w - 28) / 8
+	lg.setColor(0.07, 0.04, 0.14, 0.92)
+	lg.rectangle("fill", x, y, w, h, 10, 10)
+	for i = 1, 8 do
+		local bar = counts[i] / top * 40
+		local bx = x + 14 + (i - 1) * step
+		lg.setColor(0.4, 0.85, 0.4)
+		lg.rectangle("fill", bx + 8, y + 74 - bar, step - 16, bar)
+		lg.setColor(1, 1, 1)
+		lg.printf(i == 8 and "8+" or i, assets.card_text_font, bx, y + 76, step, "center")
+		if counts[i] > 0 then
+			lg.printf(counts[i], assets.card_text_font, bx, y + 54 - bar, step, "center")
 		end
-	end)
+	end
+	lg.printf("Cost curve" .. (n > 0 and string.format(" (avg %.1f)", total / n) or ""), assets.card_text_font, x, y + 4, w, "center")
+end
+
+-- The card (owned or not) under the given window position, if any
+local function card_under(window_x, window_y)
+	local rx, ry = window_x * reference_window_width / lg.getWidth(), window_y * reference_window_height / lg.getHeight()
+	local cw, ch = cell_size()
+	local found
+	if rx < GRID_X + GRID_W + CELL_GAP and ry >= GRID_Y and ry <= GRID_BOTTOM then
+		each_collection_card(function(i, x, y)
+			if rx >= x and rx < x + cw and ry >= y and ry < y + ch then
+				found = assets.card_names[i]
+			end
+		end)
+	end
 	return found
+end
+
+-- Name of the owned snake under the given window position, if any (only owned cards can be clicked)
+function render.collection_card_at(window_x, window_y)
+	local name = card_under(window_x, window_y)
+	return name and collection.has(name) and name or nil
+end
+
+-- Filter icons: tile colour, hover label and the little picture drawn on the tile
+local ICON = 38
+local ICON_INFO = {
+	["kind:snake"] = { { 0.3, 0.7, 0.3 }, "Snakes" }, ["kind:brew"] = { { 0.6, 0.35, 0.85 }, "Brews" }, ["kind:spell"] = { { 0.35, 0.5, 0.95 }, "Spells" },
+	["type:Land"] = { { 0.8, 0.65, 0.4 }, "Land snakes" }, ["type:Water"] = { { 0.25, 0.5, 0.9 }, "Water snakes" }, ["type:Tree"] = { { 0.25, 0.6, 0.3 }, "Tree snakes" },
+	["type:Spirit"] = { { 0.55, 0.3, 0.8 }, "Spirit snakes" }, ["type:Rainbow"] = { { 0.9, 0.5, 0.6 }, "Rainbow snakes" },
+	["own:owned"] = { { 0.3, 0.7, 0.35 }, "Owned" }, ["own:missing"] = { { 0.45, 0.45, 0.5 }, "Missing" },
+}
+
+-- Every icon with its position: the filter groups left to right, then the reset icon
+local function filter_icons()
+	local list, x = {}, 430
+	for _, group in ipairs(collection.FILTER_GROUPS) do
+		for _, key in ipairs(group.keys) do
+			table.insert(list, { group.id, key, x, 72 })
+			x = x + ICON + 5
+		end
+		x = x + 7
+	end
+	table.insert(list, { "reset", "reset", x, 72 })
+	return list
+end
+
+function render.filter_icon_at(window_x, window_y)
+	local rx, ry = window_x * reference_window_width / lg.getWidth(), window_y * reference_window_height / lg.getHeight()
+	for _, icon in ipairs(filter_icons()) do
+		if rx >= icon[3] and rx <= icon[3] + ICON and ry >= icon[4] and ry <= icon[4] + ICON then
+			return icon[1], icon[2]
+		end
+	end
+end
+
+local function draw_filter_icon(group, key, x, y, hovered)
+	local id = group .. ":" .. key
+	local on = group == "reset" and collection.filtering() or collection.filter_on(group, key)
+	local info = ICON_INFO[id]
+	local c = group == "tier" and RARITY_COLOUR[key] or info and info[1] or { 0.8, 0.3, 0.3 }
+	local a = on and 1 or 0.3
+	local s = ICON
+	lg.setColor(c[1] * 0.35, c[2] * 0.35, c[3] * 0.35, 0.95 * (on and 1 or 0.6))
+	lg.rectangle("fill", x, y, s, s, 6, 6)
+	lg.setColor(on and 1 or 0.5, on and 1 or 0.5, on and 1 or 0.5, hovered and 1 or 0.85 * a + 0.15)
+	lg.setLineWidth(hovered and 3 or 2)
+	lg.rectangle("line", x, y, s, s, 6, 6)
+	lg.setLineWidth(1)
+	lg.setColor(c[1], c[2], c[3], a)
+	if id == "kind:snake" then
+		lg.setLineWidth(4)
+		lg.line(x + 7, y + 28, x + 14, y + 12, x + 22, y + 28, x + 30, y + 12)
+		lg.setLineWidth(1)
+		lg.circle("fill", x + 30, y + 11, 3)
+	elseif id == "kind:brew" then
+		lg.rectangle("fill", x + 15, y + 6, 8, 11)
+		lg.circle("fill", x + 19, y + 24, 10)
+		lg.setColor(1, 1, 1, 0.5 * a)
+		lg.circle("fill", x + 15, y + 21, 2.5)
+	elseif id == "kind:spell" then
+		lg.polygon("fill", x + 19, y + 4, x + 23, y + 15, x + 34, y + 19, x + 23, y + 23, x + 19, y + 34, x + 15, y + 23, x + 4, y + 19, x + 15, y + 15)
+	elseif id == "type:Land" then
+		lg.polygon("fill", x + 4, y + 30, x + 16, y + 10, x + 24, y + 22, x + 30, y + 15, x + 35, y + 30)
+	elseif id == "type:Water" then
+		lg.setLineWidth(3)
+		for row = 0, 2 do
+			lg.line(x + 6, y + 11 + row * 9, x + 13, y + 7 + row * 9, x + 20, y + 11 + row * 9, x + 27, y + 7 + row * 9, x + 33, y + 11 + row * 9)
+		end
+		lg.setLineWidth(1)
+	elseif id == "type:Tree" then
+		lg.polygon("fill", x + 19, y + 4, x + 31, y + 24, x + 7, y + 24)
+		lg.rectangle("fill", x + 16, y + 24, 6, 9)
+	elseif id == "type:Spirit" then
+		lg.circle("fill", x + 19, y + 15, 10)
+		lg.rectangle("fill", x + 9, y + 15, 20, 15)
+		lg.setColor(0, 0, 0, a)
+		lg.circle("fill", x + 15, y + 15, 2)
+		lg.circle("fill", x + 23, y + 15, 2)
+	elseif id == "type:Rainbow" then
+		lg.setLineWidth(3)
+		local rainbow = { { 1, 0.3, 0.3 }, { 1, 0.85, 0.2 }, { 0.3, 0.8, 0.4 }, { 0.4, 0.5, 1 } }
+		for i, col in ipairs(rainbow) do
+			lg.setColor(col[1], col[2], col[3], a)
+			lg.arc("line", "open", x + 19, y + 30, 22 - i * 4, math.pi, 2 * math.pi)
+		end
+		lg.setLineWidth(1)
+	elseif group == "tier" then
+		lg.printf(tostring(key), assets.small_font, x, y + 3, s, "center")
+	elseif id == "own:owned" then
+		lg.setLineWidth(5)
+		lg.line(x + 8, y + 20, x + 16, y + 28, x + 31, y + 10)
+		lg.setLineWidth(1)
+	elseif id == "own:missing" then
+		lg.printf("?", assets.small_font, x, y + 3, s, "center")
+	else -- reset
+		lg.setLineWidth(4)
+		lg.line(x + 10, y + 10, x + 28, y + 28)
+		lg.line(x + 28, y + 10, x + 10, y + 28)
+		lg.setLineWidth(1)
+	end
+end
+
+local function draw_filter_bar()
+	local hovered_group, hovered_key = render.filter_icon_at(mouse.x, mouse.y)
+	local label
+	for _, icon in ipairs(filter_icons()) do
+		local hovered = icon[1] == hovered_group and icon[2] == hovered_key
+		draw_filter_icon(icon[1], icon[2], icon[3], icon[4], hovered)
+		if hovered then
+			label = { icon[1] == "tier" and ("Tier " .. icon[2] .. " " .. (require("Lore").tiers[icon[2]] or "")) or icon[1] == "reset" and "Show everything"
+				or ICON_INFO[icon[1] .. ":" .. icon[2]][2], icon[3] }
+		end
+	end
+	if label then
+		local w = assets.card_text_font:getWidth(label[1]) + 16
+		local lx = math.min(label[2], reference_window_width - w - 5)
+		lg.setColor(0, 0, 0, 0.9)
+		lg.rectangle("fill", lx, 72 + ICON + 4, w, 26, 5, 5)
+		lg.setColor(1, 1, 1)
+		lg.print(label[1], assets.card_text_font, lx + 8, 72 + ICON + 7)
+	end
+end
+
+local pane_name -- the card the details pane shows: the hovered one, else the last one hovered
+
+-- The right-hand pane: the hovered card's art and details
+local function draw_info_pane()
+	local px, py, pw, ph = 890, 125, 535, collection.deck_mode and 630 or 737
+	local name = pane_name
+	local st = name and data.stats_by_name[name]
+	local tier = st and RARITY_COLOUR[st.rarity] or { 0.6, 0.6, 0.7 }
+	lg.setColor(0.07, 0.04, 0.14, 0.92)
+	lg.rectangle("fill", px, py, pw, ph, 12, 12)
+	lg.setColor(tier[1], tier[2], tier[3], 0.8)
+	lg.setLineWidth(3)
+	lg.rectangle("line", px, py, pw, ph, 12, 12)
+	lg.setLineWidth(1)
+	if not st then
+		lg.setColor(0.7, 0.75, 0.9)
+		lg.printf("Hover over a card to see its details here", assets.small_font, px + 40, py + ph / 2 - 40, pw - 80, "center")
+		return
+	end
+	local owned = collection.has(name)
+	local snake = st.kind == "snake"
+	local scale = 1.2
+	lg.push()
+	lg.translate(px + 18, py + 18)
+	lg.scale(scale)
+	lg.setColor(owned and { 1, 1, 1 } or { 0.25, 0.22, 0.32 })
+	lg.draw(assets.card_by_name[name])
+	if owned then
+		require("CardText").draw(name, 0, 0)
+	end
+	lg.pop()
+
+	local x, w = px + 18 + img_widths * scale + 18, pw - (18 + img_widths * scale + 18) - 18
+	lg.setColor(1, 1, 1)
+	local title = owned and name:gsub("_", " ") or "???"
+	local _, lines = assets.font:getWrap(title, w)
+	lg.printf(title, assets.font, x, py + 14, w)
+	local y = py + 14 + #lines * assets.font:getHeight() + 6
+	lg.setColor(tier)
+	lg.printf("Tier " .. st.rarity .. " " .. (st.tier or "") .. "\n" .. (snake and ("Snake, " .. data.card_types[name]) or (st.kind == "brew" and "Brew" or "Spell")), assets.small_font, x, y, w)
+	y = y + 70
+	if snake then
+		stat_chip("Cost", st.cost, x, y, 85, { 0.4, 0.85, 0.4 })
+		stat_chip("Attack", owned and st.attack or "?", x + 99, y, 85, { 1, 0.4, 0.4 })
+		stat_chip("Defense", owned and st.defense or "?", x + 198, y, 85, { 0.45, 0.6, 1 })
+	else
+		stat_chip("Cost", st.cost, x, y, 85, { 0.4, 0.85, 0.4 })
+		stat_chip("Use", st.kind == "brew" and "Drink" or "Cast", x + 99, y, 184, { 0.7, 0.5, 1 })
+	end
+	y = y + 100
+	lg.setColor(1, 0.85, 0.2)
+	if owned then
+		local parts = {}
+		for _, v in ipairs(snake and collection.variant_list(name) or { { "Basic", collection.count(name) } }) do
+			table.insert(parts, (snake and v[1] .. " " or "") .. "x" .. v[2])
+		end
+		lg.printf("You own " .. collection.count(name) .. ":\n" .. table.concat(parts, ", "), assets.small_font, x, y, w)
+	else
+		lg.printf("Not collected yet. Find it in packs.", assets.small_font, x, y, w)
+	end
+
+	local below = py + 18 + img_heights * scale + 22
+	if owned then
+		below = info_section("Ability", st.ability or "None", px + 18, below, pw - 36, { 1, 0.85, 0.2 }, { 1, 1, 1 })
+		info_section("Lore", st.lore or "", px + 18, below, pw - 36, { 0.6, 0.65, 0.85 }, { 0.8, 0.85, 1 })
+	end
 end
 
 function render.collection()
 	background()
 
-	local hovered = render.collection_card_at(mouse.x, mouse.y)
-	each_collection_card(function(i, x, y)
+	local under = card_under(mouse.x, mouse.y) -- the pane shows any hovered card, owned or not
+	pane_name = under or pane_name
+	local sc = lg.getWidth() / reference_window_width
+	lg.setScissor(0, GRID_Y * sc, (GRID_X + GRID_W + CELL_GAP) * sc, (GRID_BOTTOM - GRID_Y) * sc)
+	each_collection_card(function(i, gx, gy)
+		lg.push()
+		lg.translate(gx, gy)
+		lg.scale(CARD_SCALE)
+		local x, y = 0, 0
 		local owned = collection.has(assets.card_names[i])
 		-- Snakes you haven't unlocked are drawn as dark silhouettes
 		lg.setColor(owned and { 1, 1, 1 } or { 0.12, 0.1, 0.18 })
 		lg.draw(assets.cards[i], x, y)
 		if owned then
-			require("CardText").draw(assets.card_names[i], x, y)
-			borders.draw(data.stats_by_name[assets.card_names[i]].border, x, y, img_widths, img_heights, data.stats_by_name[assets.card_names[i]].rarity)
+			require("CardText").draw(assets.card_names[i], x, y) -- (borders only show on a snake's own page, and in play)
+		end
+		local name = assets.card_names[i]
+		if owned then -- how many copies of the snake you own (duplicates and variants included)
+			lg.setColor(0, 0, 0, 0.8)
+			lg.rectangle("fill", x + 8, y + 8, 56, 34, 6, 6)
+			lg.setColor(1, 1, 1)
+			lg.printf("x" .. collection.count(name), assets.small_font, x + 8, y + 8, 56, "center")
+		end
+		if owned and collection.sacrifice_mode and collection.selected(name) > 0 then
+			lg.setColor(0.8, 0.1, 0.1, 0.45)
+			lg.rectangle("fill", x, y, img_widths, img_heights)
+			lg.setColor(1, 1, 1)
+			lg.printf("-" .. collection.selected(name), assets.font, x, y + img_heights / 2 - 25, img_widths, "center")
 		end
 		if owned and collection.deck_mode then
-			if collection.in_deck(assets.card_names[i]) then -- a green tick marks the deck's snakes
+			local copies = collection.in_deck(name)
+			if copies > 0 then -- a green badge counts the deck's copies of the snake
 				lg.setColor(0.2, 0.75, 0.3)
 				lg.circle("fill", x + img_widths - 26, y + 26, 18)
 				lg.setColor(1, 1, 1)
-				lg.setLineWidth(5)
-				lg.line(x + img_widths - 36, y + 26, x + img_widths - 29, y + 34, x + img_widths - 16, y + 18)
-				lg.setLineWidth(1)
+				lg.printf(copies, assets.small_font, x + img_widths - 44, y + 8, 36, "center")
 			else
 				lg.setColor(0, 0, 0, 0.55)
 				lg.rectangle("fill", x, y, img_widths, img_heights)
 			end
 		end
-		if assets.card_names[i] == hovered then
+		if name == under then
 			-- Hover: a pulsing glow and border kept inside the card so neighbours are untouched
 			local pulse = 0.5 + 0.5 * math.sin(time * 6)
 			lg.setBlendMode("add")
@@ -114,14 +437,20 @@ function render.collection()
 			lg.draw(assets.cards[i], x, y)
 			lg.setBlendMode("alpha")
 			lg.setColor(0.95, 0.85, 0.25, 0.6 + 0.4 * pulse)
-			lg.setLineWidth(4)
+			lg.setLineWidth(5)
 			lg.rectangle("line", x + 2, y + 2, img_widths - 4, img_heights - 4)
 			lg.setLineWidth(1)
 		end
+		lg.pop()
 	end)
+	lg.setScissor()
 	lg.setColor(1, 1, 1)
+	draw_filter_bar()
+	draw_info_pane()
 
-	buttons.collection["Collection Header"]:update_text(collection.deck_mode and ("Deck " .. collection.deck_count() .. "/" .. collection.MAX_DECK) or "Collection")
+	buttons.collection["Collection Header"]:update_text(collection.deck_mode and ("Deck " .. collection.deck_count() .. "/" .. collection.MAX_DECK)
+		or collection.sacrifice_mode and ("Pick " .. #collection.sacrificing .. "/" .. collection.SACRIFICE)
+		or ("Collection " .. collection.owned_count() .. "/" .. #data.deck))
 	buttons.collection["Collection Header"]:draw()
 	buttons.collection["Edit Deck"]:update_text(collection.deck_mode and "Done" or "Edit Deck")
 	buttons.collection["Edit Deck"]:draw()
@@ -132,8 +461,239 @@ function render.collection()
 		lg.printf(collection.message, assets.font, 370, 805, 700, "center")
 	end
 	buttons.collection["Sort"]:draw()
-	buttons.collection["Open Pack"]:update_text(collection.pack_ready() and "Open Pack" or "Pack: tomorrow")
+	buttons.collection["Sacrifice"]:update_text(collection.deck_mode and "Auto-fill" or collection.sacrifice_mode and "Cancel" or "Imbue")
+	buttons.collection["Sacrifice"]:draw()
+	if not collection.sacrifice_unlocked() and not collection.deck_mode then
+		local sacrifice = buttons.collection["Sacrifice"]
+		lg.setColor(0, 0, 0, 0.6)
+		lg.rectangle("fill", sacrifice.x - 5, sacrifice.y - 5, sacrifice.width + 10, sacrifice.height + 10, 5, 5)
+		lg.setColor(1, 1, 1)
+	end
+	if collection.deck_mode then
+		draw_curve()
+		show_hint("deck", "Click a snake to add a copy to your deck. Click again to add more copies, then once more to remove them. Auto-fill picks your strongest.")
+	end
+	if collection.sacrifice_unlocked() and not sac_tutorial and not collection.hint_seen("sac_tutorial") and not collection.deck_mode then
+		sac_tutorial = 1 -- the first visit after Sacrifice unlocks gets a short walkthrough
+		collection.mark_hint("sac_tutorial")
+	end
+	if sac_tutorial then
+		local steps = {
+			"New: Imbue! Spare copies of a snake can become a copy with a border. (The Snake God's recipes are at the altar on the main screen.)",
+			"Press Imbue, then pick 3 copies of the SAME snake. Click a picked card again to put it back. Spare copies from packs are perfect.",
+			"Press Imbue again: the three copies are given up for one copy of that snake with a random new border. Starters keep one copy; Mythics can't be imbued.",
+		}
+		lg.setColor(0, 0, 0, 0.8)
+		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+		local sacrifice = buttons.collection["Sacrifice"]
+		if sac_tutorial >= 2 then -- point at the button being explained
+			local pulse = 0.5 + 0.5 * math.sin(time * 6)
+			lg.setColor(1, 0.85, 0.2, 0.5 + 0.5 * pulse)
+			lg.setLineWidth(6)
+			lg.rectangle("line", sacrifice.x - 10, sacrifice.y - 10, sacrifice.width + 20, sacrifice.height + 20, 8, 8)
+			lg.setLineWidth(1)
+			sacrifice:draw()
+		end
+		lg.setColor(1, 0.85, 0.2)
+		lg.printf("Imbue (" .. sac_tutorial .. "/3)", assets.font, 0, reference_window_height / 2 - 170, reference_window_width, "center")
+		lg.setColor(1, 1, 1)
+		lg.printf(steps[sac_tutorial], assets.small_font, 320, reference_window_height / 2 - 80, 800, "center")
+		buttons.sac_tutorial["Next"]:update_text(sac_tutorial < 3 and "Next" or "Got it")
+		buttons.sac_tutorial["Next"]:draw()
+		return
+	end
+	if collection.sacrifice_mode then
+		show_hint("sacrifice", "Pick 3 copies of the same snake, then press Imbue to get one copy back with a random new border. You always keep one copy of each starter, and Mythics can't be imbued.")
+		lg.setColor(0, 0, 0, 0.7)
+		lg.rectangle("fill", 20, 725, 600, 56, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.printf("Imbue: 3 copies of the same snake become 1 copy with a random border", assets.small_font, 25, 733, 590, "center")
+		if collection.can_summon() then
+			buttons.collection["Summon"]:update_text("Imbue")
+			buttons.collection["Summon"]:draw()
+		end
+	end
 	buttons.collection["Open Pack"]:draw()
+	lg.setColor(0, 0, 0, 0.7)
+	lg.rectangle("fill", reference_window_width - 400, 14, 250, 40, 8, 8)
+	lg.setColor(1, 0.85, 0.2)
+	draw_eyes("", collection.eyes, reference_window_width - 400, 20, 238, "right")
+	buttons.universal["Back"]:draw()
+end
+
+-- The altar of the Snake God: the recipes you have discovered on the left, the chosen one's details on the right
+local ALTAR_X, ALTAR_Y, ALTAR_W, ALTAR_BOTTOM, ROW_H = 30, 130, 590, 862, 82
+
+-- Discovered recipes: those you can perform now first, then by reward tier (high to low) and name
+local function altar_rows()
+	local rows = {}
+	for _, recipe in ipairs(collection.recipes()) do
+		if collection.recipe_known(recipe) then
+			table.insert(rows, recipe)
+		end
+	end
+	table.sort(rows, function(a, b)
+		local ca, cb = collection.can_sacrifice(a), collection.can_sacrifice(b)
+		if ca ~= cb then
+			return ca
+		end
+		local ra, rb = data.stats_by_name[a.get].rarity, data.stats_by_name[b.get].rarity
+		if ra ~= rb then
+			return ra > rb
+		end
+		return a.get < b.get
+	end)
+	return rows
+end
+
+local function altar_top(count)
+	return math.max(math.min(scroll_offset_y * 5, 0), ALTAR_BOTTOM - ALTAR_Y - count * ROW_H) + ALTAR_Y
+end
+
+-- The reward of the recipe row under the given window position, if any
+function render.altar_row_at(window_x, window_y)
+	local rx, ry = window_x * reference_window_width / lg.getWidth(), window_y * reference_window_height / lg.getHeight()
+	if not collection.sacrifice_unlocked() or rx < ALTAR_X or rx > ALTAR_X + ALTAR_W or ry < ALTAR_Y or ry > ALTAR_BOTTOM then
+		return nil
+	end
+	local rows = altar_rows()
+	local row = rows[math.floor((ry - altar_top(#rows)) / ROW_H) + 1]
+	return row and row.get
+end
+
+local function owns(name)
+	return collection.can_sacrifice({ give = { name } })
+end
+
+function render.altar()
+	background()
+	lg.setColor(0, 0, 0, 0.8)
+	lg.printf("The Snake God", assets.font, 3, 13, reference_window_width, "center")
+	lg.setColor(1, 0.85, 0.2)
+	lg.printf("The Snake God", assets.font, 0, 10, reference_window_width, "center")
+	if not collection.sacrifice_unlocked() then
+		lg.setColor(0, 0, 0, 0.75)
+		lg.rectangle("fill", 320, 330, 800, 200, 14, 14)
+		lg.setColor(1, 1, 1)
+		lg.printf("The Snake God sleeps.\nBeat the second opponent to awaken it.", assets.small_font, 340, 380, 760, "center")
+		buttons.universal["Back"]:draw()
+		return
+	end
+	local list, by_target = collection.recipes()
+	local rows = altar_rows()
+	lg.setColor(0, 0, 0, 0.7)
+	lg.rectangle("fill", 200, 68, 1040, 40, 8, 8)
+	lg.setColor(0.9, 0.9, 1)
+	lg.printf("It demands specific snakes and gives one specific snake in return.   Recipes found: " .. #rows .. "/" .. #list, assets.small_font, 200, 72, 1040, "center")
+	if not collection.altar_target or not by_target[collection.altar_target] or not collection.recipe_known(by_target[collection.altar_target]) then
+		collection.altar_target = rows[1] and rows[1].get
+	end
+
+	-- the list
+	local sc = lg.getWidth() / reference_window_width
+	lg.setScissor(0, ALTAR_Y * sc, (ALTAR_X + ALTAR_W + 10) * sc, (ALTAR_BOTTOM - ALTAR_Y) * sc)
+	local top = altar_top(#rows)
+	for i, recipe in ipairs(rows) do
+		local y = top + (i - 1) * ROW_H
+		local can, chosen = collection.can_sacrifice(recipe), recipe.get == collection.altar_target
+		local st = data.stats_by_name[recipe.get]
+		local tier = RARITY_COLOUR[st.rarity]
+		lg.setColor(0.07, 0.04, 0.14, 0.9)
+		lg.rectangle("fill", ALTAR_X, y, ALTAR_W, ROW_H - 6, 8, 8)
+		if chosen then
+			lg.setColor(1, 0.85, 0.2)
+		elseif can then
+			lg.setColor(0.35, 0.8, 0.4)
+		else
+			lg.setColor(0.4, 0.4, 0.5)
+		end
+		lg.setLineWidth(chosen and 4 or 2)
+		lg.rectangle("line", ALTAR_X, y, ALTAR_W, ROW_H - 6, 8, 8)
+		lg.setLineWidth(1)
+		for k, name in ipairs(recipe.give) do
+			lg.setColor(owns(name) and { 1, 1, 1 } or { 0.3, 0.27, 0.38 })
+			lg.draw(assets.card_by_name[name], ALTAR_X + 10 + (k - 1) * 40, y + 3, 0, 0.22)
+		end
+		lg.setColor(1, 0.85, 0.2, can and 1 or 0.4)
+		lg.printf(">", assets.font, ALTAR_X + 172, y + 12, 40, "center")
+		lg.setColor(1, 1, 1)
+		lg.draw(assets.card_by_name[recipe.get], ALTAR_X + 222, y + 3, 0, 0.22)
+		lg.setColor(1, 1, 1, can and 1 or 0.6)
+		lg.printf((recipe.get:gsub("_", " ")), assets.small_font, ALTAR_X + 270, y + 8, ALTAR_W - 280)
+		lg.setColor(tier[1], tier[2], tier[3], can and 1 or 0.6)
+		lg.print(st.tier or "", assets.card_text_font, ALTAR_X + 270, y + 44)
+	end
+	lg.setScissor()
+
+	-- the details pane
+	local px, py, pw, ph = 640, 125, 785, 737
+	lg.setColor(0.07, 0.04, 0.14, 0.92)
+	lg.rectangle("fill", px, py, pw, ph, 12, 12)
+	lg.setColor(1, 0.85, 0.2, 0.7)
+	lg.setLineWidth(3)
+	lg.rectangle("line", px, py, pw, ph, 12, 12)
+	lg.setLineWidth(1)
+	local recipe = by_target[collection.altar_target or ""]
+	if not recipe then
+		lg.setColor(0.8, 0.85, 1)
+		lg.printf("No recipes found yet.\nEach one appears once you own all the snakes it asks for.", assets.small_font, px + 40, py + ph / 2 - 40, pw - 80, "center")
+		buttons.universal["Back"]:draw()
+		return
+	end
+	local st = data.stats_by_name[recipe.get]
+	local tier = RARITY_COLOUR[st.rarity]
+	lg.setColor(1, 1, 1)
+	lg.print((recipe.get:gsub("_", " ")), assets.font, px + 25, py + 12)
+	lg.setColor(tier)
+	lg.print("Tier " .. st.rarity .. " " .. (st.tier or "") .. "   |   Snake, " .. data.card_types[recipe.get], assets.small_font, px + 25, py + 70)
+
+	lg.setColor(1, 0.85, 0.2)
+	lg.print("The Snake God demands:", assets.small_font, px + 25, py + 115)
+	local can = collection.can_sacrifice(recipe)
+	for k, name in ipairs(recipe.give) do
+		local x = px + 25 + (k - 1) * 98
+		local have = owns(name)
+		lg.setColor(have and { 1, 1, 1 } or { 0.3, 0.27, 0.38 })
+		lg.draw(assets.card_by_name[name], x, py + 150, 0, 0.5)
+		lg.setColor(have and { 0.8, 0.9, 1 } or { 1, 0.45, 0.45 })
+		lg.printf((name:gsub("_", " ")), assets.card_text_font, x - 4, py + 314, 96, "center")
+		lg.printf(have and ("you own " .. collection.count(name)) or "missing", assets.card_text_font, x - 4, py + 362, 96, "center")
+	end
+	lg.setColor(1, 0.85, 0.2, 0.5 + 0.5 * math.sin(time * 4))
+	lg.printf(">", assets.font, px + 420, py + 250, 50, "center")
+	lg.setColor(1, 0.85, 0.2)
+	lg.print("You receive:", assets.small_font, px + 490, py + 115)
+	-- a flame glow behind the reward
+	lg.setBlendMode("add")
+	for i = 1, 4 do
+		lg.setColor(1, 0.45, 0.1, (0.05 + 0.03 * math.sin(time * 3)) * (5 - i))
+		lg.rectangle("fill", px + 490 - i * 8, py + 150 - i * 8, 148 + i * 16, 288 + i * 16, 14, 14)
+	end
+	lg.setBlendMode("alpha")
+	lg.push()
+	lg.translate(px + 490, py + 150)
+	lg.scale(0.9)
+	lg.setColor(1, 1, 1)
+	lg.draw(assets.card_by_name[recipe.get])
+	require("CardText").draw(recipe.get, 0, 0)
+	lg.pop()
+	local y = py + 450
+	y = info_section("Ability", st.ability or "None", px + 25, y, pw - 50, { 1, 0.85, 0.2 }, { 1, 1, 1 })
+	if y < 770 then
+		info_section("Lore", st.lore or "", px + 25, y, pw - 50, { 0.6, 0.65, 0.85 }, { 0.8, 0.85, 1 })
+	end
+
+	lg.setColor(1, 1, 1, can and 1 or 0.4)
+	buttons.altar["Offer"]:update_text(can and "Offer them" or "Missing snakes")
+	buttons.altar["Offer"]:draw()
+	lg.setColor(1, 1, 1)
+	if collection.message and time - collection.message_t < 2 then
+		lg.setColor(0, 0, 0, 0.85)
+		lg.rectangle("fill", 370, 60, 700, 56, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.printf(collection.message, assets.small_font, 370, 72, 700, "center")
+	end
+	show_hint("altar", "The Snake God wants specific snakes and gives back one specific snake. A recipe appears once you own everything it asks for, and stays found. Click a recipe to see it, then press Offer.")
 	buttons.universal["Back"]:draw()
 end
 
@@ -144,23 +704,231 @@ function render.lanes()
 	buttons.lanes["Reset"]:draw()
 end
 
-function render.pack()
+function render.shop()
 	background()
 	lg.setColor(1, 1, 1)
-	lg.printf(#pack_cards > 0 and "New snakes!" or "You own every snake you can pull", assets.font, 0, 80, reference_window_width, "center")
-	local gap = 40
-	local x = (reference_window_width - #pack_cards * (img_widths * 2) - (#pack_cards - 1) * gap) / 2
-	for _, name in ipairs(pack_cards) do
-		lg.push()
-		lg.translate(x, 200)
-		lg.scale(2)
-		lg.draw(assets.card_by_name[name])
-		require("CardText").draw(name, 0, 0)
-		borders.draw(data.stats_by_name[name].border, 0, 0, img_widths, img_heights, data.stats_by_name[name].rarity)
-		lg.pop()
-		x = x + img_widths * 2 + gap
+	lg.printf("Pack Shop", assets.font, 0, 40, reference_window_width, "center")
+	lg.setColor(0, 0, 0, 0.7)
+	lg.rectangle("fill", reference_window_width / 2 - 200, 98, 400, 38, 8, 8)
+	lg.setColor(1, 0.85, 0.2)
+	draw_eyes("You have ", collection.eyes, 0, 102, reference_window_width, "center")
+	local tiers = require("Lore").tiers
+	for i, pack in ipairs(collection.PACKS) do
+		local x = 110 + (i - 1) * 420
+		local c, price = pack.colour, collection.price(i)
+		local weights, border_chance = collection.odds(pack)
+		lg.setColor(0, 0, 0, 0.6)
+		lg.rectangle("fill", x, 170, 380, 560, 12, 12)
+		lg.setColor(c[1], c[2], c[3])
+		lg.setLineWidth(4)
+		lg.rectangle("line", x, 170, 380, 560, 12, 12)
+		lg.setLineWidth(1)
+		lg.printf(pack.name, assets.font, x, 185, 380, "center")
+		if price == 0 then
+			lg.printf("Free today (one a day)", assets.small_font, x, 245, 380, "center")
+		else
+			draw_eyes("", price, x, 245, 380, "center")
+		end
+		lg.setColor(0.8, 0.8, 0.8)
+		lg.printf(pack.kind == "snake" and (pack.floor and "3, 4 and 5 star snakes only" or "Snakes") or "Brews and spells", assets.small_font, x, 285, 380, "center")
+		lg.setColor(1, 1, 1)
+		lg.printf("Chance per card", assets.small_font, x, 330, 380, "center")
+		local row = 0
+		for r, weight in ipairs(weights) do
+			if weight > 0 then
+				lg.setColor(0.8, 0.8, 0.8)
+				lg.print(tiers[r], assets.small_font, x + 50, 370 + row * 38)
+				lg.printf(weight .. "%", assets.small_font, x + 230, 370 + row * 38, 100, "right")
+				row = row + 1
+			end
+		end
+		if border_chance > 0 then
+			lg.setColor(1, 0.85, 0.2)
+			lg.printf(math.floor(border_chance * 100 + 0.5) .. "% chance of a border", assets.small_font, x, 590, 380, "center")
+		end
+		local button = buttons.shop["Pack " .. i]
+		button:update_text("Open")
+		lg.setColor(1, 1, 1, collection.eyes < price and 0.45 or 1)
+		button:draw()
 	end
-	buttons.pack["Done"]:draw()
+	lg.setColor(1, 1, 1)
+	if collection.message and time - collection.message_t < 2 then
+		lg.setColor(0, 0, 0, 0.85)
+		lg.rectangle("fill", 370, 780, 700, 56, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.printf(collection.message, assets.font, 370, 785, 700, "center")
+	end
+	lg.setColor(0.85, 0.85, 0.95)
+	lg.printf("Earn snake eyes by beating opponents. Beat more of them for better odds.", assets.small_font, 0, 745, reference_window_width, "center")
+	show_hint("shop", "Win matches to earn snake eyes, then spend them here. Pricier packs have better odds of rare snakes. You can pull duplicates and use several copies in your deck.")
+	buttons.shop["Back"]:draw()
+end
+
+local function rnd(n)
+	local v = math.sin(n * 12.9898) * 43758.5453
+	return v - math.floor(v)
+end
+
+-- Square sparks flying out from (x, y) that fall and fade; age in seconds
+local function burst(x, y, age, count, colour, speed)
+	if age < 0 or age > 1.4 then
+		return
+	end
+	lg.setBlendMode("add")
+	for k = 1, count do
+		local angle, v = rnd(k * 1.7) * 6.283, speed * (0.3 + rnd(k * 3.1))
+		local px, py = x + math.cos(angle) * v * age, y + math.sin(angle) * v * age + 260 * age * age
+		lg.setColor(colour[1], colour[2], colour[3], 1 - age / 1.4)
+		local size = 4 + math.floor(rnd(k * 5.3) * 6)
+		lg.rectangle("fill", math.floor(px), math.floor(py), size, size)
+	end
+	lg.setBlendMode("alpha")
+end
+
+local REVEAL_START, REVEAL_GAP = 1.9, 1.0
+local pack_fired = {} -- which sounds this opening has played
+
+-- A sealed pack shakes and bursts open, then each snake is flipped over in turn (rarer snakes get a bigger show)
+function render.pack()
+	if pack_seen ~= pack_cards then
+		pack_seen, pack_t = pack_cards, time
+	end
+	local t = time - pack_t
+	background()
+	local sfx = require("Sounds")
+	local function once(key, name)
+		if pack_fired[key] == nil then
+			pack_fired[key] = true
+			sfx.play(name)
+		end
+	end
+	if pack_fired.seen ~= pack_cards then
+		pack_fired = { seen = pack_cards }
+	end
+	once("start", collection.pack_kind == 0 and "summon" or "rumble")
+	if t >= 1.5 then
+		once("burst", "burst")
+	end
+	local pack = collection.PACKS[collection.pack_kind]
+	local colour = pack and pack.colour or { 0.8, 0.2, 0.2 }
+	local cx, cy = reference_window_width / 2, reference_window_height / 2
+	lg.setColor(1, 1, 1)
+	local title_alpha = math.min(1, math.max(0, t - REVEAL_START + 0.3))
+	lg.setColor(1, 1, 1, title_alpha)
+	local heading = #pack_cards == 0 and "You own every snake you can pull" or (pack and "Pack opened!" or "Summoned!")
+	lg.setColor(0, 0, 0, title_alpha)
+	lg.printf(heading, assets.font, 3, 63, reference_window_width, "center")
+	lg.setColor(1, 1, 1, title_alpha)
+	lg.printf(heading, assets.font, 0, 60, reference_window_width, "center")
+
+	if t < 1.5 then -- the sealed pack: shakes harder and glows brighter until it bursts
+		local shake = (t / 1.5) ^ 2 * 14
+		local px, py = cx + math.sin(t * 60) * shake, cy + math.cos(t * 47) * shake * 0.6
+		lg.setBlendMode("add")
+		for i = 1, 5 do
+			lg.setColor(colour[1], colour[2], colour[3], 0.05 + 0.1 * (t / 1.5))
+			lg.circle("fill", px, py, 150 + i * 28 + t * 40)
+		end
+		lg.setBlendMode("alpha")
+		lg.push()
+		lg.translate(px, py)
+		lg.rotate(math.sin(t * 40) * shake * 0.004)
+		lg.setColor(colour[1] * 0.6, colour[2] * 0.6, colour[3] * 0.6)
+		lg.rectangle("fill", -130, -190, 260, 380, 14, 14)
+		lg.setColor(colour[1], colour[2], colour[3])
+		lg.setLineWidth(6)
+		lg.rectangle("line", -130, -190, 260, 380, 14, 14)
+		lg.setLineWidth(1)
+		lg.setColor(1, 1, 1, 0.25 + 0.2 * math.sin(t * 8))
+		lg.rectangle("fill", -100, -160 + (t * 400) % 320, 200, 24)
+		lg.setColor(1, 1, 1)
+		lg.printf(pack and pack.name or "Summon", assets.font, -130, -40, 260, "center")
+		lg.pop()
+	else
+		local flash = 1 - (t - 1.5) / 0.5
+		burst(cx, cy, t - 1.5, 70, colour, 700)
+		if flash > 0 then
+			lg.setColor(1, 1, 1, flash)
+			lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+		end
+	end
+
+	local gap, scale = 40, 1.8
+	local n = #pack_cards
+	local x0 = (reference_window_width - n * img_widths * scale - (n - 1) * gap) / 2
+	for i, name in ipairs(pack_cards) do
+		local age = t - (REVEAL_START + (i - 1) * REVEAL_GAP)
+		if age > 0 then
+			local st = data.stats_by_name[name]
+			once("reveal" .. i, "reveal" .. st.rarity)
+			local c = RARITY_COLOUR[st.rarity]
+			local px = x0 + (i - 1) * (img_widths * scale + gap) + img_widths * scale / 2
+			local py = 190 + img_heights * scale / 2
+			-- rays behind the card, stronger for rarer snakes
+			lg.setBlendMode("add")
+			for ray = 1, 6 + st.rarity * 2 do
+				local angle = ray / (6 + st.rarity * 2) * 6.283 + time * 0.4
+				lg.setColor(c[1], c[2], c[3], math.min(1, age * 2) * (0.04 + 0.02 * st.rarity))
+				lg.polygon("fill", px, py, px + math.cos(angle - 0.06) * 700, py + math.sin(angle - 0.06) * 700, px + math.cos(angle + 0.06) * 700, py + math.sin(angle + 0.06) * 700)
+			end
+			lg.setBlendMode("alpha")
+			local flip = math.min(1, age / 0.5)
+			local pop = 1 + 0.15 * math.max(0, 1 - age * 3)
+			local face = flip >= 0.5
+			lg.push()
+			lg.translate(px, py)
+			lg.scale(math.abs(math.cos(flip * math.pi)) * pop, pop)
+			lg.translate(-img_widths * scale / 2, -img_heights * scale / 2)
+			lg.scale(scale)
+			if face then
+				lg.setColor(1, 1, 1)
+				lg.draw(assets.card_by_name[name])
+				require("CardText").draw(name, 0, 0)
+				borders.draw(collection.pack_borders and collection.pack_borders[i] or st.border, 0, 0, img_widths, img_heights, st.rarity)
+			else
+				lg.setColor(c[1] * 0.5, c[2] * 0.5, c[3] * 0.5)
+				lg.rectangle("fill", 0, 0, img_widths, img_heights, 8, 8)
+				lg.setColor(c[1], c[2], c[3])
+				lg.setLineWidth(3)
+				lg.rectangle("line", 8, 8, img_widths - 16, img_heights - 16, 6, 6)
+				lg.setLineWidth(1)
+				lg.printf("?", assets.font, 0, img_heights / 2 - 30, img_widths, "center")
+			end
+			lg.pop()
+			if collection.pack_new[name] and face then
+				lg.setColor(1, 0.85, 0.2, math.min(1, (age - 0.5) * 4))
+				lg.printf("NEW!", assets.font, px - 100, 135, 200, "center")
+			end
+			local pulled_border = collection.pack_borders and collection.pack_borders[i]
+			if face and pulled_border and pulled_border ~= st.border then -- a variant: its new border
+				local bc = borders.colour(pulled_border)
+				lg.setColor(bc[1], bc[2], bc[3], math.min(1, (age - 0.5) * 4))
+				lg.printf(pulled_border .. " border!", assets.small_font, px - 140, py + img_heights * scale / 2 + 8, 280, "center")
+			end
+			burst(px, py, age - 0.4, 12 + st.rarity * 14, c, 250 + st.rarity * 120)
+		end
+	end
+	lg.setColor(1, 1, 1)
+	collection.pack_revealed = t > REVEAL_START + n * REVEAL_GAP
+	if collection.pack_revealed then
+		buttons.pack["Done"]:draw()
+		local pack = collection.PACKS[collection.pack_kind]
+		if pack then
+			local price = collection.price(collection.pack_kind)
+			local again = buttons.pack["Again"]
+			again:update_text("Open Another (" .. price .. ")")
+			lg.setColor(1, 1, 1, collection.eyes >= price and 1 or 0.45)
+			again:draw()
+			lg.setColor(1, 0.85, 0.2)
+			draw_eyes("", collection.eyes, reference_window_width - 345, 20, 330, "right")
+		end
+	end
+	if collection.message and time - collection.message_t < 2 then
+		lg.setColor(0, 0, 0, 0.85)
+		lg.rectangle("fill", 370, 730, 700, 56, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.printf(collection.message, assets.font, 370, 735, 700, "center")
+	end
 end
 
 -- Charmer cards: 6 across, 2 down, in reference-window units
@@ -306,6 +1074,70 @@ end
 local level_start, last_level = 0, -1
 
 -- The swirling background dissolves into the snake and its levels over about a second and a half
+-- A row of small card thumbnails for a deck (list of names), wrapped at per_row
+local function deck_thumbs(deck, x, y, per_row)
+	local scale = 0.26
+	for i, name in ipairs(deck) do
+		local col, row = (i - 1) % per_row, math.floor((i - 1) / per_row)
+		lg.setColor(1, 1, 1)
+		lg.draw(assets.card_by_name[name], x + col * 50, y + row * 92, 0, scale)
+	end
+end
+
+local function charmer_info(charmer, x, y, who)
+	lg.setColor(1, 0.85, 0.2)
+	lg.printf(who .. ": " .. charmer.name, assets.small_font, x, y, 520, "left")
+	lg.setColor(1, 1, 1)
+	lg.printf(charmer.charm .. " (" .. charmer.cost .. " venom): " .. charmer.text, assets.small_font, x, y + 34, 520, "left")
+end
+
+-- The screen shown when a level is clicked
+function render.briefing(level)
+	local opponent, challenge = opponents[level], challenges[level]
+	lg.setColor(0, 0, 0, 0.88)
+	lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+	lg.setColor(1, 1, 1)
+	lg.printf("Level " .. level .. ": " .. opponent.name, assets.font, 0, 25, reference_window_width, "center")
+	lg.setColor(1, 0.85, 0.2)
+	draw_eyes("Win: +", collection.payout(true, level), 0, 90, reference_window_width / 2 - 20, "right")
+	draw_eyes("Lose: +", collection.payout(false, level), reference_window_width / 2 + 20, 90, 400, "left")
+
+	local deck = collection.deck()
+	local shown = { unpack(deck, 1, 20) } -- a deck is at most 20; before one is chosen every owned snake is in it
+	charmer_info(charmers.by_name[chosen_avatar], 100, 140, "You")
+	lg.setColor(1, 1, 1)
+	lg.print("Your deck (" .. #deck .. ")" .. (#deck > 20 and ", first 20 shown" or ""), assets.small_font, 100, 225)
+	deck_thumbs(shown, 100, 262, 10)
+	charmer_info(charmers.of("Opponent", level), 790, 140, "Opponent")
+	lg.setColor(1, 1, 1)
+	lg.print("Their deck (" .. #opponent.deck .. ")", assets.small_font, 790, 225)
+	deck_thumbs(opponent.deck, 790, 262, 10)
+
+	-- The challenge stays hidden until the level and the previous level's challenge are beaten
+	lg.setColor(0.1, 0.06, 0.2, 0.95)
+	lg.rectangle("fill", 100, 570, 1240, 140, 10, 10)
+	local open = play.challenge_open(level)
+	lg.setColor(1, 0.85, 0.2, open and 1 or 0.6)
+	lg.rectangle("line", 100, 570, 1240, 140, 10, 10)
+	if open then
+		lg.printf("Challenge: " .. challenge.name .. " (x" .. challenge.mult .. " reward)", assets.font, 100, 585, 1240, "center")
+		lg.setColor(1, 1, 1)
+		lg.printf(challenge.text .. (collection.challenge_done(level) and "  (beaten)" or ""), assets.small_font, 100, 650, 1240, "center")
+	else
+		lg.printf("Challenge: ???", assets.font, 100, 585, 1240, "center")
+		lg.setColor(1, 1, 1, 0.8)
+		lg.printf(play.can_challenge(level) and "Beat the previous level's challenge to reveal this one" or "Beat this level to unlock its challenge", assets.small_font, 100, 650, 1240, "center")
+	end
+	lg.setColor(1, 1, 1)
+	for _, name in ipairs({ "Play", "Challenge", "Cancel" }) do
+		if name == "Challenge" and not open then
+			lg.setColor(1, 1, 1, 0.4)
+		end
+		buttons.level_choice[name]:draw()
+		lg.setColor(1, 1, 1)
+	end
+end
+
 function render.level_select()
 	if time - last_level > 0.25 then
 		level_start = time
@@ -336,13 +1168,27 @@ function render.level_select()
 		lg.setColor(1, 1, 1, fade)
 		lg.printf(i == 0 and "?" or tostring(i), assets.font, x - NODE_RADIUS, y - 25, NODE_RADIUS * 2, "center")
 		local right = x > reference_window_width / 2
-		lg.printf(name, assets.font, right and x - NODE_RADIUS - 415 or x + NODE_RADIUS + 15, y - 25, 400, right and "right" or "left")
+		local tx = right and x - NODE_RADIUS - 415 or x + NODE_RADIUS + 15
+		local reward = i <= unlocked and ("+" .. collection.payout(true, i)) or nil
+		-- a dark plate behind the label keeps it readable over the snake's green and tan
+		local width = math.max(assets.font:getWidth(name), reward and assets.small_font:getWidth(reward) + 40 or 0) + 28
+		local plate_x = right and tx + 400 - width + 14 or tx - 14
+		lg.setColor(0.05, 0.02, 0.1, 0.72 * fade)
+		lg.rectangle("fill", plate_x, y - 32, width, reward and 90 or 62, 10, 10)
+		lg.setColor(1, 1, 1, fade)
+		lg.printf(name, assets.font, tx, y - 25, 400, right and "right" or "left")
+		if reward then
+			lg.setColor(1, 0.85, 0.2, fade)
+			draw_eyes(reward, "", tx, y + 22, 400, right and "right" or "left")
+		end
 	end
 	lg.setColor(1, 1, 1)
-	buttons.level_select["Deck"]:draw()
-	buttons.level_select["Lanes"]:draw()
 	buttons.universal["Back"]:draw()
+	if level_choice then
+		render.briefing(level_choice)
+	end
 end
+
 
 local HAND_SCALE = 0.8 -- the taller cards are drawn smaller in the hand to fit under the field
 
@@ -415,11 +1261,92 @@ local snake_shader = lg.newShader([[
 local CARD_ART_H = 240 -- the card without its text panel
 local card_styles = require("CardStyles") -- the colours of each lane type's cards, cut out by the shader
 
+-- The glow or particles on a snake that has drunk a brew (cx, cy = the snake's centre). Smoke fills the whole lane cell.
+local function brew_aura(card, sector, cx, cy)
+	local kind = card.brew
+	if not kind then
+		return
+	end
+	local t = time
+	local function rising(count, speed, draw) -- calls draw(x, y, alpha, i) for particles drifting up the snake
+		for i = 1, count do
+			local phase = (t * speed + i / count) % 1
+			draw(cx + math.sin(i * 12.9) * 55, cy + 75 - phase * 150, math.sin(phase * math.pi), i)
+		end
+	end
+	local drank = card.brew_t and time - card.brew_t or 9
+	if drank < 0.7 then -- a ring splashes out when the brew is first drunk
+		lg.setColor(1, 1, 1, 0.8 * (1 - drank / 0.7))
+		lg.setLineWidth(5)
+		lg.circle("line", cx, cy, 20 + drank * 140)
+		lg.setLineWidth(1)
+	end
+	if kind == "stone" then
+		local pulse = 0.5 + 0.5 * math.sin(t * 2)
+		lg.setColor(0.7, 0.72, 0.8, 0.12 + 0.08 * pulse)
+		lg.ellipse("fill", cx, cy, 70, 82)
+		lg.setColor(0.8, 0.82, 0.9, 0.5 + 0.3 * pulse)
+		lg.setLineWidth(4)
+		lg.ellipse("line", cx, cy, 70, 82)
+		lg.setLineWidth(1)
+	elseif kind == "regrow" then
+		rising(6, 0.5, function(x, y, a)
+			lg.setColor(0.4, 1, 0.5, a)
+			lg.rectangle("fill", x - 3, y - 9, 6, 18)
+			lg.rectangle("fill", x - 9, y - 3, 18, 6)
+		end)
+	elseif kind == "venom" then
+		rising(8, 0.7, function(x, y, a, i)
+			lg.setColor(0.75, 0.35, 0.95, a * 0.9)
+			lg.circle("fill", x, y, 4 + i % 3 * 2)
+			lg.setColor(1, 1, 1, a * 0.7)
+			lg.circle("fill", x - 1, y - 1, 1.5)
+		end)
+	elseif kind == "rage" then
+		for i = 1, 7 do
+			local x = cx + (i - 4) * 18
+			local h = 34 + 22 * math.sin(t * 9 + i * 2)
+			lg.setColor(1, 0.35, 0.1, 0.7)
+			lg.polygon("fill", x - 9, cy + 56, x, cy + 56 - h, x + 9, cy + 56)
+			lg.setColor(1, 0.8, 0.2, 0.7)
+			lg.polygon("fill", x - 5, cy + 56, x, cy + 56 - h * 0.6, x + 5, cy + 56)
+		end
+	elseif kind == "frost" then
+		rising(7, -0.35, function(x, y, a)
+			lg.setColor(0.8, 0.95, 1, a)
+			lg.setLineWidth(2)
+			for k = 0, 2 do
+				local r = k * math.pi / 3 + t
+				lg.line(x - 8 * math.cos(r), y - 8 * math.sin(r), x + 8 * math.cos(r), y + 8 * math.sin(r))
+			end
+			lg.setLineWidth(1)
+		end)
+	elseif kind == "phase" then
+		local pulse = 0.5 + 0.5 * math.sin(t * 3)
+		lg.setColor(0.9, 0.95, 1, 0.1 + 0.1 * pulse)
+		lg.ellipse("fill", cx, cy, 72, 84)
+		for i = 1, 3 do
+			local a = t * 1.5 + i * 2.1
+			lg.setColor(0.9, 0.95, 1, 0.55)
+			lg.circle("fill", cx + math.cos(a) * 62, cy + math.sin(a) * 74, 7)
+		end
+	elseif kind == "smoke" then -- lane brew: drifting smoke over the whole cell the snake stands in
+		local box = play.field_hitboxes[sector]
+		for i = 1, 7 do
+			local x = box[1] + 20 + (box[3] - 40) * ((i * 0.37 + t * 0.05) % 1)
+			local y = box[2] + 30 + (box[4] - 80) * ((i * 0.61 + math.sin(t * 0.5 + i)) % 1)
+			lg.setColor(0.45, 0.45, 0.5, 0.3)
+			lg.circle("fill", x, y, 34 + i % 3 * 8)
+		end
+	end
+	lg.setColor(1, 1, 1)
+end
+
 local function draw_slot(card, sector)
 	local cx, cy = play.slot_centre(sector)
 	local dx, dy, sx, sy, alpha, flash = effects.card(card)
 	local stats = data.get_stats(card)
-	local rim = borders.colour(stats.rarity == 5 and "Rainbow" or stats.border)
+	local rim = borders.colour(stats.rarity == 5 and "Rainbow" or data.border_of(card))
 	local pulse = 0.5 + 0.5 * math.sin(time * 4)
 	card.card_object:setFilter("nearest", "nearest")
 	local style = card_styles[data.get_type(card)]
@@ -447,6 +1374,7 @@ local function draw_slot(card, sector)
 	end
 	lg.setShader()
 	lg.pop()
+	brew_aura(card, sector, cx + dx, cy + dy)
 end
 
 local LANE_X, LANE_Y = { 20, 250, 490, 720 }, { 20, 280 } -- where each lane's cells sit inside the field image
@@ -503,8 +1431,9 @@ function render.playing()
 	for side, spot in pairs({ Opponent = { 1215, 78 }, Player = { 1215, 548 } }) do
 		local c = charmers.of(side, play.level)
 		lg.setColor(1, 1, 1)
-		portrait(c.name, spot[1], spot[2], 60, 72)
-		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
+		local who = side == "Opponent" and (play.level == 0 and require("Tutorial").profile or opponents[play.level]) or c
+		portrait(who.name, spot[1], spot[2], 60, 72)
+		lg.printf(who.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
 		lg.setColor(0.6, 0.9, 0.4)
 		lg.printf(c.charm .. " (" .. c.cost .. ")", assets.debug_font, spot[1] + 68, spot[2] + 44, 145, "left")
 	end
@@ -583,7 +1512,7 @@ function render.playing()
 				lg.rectangle("fill", 1200, 325, 235, 170)
 				lg.setColor(1, 1, 1)
 				lg.printf(
-					card.card_path:sub(1, -5):gsub("_", " ") .. "\n" .. stats.ability .. "\n" .. borders.describe(stats.border)
+					card.card_path:sub(1, -5):gsub("_", " ") .. "\n" .. stats.ability .. "\n" .. borders.describe(data.border_of(card))
 						.. (#status > 0 and ("\n" .. table.concat(status, ", ")) or ""),
 					assets.debug_font, 1208, 330, 220
 				)
@@ -604,16 +1533,28 @@ function render.playing()
 		lg.printf(health[side] .. " HP", assets.debug_font, 1215 + shake, y + 8, 200, "center")
 	end
 	effects.draw()
+	if play.flash and time - play.flash.t < 0.5 then -- a screen-wide flash when a spell is cast
+		local col = play.flash.colour
+		lg.setColor(col[1], col[2], col[3], 0.4 * (1 - (time - play.flash.t) / 0.5))
+		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+	end
 	lg.setColor(1, 1, 1)
 	lg.printf(turn == "Player" and "Your Turn" or "Opponent's Turn", assets.font, 1200, 190, 230, "center")
 	lg.setColor(1, 1, 1)
 
 	if held_card then
-		held_card:draw(
-			mouse.x * reference_window_width / lg.getWidth() - img_widths / 2,
-			mouse.y * reference_window_height / lg.getHeight() - img_heights / 2,
-			0
-		)
+		local hx = mouse.x * reference_window_width / lg.getWidth() - img_widths / 2
+		local hy = mouse.y * reference_window_height / lg.getHeight() - img_heights / 2
+		held_card:draw(hx, hy, 0)
+		-- a readout above the card: its numbers, and why it can't be played yet
+		local st = data.get_stats(held_card)
+		local short = venom.Player < st.cost
+		lg.setColor(0, 0, 0, 0.8)
+		local ry = math.max(hy - 44, 0)
+		lg.rectangle("fill", hx - 10, ry, img_widths + 20, 38, 6, 6)
+		lg.setColor(1, short and 0.4 or 1, short and 0.4 or 1)
+		lg.printf(short and ("Need " .. st.cost .. " venom") or (st.kind ~= "snake" and ("Cost " .. st.cost .. (st.kind == "brew" and "  drop on your snake" or "  drop on the field")) or ("Cost " .. st.cost .. "  Atk " .. st.attack .. "  Def " .. st.defense)), assets.small_font, hx - 10, ry + 2, img_widths + 20, "center")
+		lg.setColor(1, 1, 1)
 	end
 
 	if not tutorial.allows("end_turn") then -- locked controls are dimmed like an unaffordable Charm
@@ -646,45 +1587,108 @@ function render.ended()
 		local message = level_unlocked and ("Level " .. level_unlocked .. " unlocked!") or (play.level == #opponents and "You beat every opponent!" or "")
 		lg.printf(message, assets.font, 0, 400, reference_window_width, "center")
 	end
+	lg.setColor(1, 0.85, 0.2)
+	draw_eyes("+", collection.last_reward or 0, 0, 480, reference_window_width, "center", assets.font)
+	lg.setColor(1, 1, 1)
+	if won and play.challenge then
+		lg.printf("Challenge: " .. play.challenge.name .. " (x" .. play.challenge.mult .. " reward)", assets.small_font, 0, 560, reference_window_width, "center")
+	end
 	buttons.ended["Continue"]:draw()
 end
 
+-- The info page for a card: art on the left, then name and tier, stat boxes, border, ability, lore and (from the collection) your copies
 function render.info()
 	background()
-	buttons.info["Back"]:draw()
-	buttons.info["Info Background"]:draw()
-
 	if not info_card then
+		buttons.info["Back"]:draw()
 		return
 	end
-	info_card:draw(reference_window_width * 0.8 / 6 + 5, reference_window_height * 1 / 6, 0, 2.65)
-
-	lg.setColor(mouse_over_info_background and purple or green)
 	local info = data.get_stats(info_card)
-	local rows = {
-		{ "Cost: ", info.cost, 0.7 },
-		{ "Defense: ", info.defense, 1.7 },
-		{ "Type: ", data.get_type(info_card), 2.7 },
-		{ "Attack: ", info.attack, 3.7 },
-		{ "Tier: ", info.rarity .. (info.tier and " " .. info.tier or ""), 4.7 },
-	}
-	for _, row in ipairs(rows) do
-		lg.print(
-			row[1] .. tostring(row[2]),
-			assets.font,
-			reference_window_width / 2,
-			info_background_y + reference_window_height * row[3] / 10
-		)
+	local snake = info.kind == "snake"
+	local name = info_card.card_path:sub(1, -5)
+	local tier = RARITY_COLOUR[info.rarity]
+	local pulse = 0.5 + 0.5 * math.sin(time * 2.5)
+
+	-- the card, on a glow in its tier colour
+	local cx, cy, scale = 60, 70, 2.3
+	lg.setBlendMode("add")
+	for i = 1, 4 do
+		lg.setColor(tier[1], tier[2], tier[3], (0.05 + 0.03 * pulse) * (5 - i))
+		lg.rectangle("fill", cx - i * 10, cy - i * 10, img_widths * scale + i * 20, img_heights * scale + i * 20, 16, 16)
 	end
-	-- Longer text wraps in the smaller font
-	local text_width = reference_window_width * 0.37
-	for _, block in ipairs({
-		{ "Ability: " .. info.ability, 5.3 },
-		{ borders.describe(info.border), 6.4 },
-		{ info.lore, 7.5 },
-	}) do
-		lg.printf(block[1], assets.small_font, reference_window_width / 2, info_background_y + reference_window_height * block[2] / 10, text_width)
+	lg.setBlendMode("alpha")
+	lg.push()
+	info_card:draw(cx, cy, 0, scale)
+	lg.pop()
+
+	-- the text panel
+	local px, pw = 500, 900
+	lg.setColor(0.07, 0.04, 0.14, 0.92)
+	lg.rectangle("fill", px, 40, pw, 792, 14, 14)
+	lg.setColor(tier[1], tier[2], tier[3], 0.7 + 0.3 * pulse)
+	lg.setLineWidth(4)
+	lg.rectangle("line", px, 40, pw, 792, 14, 14)
+	lg.setLineWidth(1)
+
+	local x, w = px + 35, pw - 70
+	lg.setColor(1, 1, 1)
+	lg.print((name:gsub("_", " ")), assets.font, x, 58)
+	lg.setColor(tier)
+	local kind = snake and ("Snake, " .. data.get_type(info_card)) or (info.kind == "brew" and "Brew" or "Spell")
+	lg.print("Tier " .. info.rarity .. (info.tier and (" " .. info.tier) or "") .. "   |   " .. kind, assets.small_font, x, 122)
+
+	-- stat boxes
+	local y = 172
+	stat_chip("Cost", info.cost, x, y, 150, { 0.4, 0.85, 0.4 })
+	if snake then
+		stat_chip("Attack", info.attack, x + 170, y, 150, { 1, 0.4, 0.4 })
+		stat_chip("Defense", info.defense, x + 340, y, 150, { 0.45, 0.6, 1 })
+	else
+		stat_chip("Use", info.kind == "brew" and "Drink" or "Cast", x + 170, y, 320, { 0.7, 0.5, 1 })
+		lg.setColor(0.8, 0.85, 1)
+		lg.printf(info.kind == "brew" and "Drop it on one of your snakes" or "Drop it anywhere on the field", assets.small_font, x + 510, y + 22, w - 510)
 	end
+	y = y + 112
+
+	if snake then
+		local border = data.border_of(info_card)
+		local colour = borders.colour(border) or { 0.7, 0.7, 0.7 }
+		lg.setColor(colour[1] * 0.2, colour[2] * 0.2, colour[3] * 0.2, 0.9)
+		local _, lines = assets.small_font:getWrap(borders.describe(border), w - 30)
+		local h = 20 + #lines * assets.small_font:getHeight()
+		lg.rectangle("fill", x, y, w, h, 8, 8)
+		lg.setColor(colour[1], colour[2], colour[3])
+		lg.rectangle("fill", x, y, 8, h, 4, 4)
+		lg.printf(borders.describe(border), assets.small_font, x + 22, y + 10, w - 30)
+		y = y + h + 22
+	end
+
+	y = info_section("Ability", info.ability or "None", x, y, w, { 1, 0.85, 0.2 }, { 1, 1, 1 })
+	y = info_section("Lore", info.lore or "", x, y, w, { 0.6, 0.65, 0.85 }, { 0.8, 0.85, 1 })
+
+	-- From the collection: every variant of the snake you have, with its border and how many copies
+	if info_return == "collection" and y < 690 and collection.count(name) > 0 then
+		lg.setColor(1, 0.85, 0.2)
+		lg.print("Your copies (" .. collection.count(name) .. ")", assets.small_font, x, 690)
+		local variants = snake and collection.variant_list(name) or { { "Basic", collection.count(name) } }
+		for i, v in ipairs(variants) do
+			local vx, thumb = x + (i - 1) * 70, 0.33
+			lg.push()
+			lg.translate(vx, 724)
+			lg.scale(thumb)
+			lg.setColor(1, 1, 1)
+			lg.draw(assets.card_by_name[name])
+			if snake then
+				borders.draw(v[1], 0, 0, img_widths, img_heights, info.rarity)
+			end
+			lg.pop()
+			lg.setColor(0, 0, 0, 0.8)
+			lg.rectangle("fill", vx, 724, 34, 24, 5, 5)
+			lg.setColor(1, 1, 1)
+			lg.printf("x" .. v[2], assets.card_text_font, vx, 725, 34, "center")
+		end
+	end
+	buttons.info["Back"]:draw()
 end
 
 return render

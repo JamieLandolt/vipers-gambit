@@ -105,7 +105,10 @@ function lane_editor.draw()
 	local counts = { Land = 0, Water = 0, Tree = 0, Spirit = 0, Rainbow = 0 }
 	local data = require("CardData")
 	for _, name in ipairs(require("Collection").deck()) do
-		counts[data.card_types[name]] = counts[data.card_types[name]] + 1
+		local kind = data.card_types[name]
+		if counts[kind] then -- (brews and spells have no lane)
+			counts[kind] = counts[kind] + 1
+		end
 	end
 	lg.setColor(1, 1, 1)
 	lg.printf(("Your deck: %d Land, %d Water, %d Tree, %d Spirit, %d Rainbow"):format(counts.Land, counts.Water, counts.Tree, counts.Spirit, counts.Rainbow), assets.small_font, 0, 640, reference_window_width, "center")

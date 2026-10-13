@@ -4,9 +4,6 @@ local powers = require("Powers")
 local lore = require("Lore")
 
 local card_stats = {
-	Snake = stats(2, 3, 2, "N/A", "Basic", 1, nil, "N/A"),
-	Big_Snake = stats(3, 3, 10, "N/A", "Basic", 2, nil, "N/A"),
-	Anaconda = stats(6, 8, 8, "N/A", "Basic", 3, nil, "N/A"),
 	Copperhead = stats(5, 10, 5, "N/A", "Basic", 3, nil, "N/A"),
 	Zombie_Snake = stats(3, 5, 5, "N/A", "Basic", 2, nil, "N/A"),
 	Cannibal_Snake = stats(3, 12, 3, "N/A", "Basic", 2, nil, "N/A"),
@@ -58,8 +55,8 @@ end
 
 -- Each snake has one type; lanes only accept certain types (see play.lane_types), except Rainbow which fits any lane
 local type_lists = {
-	Land = { "Snake", "Big_Snake", "Cannibal_Snake", "Cobra", "King_Cobra", "Albino_Cobra", "Horned_Viper", "Grey_Snake", "Dirt_Snake", "Sand_Snake" },
-	Water = { "Anaconda", "Extra_Long_Python", "Frost_Cobra", "Sea_Snake", "Toxic_Snake", "Mud_Snake", "Ball_Python", "Garter_Snake", "Copperhead" },
+	Land = { "Cannibal_Snake", "Cobra", "King_Cobra", "Albino_Cobra", "Horned_Viper", "Grey_Snake", "Dirt_Snake", "Sand_Snake" },
+	Water = { "Extra_Long_Python", "Frost_Cobra", "Sea_Snake", "Toxic_Snake", "Mud_Snake", "Ball_Python", "Garter_Snake", "Copperhead" },
 	Tree = { "Boa_Constrictor", "Tree_Boa", "Vine_Snake", "Grass_Snake", "Worm_Snake", "Black_Mamba", "Kingsnake", "Corn_Snake", "Brown_Snake" },
 	Rainbow = { "Coral_Snake", "Rattlesnake", "Gaboon_Viper", "Golden_Snake" }, -- fits any lane
 	Spirit = { "Zombie_Snake", "Skeleton_Snake", "Ghost_Snake", "Shadow_Snake", "Lava_Snake", "Blood_Cobra", "Pale_Snake" },
@@ -69,6 +66,14 @@ for _, new in ipairs(require("NewCards")) do
 	type_lists[new.type] = type_lists[new.type] or {}
 	table.insert(type_lists[new.type], new.name)
 end
+-- Brews and spells (Brews.lua) are cards too: no attack or defense, and their own "type" for the card colours
+for _, b in ipairs(require("Brews").list) do
+	card_stats[b.name] = stats(b.cost, 0, 0, b.text, b.kind == "brew" and "Brew" or "Spell", b.rarity, nil, b.lore)
+	card_stats[b.name].kind = b.kind
+	local card_type = b.kind == "brew" and "Brew" or "Spell"
+	type_lists[card_type] = type_lists[card_type] or {}
+	table.insert(type_lists[card_type], b.name)
+end
 local card_types = {}
 for snake_type, names in pairs(type_lists) do
 	for _, name in ipairs(names) do
@@ -76,24 +81,35 @@ for snake_type, names in pairs(type_lists) do
 	end
 end
 
+-- Hand-picked abilities in the Abilities.lua format (the rest are assigned by type and tier)
+local ABILITY_OVERRIDES = {
+	Chromatic_Wyrm = "refresh:1:3", -- the tier 4 Wyrm lets your other snakes use their abilities again
+	Kaleido_Viper = "refresh:1:4",
+}
+
 -- Snakes are tougher than their listed defense (the legendaries are already set as intended)
 local HEALTH_SCALE = 1.5
 local MIN_ATTACK = 2
 
 local deck = {}
 for name, st in pairs(card_stats) do
-	st.attack = math.max(st.attack, MIN_ATTACK)
-	if st.rarity < 5 then
-		st.defense = math.ceil(st.defense * HEALTH_SCALE)
+	st.kind = st.kind or "snake"
+	if st.kind == "snake" then
+		st.attack = math.max(st.attack, MIN_ATTACK)
+		if st.rarity < 5 then
+			st.defense = math.ceil(st.defense * HEALTH_SCALE)
+		end
 	end
 	table.insert(deck, name)
-	if powers.of[name] then
-		st.ability = powers.of[name].text -- hand-made and unique, applied through Powers.lua
-	else
-		st.ability_code = st.ability_code or abilities.assign(name, card_types[name], st.rarity)
-		st.ability = abilities.describe(st.ability_code)
+	if st.kind == "snake" then -- (brews and spells carry their own text and lore, see Brews.lua)
+		if powers.of[name] then
+			st.ability = powers.of[name].text -- hand-made and unique, applied through Powers.lua
+		else
+			st.ability_code = ABILITY_OVERRIDES[name] or st.ability_code or abilities.assign(name, card_types[name], st.rarity)
+			st.ability = abilities.describe(st.ability_code)
+		end
+		st.lore = lore[name] or st.lore
 	end
-	st.lore = lore[name] or st.lore
 	st.tier = lore.tiers[st.rarity]
 end
 table.sort(deck)
@@ -106,4 +122,9 @@ local function get_type(card)
 	return card_types[string.sub(card.card_path, 1, -5)]
 end
 
-return { deck = deck, get_stats = get_stats, get_type = get_type, card_types = card_types, stats_by_name = card_stats }
+-- A card's border: the one a variant copy carries (set on the card when drawn), else its snake's own
+local function border_of(card)
+	return card.border or get_stats(card).border
+end
+
+return { deck = deck, border_of = border_of, get_stats = get_stats, get_type = get_type, card_types = card_types, stats_by_name = card_stats }
