@@ -17,8 +17,13 @@ tutorial.profile = {
 local ended_turns = 0 -- how many times the player has pressed End Turn
 local last_turn
 
+-- The tutorial player only has these four snakes: a plain one, a Venom-border one, a Rainbow one and one with an ability
+tutorial.player_deck = { "Skinny_Snake", "Orchid_Snake", "Candy_Snake", "Brown_Snake" }
+
+-- Each step waits for the player to do something (done), to press Next (next), or either (both).
+-- The End Turn, ability and Charm controls stay locked until their step (see tutorial.allows).
 local steps = {
-	{ text = "Welcome, Charmer! Drag a snake from your hand onto a glowing slot on your side of the field.",
+	{ text = "Welcome, Charmer! Drag a snake from your hand onto a lit slot on your side of the field.",
 		done = function()
 			for slot = 5, 8 do
 				if played_cards[slot] then
@@ -26,13 +31,40 @@ local steps = {
 				end
 			end
 		end },
-	{ text = "Each lane only fits certain snake types: read the label on every slot. Rainbow snakes fit any lane.", next = true },
-	{ text = "Snakes cost venom (the meter at the left). It grows by 1 every turn. Now press End Turn to attack.",
+	{ text = "Lanes: each lane only fits certain snake types, named on every slot (the lane's look matches: sand, water, leaves, mist). Rainbow snakes fit any lane.", next = true },
+	{ text = "Borders: the coloured frame on a card gives a passive effect. Venom poisons, Fire carries overkill damage to health, Frost freezes, Shadow dodges the first hit, Gold earns venom, Rainbow grows. Play your green-framed snake and hover it.",
+		done = function()
+			for slot = 5, 8 do
+				local c = played_cards[slot]
+				if c and require("CardData").get_stats(c).border ~= "Basic" then
+					return true
+				end
+			end
+		end },
+	{ text = "Rarity: the bars under a card show its tier, from 1 (Hatchling) up to 5 (Mythic, the legendaries). Rarer snakes are stronger and cost more venom.", next = true },
+	{ text = "Venom: the meter at the left pays for snakes. You get 1 more each turn.", next = true },
+	{ text = "Now press End Turn. Your snakes attack the card in the lane opposite them, or the enemy's health if the lane is empty.",
 		done = function() return ended_turns >= 1 end },
-	{ text = "Your snakes hit the card in the lane opposite them, or the enemy's health if the lane is empty. Then the enemy takes its turn.", next = true },
-	{ text = "Keep playing snakes and pressing End Turn. A snake with a ! can use its ability for venom: click it. Hover any snake to read its ability and border.", next = true },
+	{ text = "The enemy takes its turn, then it is yours again.", next = true },
+	{ text = "Abilities: a snake with a ! can use an ability for venom. Click it. Hover any snake to read its ability.",
+		done = function()
+			for slot = 5, 8 do
+				if played_cards[slot] and played_cards[slot].used then
+					return true
+				end
+			end
+		end, next = true },
+	{ text = "Charm: your charmer's Charm button, right of the field, is a power you can use once a turn for venom. Try it!",
+		done = function() return require("Play").charm_used.Player end, next = true },
 	{ text = "Reduce the enemy's health to 0 to win. Good luck!", next = true },
 }
+
+-- Locked controls: the step number at which each unlocks
+local UNLOCK = { end_turn = 6, ability = 8, charm = 9 }
+
+function tutorial.allows(control)
+	return not tutorial.active or tutorial.step >= UNLOCK[control]
+end
 
 function tutorial.start()
 	tutorial.active, tutorial.step, ended_turns, last_turn = true, 1, 0, "Player"
@@ -69,6 +101,11 @@ function tutorial.advance()
 	end
 end
 
+-- Lane type labels show once the tutorial reaches its lane step
+function tutorial.show_labels()
+	return tutorial.active and tutorial.step >= 2
+end
+
 function tutorial.needs_next()
 	return tutorial.active and steps[tutorial.step] and steps[tutorial.step].next
 end
@@ -89,7 +126,7 @@ function tutorial.draw()
 	lg.setLineWidth(1)
 	lg.setColor(1, 1, 1)
 	lg.printf("Tutorial " .. tutorial.step .. "/" .. #steps, assets.debug_font, x + 10, y + 8, w - 20, "center")
-	lg.printf(step.text, assets.small_font, x + 12, y + 40, w - 24)
+	lg.printf(step.text, assets.debug_font, x + 12, y + 36, w - 24)
 end
 
 return tutorial

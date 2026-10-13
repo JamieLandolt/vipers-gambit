@@ -46,13 +46,51 @@ local function place_effect(placed, sector)
 	play.check_end()
 end
 
--- Each lane (column) accepts two snake types, and every type fits in two lanes
-play.lane_types = {
-	{ Land = true, Water = true },
-	{ Water = true, Tree = true },
-	{ Tree = true, Spirit = true },
-	{ Spirit = true, Land = true },
-}
+-- Each lane (column) accepts two snake types. The player can swap them around on the Lanes screen;
+-- lane_chips[lane] is the two types in order and lane_types[lane] the same as a set for lookups.
+local DEFAULT_CHIPS = { { "Land", "Water" }, { "Water", "Tree" }, { "Tree", "Spirit" }, { "Land", "Spirit" } }
+play.lane_chips, play.lane_types = {}, {}
+
+local function set_lanes(chips)
+	for lane = 1, 4 do
+		play.lane_chips[lane] = { chips[lane][1], chips[lane][2] }
+		play.lane_types[lane] = { [chips[lane][1]] = true, [chips[lane][2]] = true }
+	end
+end
+
+local function save_lanes()
+	local lines = {}
+	for lane = 1, 4 do
+		lines[lane] = play.lane_chips[lane][1] .. "," .. play.lane_chips[lane][2]
+	end
+	love.filesystem.write("lanes.txt", table.concat(lines, "\n"))
+end
+
+function play.load_lanes()
+	local chips, valid = {}, { Land = true, Water = true, Tree = true, Spirit = true }
+	for line in (love.filesystem.read("lanes.txt") or ""):gmatch("[^\n]+") do
+		local a, b = line:match("^(%a+),(%a+)$")
+		if a and valid[a] and valid[b] then
+			table.insert(chips, { a, b })
+		end
+	end
+	set_lanes(#chips == 4 and chips or DEFAULT_CHIPS)
+end
+
+function play.reset_lanes()
+	set_lanes(DEFAULT_CHIPS)
+	save_lanes()
+end
+
+-- Swaps two lane types, e.g. one dragged onto another
+function play.swap_lane_types(lane_a, slot_a, lane_b, slot_b)
+	local chips = play.lane_chips
+	chips[lane_a][slot_a], chips[lane_b][slot_b] = chips[lane_b][slot_b], chips[lane_a][slot_a]
+	set_lanes(chips)
+	save_lanes()
+end
+
+set_lanes(DEFAULT_CHIPS)
 
 function play.lane_accepts(card, slot)
 	local snake_type = data.get_type(card)
@@ -71,9 +109,9 @@ end
 
 local profile = opponents[1]
 
-local function fill_hand(hand, deck)
+local function fill_hand(hand, deck, size)
 	local chosen = {}
-	while #hand < HAND_SIZE do
+	while #hand < (size or HAND_SIZE) do
 		local index = math.random(1, #deck)
 		if not contains(chosen, index) then
 			table.insert(hand, card(deck[index] .. ".png", img_widths, img_heights))
@@ -132,7 +170,11 @@ function play.start_turn()
 	play.charm_used[turn] = false
 	max_venom[turn] = math.min(max_venom[turn] + 1, MAX_VENOM)
 	venom[turn] = max_venom[turn]
-	fill_hand(hand_of(turn), turn == "Player" and collection.deck() or profile.deck)
+	if play.level == 0 and turn == "Player" then
+		fill_hand(player_hand, tutorial.player_deck, #tutorial.player_deck) -- the tutorial hand is fixed and small
+	else
+		fill_hand(hand_of(turn), turn == "Player" and collection.deck() or profile.deck)
+	end
 
 	for slot = turn == "Player" and 5 or 1, turn == "Player" and 8 or 4 do
 		local c = played_cards[slot]
@@ -165,7 +207,7 @@ function play.new_game(level)
 	turn = "Player"
 	max_health = { Player = STARTING_HEALTH, Opponent = profile.health or STARTING_HEALTH }
 	health = { Player = STARTING_HEALTH, Opponent = profile.health or STARTING_HEALTH }
-	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) } -- start_turn adds the first point, so turn 1 has 2
+	max_venom = { Player = level == 0 and 3 or 1, Opponent = 1 + (profile.venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
 	held_card, winner, confirm_forfeit = nil, nil, false
@@ -200,7 +242,11 @@ function play.redraw(side)
 		hand[i] = nil
 	end
 	card_hitboxes = {}
-	fill_hand(hand, side == "Player" and collection.deck() or profile.deck)
+	if play.level == 0 and side == "Player" then
+		fill_hand(hand, tutorial.player_deck, #tutorial.player_deck) -- the tutorial hand stays the four lesson snakes
+	else
+		fill_hand(hand, side == "Player" and collection.deck() or profile.deck)
+	end
 end
 
 -- Hits the card in `slot` (or that side's health if the lane is empty) for `attack`, with the
@@ -319,6 +365,7 @@ end
 -- Can this side use its charmer's charm right now?
 function play.charm_ready(side)
 	return turn == side and not play.charm_used[side] and venom[side] >= charmers.of(side, play.level).cost
+		and (side ~= "Player" or tutorial.allows("charm"))
 end
 
 -- Pay venom for the charm (once per turn); does nothing if the charm would have no effect

@@ -8,7 +8,11 @@ local UNOBTAINABLE = { "Cobra", "King_Cobra", "Albino_Cobra", "Blood_Cobra", "Fr
 -- Only T1 snakes, covering every lane type; the other T1s and everything else come from packs
 local STARTERS = { "Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
 
+collection.MIN_DECK, collection.MAX_DECK = 8, 20
+collection.deck_mode = false -- the collection screen is editing the deck
+
 local owned, last_pack = {}, "-"
+local deck_set -- names in the player's chosen deck; nil until they first edit it (then every owned snake is the deck)
 
 local function today()
 	return os.date("%Y-%m-%d")
@@ -38,11 +42,30 @@ function collection.load()
 	for i = 4, #lines do
 		owned[lines[i]] = true
 	end
+
+	-- deck.txt: one snake name per line
+	local saved = love.filesystem.read("deck.txt")
+	deck_set = nil
+	if saved then
+		deck_set = {}
+		for name in saved:gmatch("[^\n]+") do
+			deck_set[name] = true
+		end
+	end
+end
+
+local function save_deck()
+	local names = {}
+	for name in pairs(deck_set) do
+		table.insert(names, name)
+	end
+	love.filesystem.write("deck.txt", table.concat(names, "\n"))
 end
 
 -- Wipes progress back to a new game (settings are kept)
 function collection.reset()
-	unlocked, collection.unlock_all, last_pack, owned = 1, false, "-", {}
+	unlocked, collection.unlock_all, last_pack, owned, deck_set = 1, false, "-", {}, nil
+	love.filesystem.remove("deck.txt")
 	for _, name in ipairs(STARTERS) do
 		owned[name] = true
 	end
@@ -58,8 +81,75 @@ function collection.toggle_unlock_all()
 	collection.save()
 end
 
--- The snakes the player draws their hand from
+local function stat(name, field)
+	local stats = data.get_stats({ card_path = name .. ".png" })
+	return stats and stats[field] or 0
+end
+
+-- Owned snakes that are in the chosen deck
+local function chosen()
+	local list = {}
+	for _, name in ipairs(data.deck) do
+		if deck_set[name] and collection.has(name) then
+			table.insert(list, name)
+		end
+	end
+	return list
+end
+
+function collection.in_deck(name)
+	return collection.has(name) and (deck_set == nil or deck_set[name] == true)
+end
+
+function collection.deck_count()
+	return deck_set and #chosen() or 0
+end
+
+-- First time editing: start from the strongest owned snakes, up to the size limit
+function collection.start_deck_edit()
+	if deck_set then
+		return
+	end
+	local names = {}
+	for _, name in ipairs(data.deck) do
+		if collection.has(name) then
+			table.insert(names, name)
+		end
+	end
+	table.sort(names, function(a, b)
+		return stat(a, "rarity") > stat(b, "rarity") or (stat(a, "rarity") == stat(b, "rarity") and a < b)
+	end)
+	deck_set = {}
+	for i = 1, math.min(#names, collection.MAX_DECK) do
+		deck_set[names[i]] = true
+	end
+	save_deck()
+end
+
+-- Adds or removes a snake; returns a message when the change isn't allowed
+function collection.toggle_deck(name)
+	if deck_set[name] and collection.has(name) then
+		if collection.deck_count() <= collection.MIN_DECK then
+			return "A deck needs at least " .. collection.MIN_DECK .. " snakes"
+		end
+		deck_set[name] = nil
+	else
+		if collection.deck_count() >= collection.MAX_DECK then
+			return "Your deck is full (" .. collection.MAX_DECK .. " snakes)"
+		end
+		deck_set[name] = true
+	end
+	save_deck()
+end
+
+-- The snakes the player draws their hand from: the chosen deck, or every owned snake before one is chosen
 function collection.deck()
+	if deck_set then
+		local list = chosen()
+		if #list >= collection.MIN_DECK then
+			return list
+		end
+	end
 	local deck = {}
 	for _, name in ipairs(data.deck) do
 		if collection.has(name) then
@@ -69,10 +159,6 @@ function collection.deck()
 	return deck
 end
 
-local function stat(name, field)
-	local stats = data.get_stats({ card_path = name .. ".png" })
-	return stats and stats[field] or 0
-end
 
 local SORTS = {
 	{ "Name", function(name) return name end },
@@ -128,6 +214,12 @@ function collection.open_pack()
 		local name = table.remove(pool, math.random(#pool))
 		owned[name] = true
 		table.insert(pulled, name)
+		if deck_set and collection.deck_count() < collection.MAX_DECK then
+			deck_set[name] = true -- new snakes join the deck while it has room
+		end
+	end
+	if deck_set then
+		save_deck()
 	end
 	last_pack = today()
 	collection.save()

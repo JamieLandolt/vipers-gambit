@@ -8,6 +8,7 @@ local render = require("Render")
 local collection = require("Collection")
 local charmers = require("Charmers")
 local tutorial = require("Tutorial")
+local lane_editor = require("LaneEditor")
 local settings = require("Settings")
 
 reference_window_width = 1440
@@ -47,6 +48,7 @@ buttons = {
 	level_select = {},
 	character_select = {},
 	collection = {},
+	lanes = {},
 	playing = {},
 	paused = {},
 	pack = {},
@@ -62,6 +64,7 @@ game = {
 		level_select = false,
 		character_select = false,
 		collection = false,
+		lanes = false,
 		playing = false,
 		paused = false,
 		pack = false,
@@ -158,6 +161,7 @@ function love.load()
 
 	love.window.setMode(reference_window_width, reference_window_height, { resizable = true, vsync = 0 })
 	collection.load()
+	play.load_lanes()
 	charmers.load()
 	build_ui()
 	settings.load() -- after build_ui, which lays out for the reference window size
@@ -233,7 +237,11 @@ function love.mousepressed(x, y, button)
 
 	if game.state["collection"] and not pressed then
 		local name = render.collection_card_at(x, y)
-		if name then
+		if name and collection.deck_mode then
+			-- Editing the deck: a click adds or removes the snake (the message says why it didn't work)
+			collection.message, collection.message_t = collection.toggle_deck(name), time
+			play_sound(hover_sound)
+		elseif name then
 			info_card, info_return = require("Card")(name .. ".png", img_widths, img_heights), "collection"
 			play_sound(hover_sound)
 			animation, animation_time = true, 0
@@ -250,7 +258,11 @@ function love.mousepressed(x, y, button)
 		end
 	end
 
-	if game.state["level_select"] then
+	if game.state["lanes"] and not pressed then
+		lane_editor.press(x, y)
+	end
+
+	if game.state["level_select"] and not pressed then
 		local level = render.level_at(x, y)
 		if level and level <= unlocked then
 			play.new_game(level)
@@ -268,7 +280,7 @@ function love.mousepressed(x, y, button)
 	if game.state["playing"] and turn == "Player" then
 		-- Clicking one of your snakes on the field uses its activated ability
 		for slot = 5, 8 do
-			if played_cards[slot] and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
+			if played_cards[slot] and tutorial.allows("ability") and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
 				play.activate(slot)
 			end
 		end
@@ -284,6 +296,12 @@ function love.mousepressed(x, y, button)
 				held_card = card
 			end
 		end
+	end
+end
+
+function love.mousereleased(x, y, button)
+	if button == 1 and game.state["lanes"] then
+		lane_editor.release(x, y)
 	end
 end
 

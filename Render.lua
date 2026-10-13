@@ -4,7 +4,6 @@ local assets = require("Assets")
 local data = require("CardData")
 local play = require("Play")
 local effects = require("Effects")
-local lanes = require("Lanes")
 local abilities = require("Abilities")
 local borders = require("Borders")
 local collection = require("Collection")
@@ -13,6 +12,7 @@ local shader = require("Shader")
 local title = require("Title")
 local charmers = require("Charmers")
 local tutorial = require("Tutorial")
+local lane_editor = require("LaneEditor")
 local settings = require("Settings")
 
 local render = {}
@@ -92,6 +92,19 @@ function render.collection()
 		if owned then
 			borders.draw(data.stats_by_name[assets.card_names[i]].border, x, y, img_widths, img_heights, data.stats_by_name[assets.card_names[i]].rarity)
 		end
+		if owned and collection.deck_mode then
+			if collection.in_deck(assets.card_names[i]) then -- a green tick marks the deck's snakes
+				lg.setColor(0.2, 0.75, 0.3)
+				lg.circle("fill", x + img_widths - 26, y + 26, 18)
+				lg.setColor(1, 1, 1)
+				lg.setLineWidth(5)
+				lg.line(x + img_widths - 36, y + 26, x + img_widths - 29, y + 34, x + img_widths - 16, y + 18)
+				lg.setLineWidth(1)
+			else
+				lg.setColor(0, 0, 0, 0.55)
+				lg.rectangle("fill", x, y, img_widths, img_heights)
+			end
+		end
 		if assets.card_names[i] == hovered then
 			-- Hover: a pulsing glow and border kept inside the card so neighbours are untouched
 			local pulse = 0.5 + 0.5 * math.sin(time * 6)
@@ -107,11 +120,27 @@ function render.collection()
 	end)
 	lg.setColor(1, 1, 1)
 
+	buttons.collection["Collection Header"]:update_text(collection.deck_mode and ("Deck " .. collection.deck_count() .. "/" .. collection.MAX_DECK) or "Collection")
 	buttons.collection["Collection Header"]:draw()
+	buttons.collection["Edit Deck"]:update_text(collection.deck_mode and "Done" or "Edit Deck")
+	buttons.collection["Edit Deck"]:draw()
+	if collection.message and time - collection.message_t < 2 then
+		lg.setColor(0, 0, 0, 0.85)
+		lg.rectangle("fill", 370, 800, 700, 56, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.printf(collection.message, assets.font, 370, 805, 700, "center")
+	end
 	buttons.collection["Sort"]:draw()
 	buttons.collection["Open Pack"]:update_text(collection.pack_ready() and "Open Pack" or "Pack: tomorrow")
 	buttons.collection["Open Pack"]:draw()
 	buttons.universal["Back"]:draw()
+end
+
+function render.lanes()
+	background()
+	lane_editor.draw()
+	buttons.lanes["Back"]:draw()
+	buttons.lanes["Reset"]:draw()
 end
 
 function render.pack()
@@ -307,6 +336,8 @@ function render.level_select()
 		lg.printf(name, assets.font, right and x - NODE_RADIUS - 415 or x + NODE_RADIUS + 15, y - 25, 400, right and "right" or "left")
 	end
 	lg.setColor(1, 1, 1)
+	buttons.level_select["Deck"]:draw()
+	buttons.level_select["Lanes"]:draw()
 	buttons.universal["Back"]:draw()
 end
 
@@ -338,23 +369,74 @@ local function draw_stats(sector)
 end
 
 -- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
+local SNAKE_SCALE = 1.0 -- cut-out snakes are drawn a little larger than whole cards were
+
+-- Snakes on the board are cut out of their card (no purple frame or corner numbers) and sway gently.
+-- Every card is 33x48 art pixels; the shader keeps the middle, drops the card's background and frame colours,
+-- shifts each row sideways by whole art pixels (a wave that grows towards the tail) and traces the silhouette
+-- in the border's colour. Frozen snakes stop moving and tint blue, poisoned ones tint green.
+local snake_shader = lg.newShader([[
+	uniform float time;
+	uniform float seed;
+	uniform float sway;
+	uniform vec4 rim;
+	uniform vec3 tint;
+	const vec2 art = vec2(33.0, 48.0);
+
+	vec4 snake(Image tex, vec2 uv) {
+		vec2 px = uv * art;
+		if (px.x < 2.0 || px.x > 31.0 || px.y < 2.0 || px.y > 46.0) return vec4(0.0);
+		if (px.y < 9.0 && px.x < 10.0) return vec4(0.0);  // cost number and tier icon
+		if (px.y >= 38.0) return vec4(0.0);               // attack, defense and rarity bars
+		vec4 c = Texel(tex, uv);
+		if (distance(c.rgb, vec3(118.0, 66.0, 138.0) / 255.0) < 0.02) return vec4(0.0);  // card background
+		if (distance(c.rgb, vec3(63.0, 63.0, 116.0) / 255.0) < 0.02) return vec4(0.0);   // card frame
+		return c;
+	}
+
+	vec4 effect(vec4 color, Image tex, vec2 uv, vec2 sc) {
+		float row = uv.y * art.y;
+		float shift = floor(sin(time * 2.4 + row * 0.35 + seed) * (0.5 + 1.5 * uv.y) * sway + 0.5);
+		vec2 at = uv - vec2(shift / art.x, 0.0);
+		vec4 c = snake(tex, at);
+		if (c.a > 0.0) return vec4(c.rgb * tint, c.a) * color;
+		vec2 d = 1.0 / art;
+		float edge = max(max(snake(tex, at + vec2(d.x, 0.0)).a, snake(tex, at - vec2(d.x, 0.0)).a),
+		                 max(snake(tex, at + vec2(0.0, d.y)).a, snake(tex, at - vec2(0.0, d.y)).a));
+		if (edge > 0.0 && rim.a > 0.0) return vec4(rim.rgb, rim.a * color.a);
+		return vec4(0.0);
+	}
+]])
+
 local function draw_slot(card, sector)
 	local cx, cy = play.slot_centre(sector)
 	local dx, dy, sx, sy, alpha, flash = effects.card(card)
+	local stats = data.get_stats(card)
+	local rim = borders.colour(stats.rarity == 5 and "Rainbow" or stats.border)
+	local pulse = 0.5 + 0.5 * math.sin(time * 4)
+	card.card_object:setFilter("nearest", "nearest")
+	snake_shader:send("time", time)
+	snake_shader:send("seed", sector * 1.7)
+	snake_shader:send("sway", card.frozen and 0 or 1)
+	snake_shader:send("rim", rim and { rim[1], rim[2], rim[3], 0.55 + 0.4 * pulse } or { 0, 0, 0, 0 })
+	snake_shader:send("tint", card.frozen and { 0.6, 0.85, 1.2 } or (card.poison and { 0.7, 1.15, 0.6 } or { 1, 1, 1 }))
 	lg.push()
 	lg.translate(cx + dx, cy + dy)
-	lg.scale(0.8 * sx, 0.8 * sy)
+	lg.scale(SNAKE_SCALE * sx, SNAKE_SCALE * sy)
+	lg.setShader(snake_shader)
 	lg.setColor(1, 1, 1, alpha)
 	lg.draw(card.card_object, -img_widths / 2, -img_heights / 2)
-	borders.draw(data.get_stats(card).border, -img_widths / 2, -img_heights / 2, img_widths, img_heights, data.get_stats(card).rarity)
 	if flash > 0 then
 		lg.setBlendMode("add")
 		lg.setColor(1, 1, 1, flash * 0.8)
 		lg.draw(card.card_object, -img_widths / 2, -img_heights / 2)
 		lg.setBlendMode("alpha")
 	end
+	lg.setShader()
 	lg.pop()
 end
+
+local LANE_X, LANE_Y = { 20, 250, 490, 720 }, { 20, 280 } -- where each lane's cells sit inside the field image
 
 function render.playing()
 	background()
@@ -366,19 +448,26 @@ function render.playing()
 
 	lg.setColor(1, 1, 1)
 	lg.draw(assets.playing_field, 245, 15)
+	-- The field image is the default arrangement; draw each lane's cells from the tiles for the lane types in use
+	for lane = 1, 4 do
+		for row = 1, 2 do
+			lane_editor.draw_tile(play.lane_chips[lane][1], play.lane_chips[lane][2], row, 245 + LANE_X[lane], 15 + LANE_Y[row])
+		end
+	end
 
-	-- Lane labels, and a green tint on the empty player slots the held card may go in
+	-- Lane labels (tutorial only), and a green tint on the empty player slots the held card may go in
 	for _, box in ipairs(play.field_hitboxes) do
 		local lane = play.lane_types[(box[5] - 1) % 4 + 1]
-		lanes.draw(box, lane)
-		local label = {}
-		for _, snake_type in ipairs({ "Land", "Water", "Tree", "Spirit" }) do
-			if lane[snake_type] then
-				table.insert(label, snake_type)
+		if tutorial.show_labels() then -- the type names are only spelled out while the tutorial explains lanes
+			local label = {}
+			for _, snake_type in ipairs({ "Land", "Water", "Tree", "Spirit" }) do
+				if lane[snake_type] then
+					table.insert(label, snake_type)
+				end
 			end
+			lg.setColor(1, 1, 1, 0.9)
+			lg.print(table.concat(label, " / "), assets.debug_font, box[1] + 10, box[2] + 6)
 		end
-		lg.setColor(1, 1, 1, 0.6)
-		lg.print(table.concat(label, " / "), assets.debug_font, box[1] + 10, box[2] + 6)
 		if held_card and box[5] > 4 and not played_cards[box[5]] and play.lane_accepts(held_card, box[5]) then
 			lg.setColor(0.45, 0.8, 0.3, 0.25)
 			lg.rectangle("fill", box[1] + 8, box[2] + 8, box[3] - 16, box[4] - 16)
@@ -446,7 +535,7 @@ function render.playing()
 	-- A pulsing ! marks your snakes whose activated ability you can afford right now
 	local pulse = 0.5 + 0.5 * math.sin(time * 6)
 	for sector = 5, 8 do
-		if played_cards[sector] and turn == "Player" and abilities.ready(played_cards[sector], "Player") then
+		if played_cards[sector] and turn == "Player" and tutorial.allows("ability") and abilities.ready(played_cards[sector], "Player") then
 			local box = play.field_hitboxes[sector]
 			lg.setColor(1, 0.9, 0.2, 0.6 + 0.4 * pulse)
 			lg.circle("fill", box[1] + box[3] - 28, box[2] + 28, 16)
@@ -503,6 +592,12 @@ function render.playing()
 		)
 	end
 
+	if not tutorial.allows("end_turn") then -- locked controls are dimmed like an unaffordable Charm
+		local end_turn = buttons.playing["End Turn"]
+		lg.setColor(0, 0, 0, 0.55)
+		lg.rectangle("fill", end_turn.x - 5, end_turn.y - 5, end_turn.width + 10, end_turn.height + 10, 5, 5)
+		lg.setColor(1, 1, 1)
+	end
 	tutorial.draw()
 	if tutorial.needs_next() then
 		buttons.playing["Tutorial Next"]:draw()

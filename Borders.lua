@@ -181,4 +181,9 @@ function borders.draw(name, x, y, w, h, tier)
 	end
 end
 
+-- The border's colour right now (animated for Rainbow), or nil for Basic; used for glowing outlines on the board
+function borders.colour(name)
+	return name ~= "Basic" and borders[name] and colour(name) or nil
+end
+
 return borders

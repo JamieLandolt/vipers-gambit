@@ -69,7 +69,23 @@ return function()
 		collection.next_sort()
 		buttons.collection["Sort"]:update_text("Sort: " .. collection.sort_name())
 	end, nil, 850, 5, button_width * 1.3, button_height)
+	buttons.collection["Edit Deck"] = b("Edit Deck", function()
+		collection.deck_mode = not collection.deck_mode
+		if collection.deck_mode then
+			collection.start_deck_edit()
+		end
+	end, nil, 150, 5, button_width * 1.2, button_height)
 	buttons.pack["Done"] = b("Done", update_animation_screen, "collection", 5, 5, back_width, button_height)
+
+	-- Set up a match before picking an opponent
+	buttons.level_select["Deck"] = b("Deck", function()
+		collection.deck_mode = true
+		collection.start_deck_edit()
+		update_animation_screen("collection")
+	end, nil, w - button_width - 10, 5, button_width, button_height)
+	buttons.level_select["Lanes"] = b("Lanes", update_animation_screen, "lanes", w - button_width - 10, 80, button_width, button_height)
+	buttons.lanes["Back"] = b("Back", update_animation_screen, "level_select", 5, 5, back_width, button_height)
+	buttons.lanes["Reset"] = b("Reset", function() play.reset_lanes() end, nil, w / 2 - button_width / 2, h - 110, button_width, button_height)
 
 	buttons.level_select["Select Opponent"] = b("Select Opponent", nil, nil, 5, 5, back_width, button_height)
 
@@ -98,7 +114,7 @@ return function()
 		true -- The balatro button effect
 	)
 	local function end_player_turn()
-		if turn == "Player" then
+		if turn == "Player" and tutorial.allows("end_turn") then
 			play.end_turn()
 		end
 	end

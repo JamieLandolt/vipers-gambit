@@ -22,6 +22,7 @@ local assets = {
 	venom = numbered("Venom_", "", 0, 10),
 	background = lg.newImage("assets/backgrounds/SnakeBackground.png"),
 	level_snake = lg.newImage("assets/backgrounds/LevelSnake.png"),
+	lane_tiles = lg.newImage("assets/Sprites/Lane_Tiles.png"),
 	playing_field = lg.newImage("assets/Sprites/Playing_field.png"),
 	avatars = {},
 	icons = {
