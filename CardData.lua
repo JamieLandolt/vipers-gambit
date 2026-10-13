@@ -78,8 +78,14 @@ for snake_type, names in pairs(type_lists) do
 	end
 end
 
+-- Snakes are tougher than their listed defense (the legendaries are already set as intended)
+local HEALTH_SCALE = 1.5
+
 local deck = {}
 for name, st in pairs(card_stats) do
+	if st.rarity < 5 then
+		st.defense = math.ceil(st.defense * HEALTH_SCALE)
+	end
 	table.insert(deck, name)
 	if powers.of[name] then
 		st.ability = powers.of[name].text -- hand-made and unique, applied through Powers.lua
