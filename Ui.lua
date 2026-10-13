@@ -4,6 +4,7 @@ local button = require("Button")
 local assets = require("Assets")
 local play = require("Play")
 local collection = require("Collection")
+local tutorial = require("Tutorial")
 local title = require("Title")
 local settings = require("Settings")
 
@@ -82,6 +83,9 @@ return function()
 	end, nil, w / 2 - button_width - 20, h / 2, button_width, button_height)
 	buttons.playing["No"] = b("No", function() confirm_forfeit = false end, nil, w / 2 + 20, h / 2, button_width, button_height)
 	buttons.playing["Charm"] = b("Charm", function() play.use_charm("Player") end, nil, 1210, 640, 210, button_height)
+	buttons.playing["Tutorial Next"] = b("Next", function()
+		tutorial.advance()
+	end, nil, 20, 410, 200, 50)
 	buttons.playing["Card Background"] = b("", function() end, nil, hand.x, hand.y, hand.width, hand.height)
 	buttons.playing["Info"] = b(
 		"Info",

@@ -8,6 +8,7 @@ local effects = require("Effects")
 local abilities = require("Abilities")
 local powers = require("Powers")
 local charmers = require("Charmers")
+local tutorial = require("Tutorial")
 
 local play = {}
 play.charm_used = { Player = false, Opponent = false } -- one charm per turn
@@ -112,6 +113,9 @@ function play.check_end()
 		if hp <= 0 then
 			winner = side == "Player" and "Opponent" or "Player"
 			level_unlocked = nil -- set when this win opens the next level
+			if winner == "Player" and play.level == 0 then
+				tutorial.finish()
+			end
 			if winner == "Player" and play.level == unlocked and unlocked < #opponents then
 				unlocked, level_unlocked = unlocked + 1, unlocked + 1
 				collection.save()
@@ -157,10 +161,10 @@ end
 
 function play.new_game(level)
 	play.level = level
-	profile = opponents[level] or opponents[1]
+	profile = level == 0 and tutorial.profile or opponents[level] or opponents[1]
 	turn = "Player"
-	max_health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
-	health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
+	max_health = { Player = STARTING_HEALTH, Opponent = profile.health or STARTING_HEALTH }
+	health = { Player = STARTING_HEALTH, Opponent = profile.health or STARTING_HEALTH }
 	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
@@ -428,7 +432,11 @@ function play.place_card()
 	end
 
 	-- If card is dropped but not played
-	table.insert(player_hand, held_card)
+	-- It glides back from where it was let go to its old place in the hand
+	held_card.glide_x = mouse.x * reference_window_width / lg.getWidth() - img_widths / 2
+	held_card.glide_y = mouse.y * reference_window_height / lg.getHeight() - img_heights / 2
+	held_card.glide_t = time
+	table.insert(player_hand, math.min(held_index or #player_hand + 1, #player_hand + 1), held_card)
 	held_card = nil
 	play_sound(hover_sound)
 end

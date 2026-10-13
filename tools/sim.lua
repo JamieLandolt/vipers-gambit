@@ -6,7 +6,7 @@
 --   EXTRA=<n>      level mode: the starter deck plus n random other snakes (opened packs)
 --   FRAC=<0-1>     matrix mode: share of a deck's snakes that carry the ability (default 0.5)
 package.path = "./?.lua;" .. package.path
-package.preload["love"] = function() return { graphics = {}, mouse = {}, filesystem = {} } end
+package.preload["love"] = function() return { graphics = {}, mouse = {}, filesystem = { write = function() end, getInfo = function() end } } end
 package.preload["Effects"] = function() return { add = function() end, clear = function() end } end
 package.preload["Card"] = function() return function(p) return { card_path = p } end end
 local data = require("CardData")

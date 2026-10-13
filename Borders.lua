@@ -16,6 +16,12 @@ function borders.text(name)
 	return borders[name].text
 end
 
+-- "Shadow border (Phantom): ignores the first hit it takes"
+function borders.describe(name)
+	local effect, rest = borders[name].text:match("^(.-): (.*)$")
+	return effect and (name .. " border (" .. effect .. "): " .. rest) or (name .. " border: " .. borders[name].text)
+end
+
 local function colour(name)
 	if name == "Rainbow" then
 		local t = time * 1.5

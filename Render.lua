@@ -4,6 +4,7 @@ local assets = require("Assets")
 local data = require("CardData")
 local play = require("Play")
 local effects = require("Effects")
+local lanes = require("Lanes")
 local abilities = require("Abilities")
 local borders = require("Borders")
 local collection = require("Collection")
@@ -11,6 +12,7 @@ local opponents = require("Opponents")
 local shader = require("Shader")
 local title = require("Title")
 local charmers = require("Charmers")
+local tutorial = require("Tutorial")
 local settings = require("Settings")
 
 local render = {}
@@ -252,7 +254,7 @@ local function level_offset_y()
 end
 
 local function level_node(i)
-	local y = 40 + (i - 1) * (HEAD_Y - 80) / (#opponents - 1)
+	local y = i == 0 and 12 or 40 + (i - 1) * (HEAD_Y - 80) / (#opponents - 1) -- 0 is the tutorial, at the tail
 	local u = (y + 10) / (HEAD_Y + 10)
 	local env = math.max(math.min((1 - u) / 0.1, 1), 0)
 	return (96 + 52 * math.sin(2 * math.pi * 3 * u) * env) * ART_SCALE, y * ART_SCALE + level_offset_y()
@@ -261,7 +263,7 @@ end
 -- Returns the level whose node is under the given window position
 function render.level_at(x, y)
 	local rx, ry = x * reference_window_width / lg.getWidth(), y * reference_window_height / lg.getHeight()
-	for i = 1, #opponents do
+	for i = 0, #opponents do
 		local nx, ny = level_node(i)
 		if (rx - nx) ^ 2 + (ry - ny) ^ 2 <= NODE_RADIUS ^ 2 then
 			return i
@@ -287,18 +289,22 @@ function render.level_select()
 	lg.draw(assets.level_snake, 0, level_offset_y(), 0, ART_SCALE / 10)
 
 	local hovered = render.level_at(mouse.x, mouse.y)
-	for i, opponent in ipairs(opponents) do
+	for i = 0, #opponents do
+		local name = i == 0 and "Tutorial" or opponents[i].name
 		local x, y = level_node(i)
 		local fill = i > unlocked and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple)
+		if i == 0 and not tutorial.done then -- the new-player hint: this node pulses until it has been beaten
+			fill = { 0.45 + 0.35 * math.sin(time * 5), 0.8, 0.3 }
+		end
 		lg.setColor(fill[1], fill[2], fill[3], fade)
 		lg.circle("fill", x, y, NODE_RADIUS)
 		lg.setColor(0, 0, 0, fade)
 		lg.setLineWidth(5)
 		lg.circle("line", x, y, NODE_RADIUS)
 		lg.setColor(1, 1, 1, fade)
-		lg.printf(tostring(i), assets.font, x - NODE_RADIUS, y - 25, NODE_RADIUS * 2, "center")
+		lg.printf(i == 0 and "?" or tostring(i), assets.font, x - NODE_RADIUS, y - 25, NODE_RADIUS * 2, "center")
 		local right = x > reference_window_width / 2
-		lg.printf(opponent.name, assets.font, right and x - NODE_RADIUS - 415 or x + NODE_RADIUS + 15, y - 25, 400, right and "right" or "left")
+		lg.printf(name, assets.font, right and x - NODE_RADIUS - 415 or x + NODE_RADIUS + 15, y - 25, 400, right and "right" or "left")
 	end
 	lg.setColor(1, 1, 1)
 	buttons.universal["Back"]:draw()
@@ -310,20 +316,21 @@ local function hand_x(i)
 	return x_pos + x_offset * (i - 1) + (-450 / 8 * #player_hand + 450), x_offset
 end
 
-local function draw_stats(sector, offset)
+-- Attack and defense badges sit along the bottom of the card's own field sector
+local function draw_stats(sector)
+	local box = play.field_hitboxes[sector]
 	local background_scale, digit_scale = 1.9, 1.5
-	local attack_x, defense_x, y = 285, 385, 468
-	local slot = (sector - 5) * 230 + offset
+	local attack_x, defense_x, y = box[1] + 40, box[1] + 140, box[2] + 183
 	local stats = data.get_stats(played_cards[sector])
 
 	lg.scale(background_scale)
-	lg.draw(assets.backgrounds[1], (defense_x + slot) / background_scale, y / background_scale)
-	lg.draw(assets.backgrounds[2], (attack_x + slot) / background_scale, y / background_scale)
+	lg.draw(assets.backgrounds[1], defense_x / background_scale, y / background_scale)
+	lg.draw(assets.backgrounds[2], attack_x / background_scale, y / background_scale)
 	lg.scale(1 / background_scale)
 
 	lg.scale(digit_scale)
 	for _, digits in ipairs({ { assets.defenses, played_cards[sector].hp or stats.defense, defense_x }, { assets.attacks, abilities.attack(played_cards[sector], sector), attack_x } }) do
-		local sprites, value, x = digits[1], digits[2], digits[3] + 5 + slot
+		local sprites, value, x = digits[1], digits[2], digits[3] + 5
 		lg.draw(sprites[math.floor(value / 10) + 1], (x - 10) / digit_scale, (y + 5) / digit_scale)
 		lg.draw(sprites[value % 10 + 1], (x + 11) / digit_scale, (y + 5) / digit_scale)
 	end
@@ -363,6 +370,7 @@ function render.playing()
 	-- Lane labels, and a green tint on the empty player slots the held card may go in
 	for _, box in ipairs(play.field_hitboxes) do
 		local lane = play.lane_types[(box[5] - 1) % 4 + 1]
+		lanes.draw(box, lane)
 		local label = {}
 		for _, snake_type in ipairs({ "Land", "Water", "Tree", "Spirit" }) do
 			if lane[snake_type] then
@@ -404,7 +412,13 @@ function render.playing()
 	local y_pos = reference_window_height * 16.6 / 24 - 5
 	for i, card in ipairs(player_hand) do
 		local x, x_offset = hand_x(i)
-		card:draw(x, y_pos, 0)
+		local draw_x, draw_y = x, y_pos
+		local glide = card.glide_t and (time - card.glide_t) / 0.15
+		if glide and glide < 1 then
+			local ease = 1 - (1 - glide) ^ 3
+			draw_x, draw_y = card.glide_x + (x - card.glide_x) * ease, card.glide_y + (y_pos - card.glide_y) * ease
+		end
+		card:draw(draw_x, draw_y, 0)
 		card_hitboxes[card] = { x, y_pos, i ~= #player_hand and x_offset or 165, img_heights }
 	end
 
@@ -423,16 +437,9 @@ function render.playing()
 	lg.draw(assets.venom[venom.Player + 1], (245 - venom_scale * 36) / 2, (555 - venom_scale * 36) / 2)
 	lg.scale(1 / venom_scale)
 
-	-- Offset accounts for the thicker middle bar in the playing field; it carries over between sectors
-	local offset = 0
 	for sector = 1, 8 do
 		if played_cards[sector] then
-			if sector == 7 or sector == 2 then
-				offset = 15
-			elseif sector == 8 or sector == 4 then
-				offset = 20
-			end
-			draw_stats(sector, offset)
+			draw_stats(sector)
 		end
 	end
 
@@ -463,7 +470,7 @@ function render.playing()
 				lg.rectangle("fill", 1200, 325, 235, 170)
 				lg.setColor(1, 1, 1)
 				lg.printf(
-					card.card_path:sub(1, -5):gsub("_", " ") .. "\n" .. stats.ability .. "\n" .. stats.border .. ": " .. borders.text(stats.border)
+					card.card_path:sub(1, -5):gsub("_", " ") .. "\n" .. stats.ability .. "\n" .. borders.describe(stats.border)
 						.. (#status > 0 and ("\n" .. table.concat(status, ", ")) or ""),
 					assets.debug_font, 1208, 330, 220
 				)
@@ -496,6 +503,11 @@ function render.playing()
 		)
 	end
 
+	tutorial.draw()
+	if tutorial.needs_next() then
+		buttons.playing["Tutorial Next"]:draw()
+	end
+
 	if confirm_forfeit then
 		lg.setColor(0, 0, 0, 0.7)
 		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
@@ -510,7 +522,7 @@ function render.ended()
 	background()
 	lg.setColor(1, 1, 1)
 	local won = winner == "Player"
-	lg.printf(won and ("Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 220, reference_window_width / 3, "center", 0, 3, 3)
+	lg.printf(won and (play.level == 0 and "Tutorial Complete!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 220, reference_window_width / 3, "center", 0, 3, 3)
 	if won then
 		local message = level_unlocked and ("Level " .. level_unlocked .. " unlocked!") or (play.level == #opponents and "You beat every opponent!" or "")
 		lg.printf(message, assets.font, 0, 400, reference_window_width, "center")
@@ -549,7 +561,7 @@ function render.info()
 	local text_width = reference_window_width * 0.37
 	for _, block in ipairs({
 		{ "Ability: " .. info.ability, 5.3 },
-		{ info.border .. " border: " .. borders.text(info.border), 6.4 },
+		{ borders.describe(info.border), 6.4 },
 		{ info.lore, 7.5 },
 	}) do
 		lg.printf(block[1], assets.small_font, reference_window_width / 2, info_background_y + reference_window_height * block[2] / 10, text_width)

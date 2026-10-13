@@ -7,6 +7,7 @@ local play = require("Play")
 local render = require("Render")
 local collection = require("Collection")
 local charmers = require("Charmers")
+local tutorial = require("Tutorial")
 local settings = require("Settings")
 
 reference_window_width = 1440
@@ -27,6 +28,7 @@ card_hitboxes = {} -- x, y, width, height
 player_hand = {}
 opponent_hand = {}
 held_card = nil
+held_index = nil -- where the held snake sat in the hand
 info_card = nil
 info_return = "playing" -- screen the info page's Back button returns to
 level_unlocked = nil -- level opened by the last win
@@ -177,6 +179,7 @@ function love.update(dt)
 	handle_animations(dt)
 	settings.update()
 	if game.state["playing"] then
+		tutorial.update()
 		if confirm_forfeit then
 			return
 		elseif turn == "Player" then
@@ -251,6 +254,11 @@ function love.mousepressed(x, y, button)
 		local level = render.level_at(x, y)
 		if level and level <= unlocked then
 			play.new_game(level)
+			if level == 0 then
+				tutorial.start()
+			else
+				tutorial.active = false
+			end
 			animation, animation_time = true, 0
 			update_animation_screen("playing")
 		end
@@ -269,6 +277,7 @@ function love.mousepressed(x, y, button)
 				for i, c in pairs(player_hand) do
 					if c == card then
 						table.remove(player_hand, i)
+						held_index = i -- so it goes back to the same place if it isn't played
 					end
 				end
 				card_hitboxes[card] = nil
