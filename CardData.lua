@@ -80,9 +80,11 @@ end
 
 -- Snakes are tougher than their listed defense (the legendaries are already set as intended)
 local HEALTH_SCALE = 1.5
+local MIN_ATTACK = 2
 
 local deck = {}
 for name, st in pairs(card_stats) do
+	st.attack = math.max(st.attack, MIN_ATTACK)
 	if st.rarity < 5 then
 		st.defense = math.ceil(st.defense * HEALTH_SCALE)
 	end
