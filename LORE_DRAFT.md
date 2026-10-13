@@ -61,8 +61,6 @@ Every snake above Tier 1 gets its own unique ability (Tier 1 snakes get small on
 ### Land (the Dustwild)
 - **Snake**: The plain, original snake, the one every Charmer starts with.
 - **Big_Snake**: Grew too large for its burrow and has been blocking the road since.
-- **Baby_Snake**: Hatched yesterday and bites anything that moves.
-- **Well_Fed_Snake**: Sleeps after meals, so it never needs to attack.
 - **Cannibal_Snake**: Eats other snakes; the Court bans it from banquets.
 - **Cobra**: The Court's guard animal, hood flared to show the way out.
 - **King_Cobra**: Rules the Dustwild dens and expects bows.

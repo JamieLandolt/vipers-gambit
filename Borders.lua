@@ -5,7 +5,7 @@ local lg = love.graphics
 local borders = {
 	Basic = { text = "No special effect" },
 	Venom = { colour = { 0.45, 0.9, 0.2 }, text = "Poison: its hits poison the target for 2 turns (-1 defense each turn)" },
-	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: damage beyond a kill carries through to the owner's health" },
+	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: damage beyond a kill hits the owner's health twice over" },
 	Frost = { colour = { 0.5, 0.85, 1 }, text = "Chill: snakes it hits can't attack on their next turn" },
 	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Phantom: ignores the first hit it takes" },
 	Gold = { colour = { 1, 0.85, 0.2 }, text = "Wealth: +1 venom each turn while on the field" },

@@ -30,10 +30,10 @@ play.field_hitboxes = {
 	{ 245 + sector_width * 3 - 10, 285, sector_width, sector_height, 8 },
 }
 
--- Centre of a played card in a sector (cards are drawn at 0.8 scale), and where each health bar sits
+-- Centre of a played snake in a sector (above its badges), and where each health bar sits
 function play.slot_centre(sector)
 	local box = play.field_hitboxes[sector]
-	return box[1] + 54 + img_widths * 0.4, box[2] + 34 + img_heights * 0.4
+	return box[1] + 54 + img_widths * 0.4, box[2] + 95
 end
 
 play.bar_y = { Opponent = 30, Player = 500 }
@@ -276,8 +276,8 @@ function play.hit(attacker, slot, attack, delay)
 		end
 	end
 	if defender.hp <= 0 then
-		if border == "Fire" and defender.hp < 0 then
-			health[owner] = health[owner] + defender.hp -- the overkill carries through
+		if defender.hp < 0 then -- damage beyond the kill goes through to the owner's health (doubled by Fire)
+			play.hurt(owner, -defender.hp * (border == "Fire" and 2 or 1), delay)
 		end
 		destroy(slot, delay)
 		for s, c in pairs(played_cards) do

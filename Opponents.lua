@@ -13,9 +13,9 @@ local function opponent(name, style, venom, deck)
 end
 
 return {
-	opponent("Garden Keeper", "defensive", 0, { "Garter_Snake", "Corn_Snake", "Vine_Snake", "Snake", "Well_Fed_Snake", "Coral_Snake" }),
+	opponent("Garden Keeper", "defensive", 0, { "Garter_Snake", "Corn_Snake", "Vine_Snake", "Snake", "Mud_Snake", "Coral_Snake" }),
 	opponent("Pond Skulker", "balanced", 0, { "Sea_Snake", "Corn_Snake", "Snake", "Skeleton_Snake", "Ball_Python", "Garter_Snake" }),
-	opponent("Venom Rookie", "aggro", 0, { "Baby_Snake", "Vine_Snake", "Coral_Snake", "Sea_Snake", "Skinny_Snake", "Scrub_Racer" }),
+	opponent("Venom Rookie", "aggro", 0, { "Dust_Adder", "Vine_Snake", "Coral_Snake", "Sea_Snake", "Skinny_Snake", "Scrub_Racer" }),
 	opponent("Crypt Warden", "defensive", 1, { "Stone_Constrictor", "Bull_Snake", "Mesa_Adder", "Iron_Snake", "Zombie_Snake", "Ghost_Snake" }),
 	opponent("Reed Stalker", "balanced", 1, { "Kingsnake", "Tree_Boa", "Jungle_Racer", "Liana_Snake", "Tide_Snake", "Dusk_Snake" }),
 	opponent("Fang Brawler", "aggro", 1, { "Bamboo_Pit_Viper", "Cottonmouth", "Prairie_Rattler", "Moray_Viper", "Cursed_Snake", "Gaboon_Viper" }),

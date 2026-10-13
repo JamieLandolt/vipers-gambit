@@ -32,7 +32,7 @@ local steps = {
 			end
 		end },
 	{ text = "Lanes: each lane only fits certain snake types, named on every slot (the lane's look matches: sand, water, leaves, mist). Rainbow snakes fit any lane.", next = true },
-	{ text = "Borders: the coloured frame on a card gives a passive effect. Venom poisons, Fire carries overkill damage to health, Frost freezes, Shadow dodges the first hit, Gold earns venom, Rainbow grows. Play your green-framed snake and hover it.",
+	{ text = "Borders: the coloured frame on a card gives a passive effect. Venom poisons, Fire doubles overkill damage to health, Frost freezes, Shadow dodges the first hit, Gold earns venom, Rainbow grows. Play your green-framed snake and hover it.",
 		done = function()
 			for slot = 5, 8 do
 				local c = played_cards[slot]
@@ -43,7 +43,7 @@ local steps = {
 		end },
 	{ text = "Rarity: the bars under a card show its tier, from 1 (Hatchling) up to 5 (Mythic, the legendaries). Rarer snakes are stronger and cost more venom.", next = true },
 	{ text = "Venom: the meter at the left pays for snakes. You get 1 more each turn.", next = true },
-	{ text = "Now press End Turn. Your snakes attack the card in the lane opposite them, or the enemy's health if the lane is empty.",
+	{ text = "Now press End Turn. Your snakes attack the card in the lane opposite them, or the enemy's health if the lane is empty. Damage left over after a kill hits their health too.",
 		done = function() return ended_turns >= 1 end },
 	{ text = "The enemy takes its turn, then it is yours again.", next = true },
 	{ text = "Abilities: a snake with a ! can use an ability for venom. Click it. Hover any snake to read its ability.",

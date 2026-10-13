@@ -119,7 +119,6 @@ local P = powers.of
 
 -- Tier 1
 P.Snake = { text = "Heals 1 defense at the start of your turn", turn = function(c) heal(c.card, 1) end }
-P.Well_Fed_Snake = { text = "Gains 2 defense when played", play = function(c) buff(c.card, 0, 2) end }
 P.Coral_Snake = {
 	text = "Whatever hits it permanently loses 1 attack",
 	hurt = function(_, attacker)
@@ -172,7 +171,6 @@ P.Worm_Snake = { text = "Gain 1 venom when it is destroyed", death = function(c)
 
 -- Tier 2
 P.Big_Snake = { text = "Grows: +1 attack at the start of your turn", turn = function(c) buff(c.card, 1, 0) end }
-P.Baby_Snake = { text = "Tantrum: +3 attack each time it is hit", hurt = function(c) buff(c.card, 3, 0) end }
 P.Zombie_Snake = {
 	text = "Returns to your hand when destroyed",
 	death = function(c)

@@ -12,6 +12,8 @@ end
 local assets = {
 	font = lg.newFont("assets/Jersey15-Regular.ttf", 50),
 	small_font = lg.newFont("assets/Jersey15-Regular.ttf", 28),
+	card_name_font = lg.newFont("assets/Jersey15-Regular.ttf", 24),
+	card_text_font = lg.newFont("assets/Jersey15-Regular.ttf", 17),
 	debug_font = lg.newFont("assets/Jersey15-Regular.ttf", 20),
 	backgrounds = {
 		lg.newImage("assets/Sprites/DefenseBackground.png"),

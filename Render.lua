@@ -90,6 +90,7 @@ function render.collection()
 		lg.setColor(owned and { 1, 1, 1 } or { 0.12, 0.1, 0.18 })
 		lg.draw(assets.cards[i], x, y)
 		if owned then
+			require("CardText").draw(assets.card_names[i], x, y)
 			borders.draw(data.stats_by_name[assets.card_names[i]].border, x, y, img_widths, img_heights, data.stats_by_name[assets.card_names[i]].rarity)
 		end
 		if owned and collection.deck_mode then
@@ -154,6 +155,7 @@ function render.pack()
 		lg.translate(x, 200)
 		lg.scale(2)
 		lg.draw(assets.card_by_name[name])
+		require("CardText").draw(name, 0, 0)
 		borders.draw(data.stats_by_name[name].border, 0, 0, img_widths, img_heights, data.stats_by_name[name].rarity)
 		lg.pop()
 		x = x + img_widths * 2 + gap
@@ -167,16 +169,16 @@ local crops = {}
 
 local function card_pos(i)
 	local x0 = (reference_window_width - 6 * CARD_W - 5 * CARD_GAP) / 2
-	return x0 + (i - 1) % 6 * (CARD_W + CARD_GAP), 88 + math.floor((i - 1) / 6) * (CARD_H + CARD_GAP)
+	return x0 + (i - 1) * (CARD_W + CARD_GAP), 250 -- one centred row of six
 end
 
 -- Returns the name of the charmer card under the given window position
 function render.charmer_at(x, y)
 	local rx, ry = x * reference_window_width / lg.getWidth(), y * reference_window_height / lg.getHeight()
-	for i, c in ipairs(charmers.list) do
+	for i = 1, charmers.PICKABLE do
 		local cx, cy = card_pos(i)
 		if rx > cx and rx < cx + CARD_W and ry > cy and ry < cy + CARD_H then
-			return c.name
+			return charmers.list[i].name
 		end
 	end
 end
@@ -198,7 +200,8 @@ function render.character_select()
 	buttons.character_select["Charmers Header"]:draw()
 	buttons.universal["Back"]:draw()
 	local hovered = render.charmer_at(mouse.x, mouse.y)
-	for i, c in ipairs(charmers.list) do
+	for i = 1, charmers.PICKABLE do
+		local c = charmers.list[i]
 		local x, y = card_pos(i)
 		local selected = c.name == chosen_avatar
 		lg.setColor(selected and green or (hovered == c.name and { 0.97, 0.9, 0.2 } or { 15 / 255, 140 / 255, 220 / 255 }))
@@ -341,10 +344,11 @@ function render.level_select()
 	buttons.universal["Back"]:draw()
 end
 
+local HAND_SCALE = 0.8 -- the taller cards are drawn smaller in the hand to fit under the field
+
 local function hand_x(i)
-	local x_pos = reference_window_width * 1.1 / 6 + 5
-	local x_offset = reference_window_width * 0.44 / 6
-	return x_pos + x_offset * (i - 1) + (-450 / 8 * #player_hand + 450), x_offset
+	local x_offset = img_widths * HAND_SCALE + 6
+	return (reference_window_width - 245 - #player_hand * x_offset) / 2 + 245 + x_offset * (i - 1), x_offset
 end
 
 -- Attack and defense badges sit along the bottom of the card's own field sector
@@ -369,35 +373,35 @@ local function draw_stats(sector)
 end
 
 -- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
-local SNAKE_SCALE = 1.0 -- cut-out snakes are drawn a little larger than whole cards were
+local SNAKE_SCALE = 0.95 -- cut-out snakes sit in the cell above the attack and defense badges
 
--- Snakes on the board are cut out of their card (no purple frame or corner numbers) and sway gently.
--- Every card is 33x48 art pixels; the shader keeps the middle, drops the card's background and frame colours,
--- shifts each row sideways by whole art pixels (a wave that grows towards the tail) and traces the silhouette
--- in the border's colour. Frozen snakes stop moving and tint blue, poisoned ones tint green.
+-- Snakes on the board are cut out of their card (no purple frame or corner numbers).
+-- Every card is 33x64 art pixels; the shader keeps the art area, drops the card's background and frame colours
+-- (they depend on the snake's lane type, see CardStyles.lua) and traces the silhouette in the border's colour.
+-- Frozen snakes tint blue, poisoned ones tint green.
 local snake_shader = lg.newShader([[
-	uniform float time;
-	uniform float seed;
-	uniform float sway;
 	uniform vec4 rim;
 	uniform vec3 tint;
-	const vec2 art = vec2(33.0, 48.0);
+	uniform vec3 bgs[6];
+	uniform int bg_count;
+	uniform vec3 frame;
+	const vec2 art = vec2(33.0, 64.0);
 
 	vec4 snake(Image tex, vec2 uv) {
 		vec2 px = uv * art;
-		if (px.x < 2.0 || px.x > 31.0 || px.y < 2.0 || px.y > 46.0) return vec4(0.0);
+		if (px.x < 2.0 || px.x > 31.0 || px.y < 2.0 || px.y > 62.0) return vec4(0.0);
 		if (px.y < 9.0 && px.x < 10.0) return vec4(0.0);  // cost number and tier icon
 		if (px.y >= 38.0) return vec4(0.0);               // attack, defense and rarity bars
 		vec4 c = Texel(tex, uv);
-		if (distance(c.rgb, vec3(118.0, 66.0, 138.0) / 255.0) < 0.02) return vec4(0.0);  // card background
-		if (distance(c.rgb, vec3(63.0, 63.0, 116.0) / 255.0) < 0.02) return vec4(0.0);   // card frame
+		for (int i = 0; i < 6; i++) {
+			if (i < bg_count && distance(c.rgb, bgs[i]) < 0.02) return vec4(0.0);  // card background
+		}
+		if (distance(c.rgb, frame) < 0.02) return vec4(0.0);                     // card frame
 		return c;
 	}
 
 	vec4 effect(vec4 color, Image tex, vec2 uv, vec2 sc) {
-		float row = uv.y * art.y;
-		float shift = floor(sin(time * 2.4 + row * 0.35 + seed) * (0.5 + 1.5 * uv.y) * sway + 0.5);
-		vec2 at = uv - vec2(shift / art.x, 0.0);
+		vec2 at = uv;
 		vec4 c = snake(tex, at);
 		if (c.a > 0.0) return vec4(c.rgb * tint, c.a) * color;
 		vec2 d = 1.0 / art;
@@ -408,6 +412,9 @@ local snake_shader = lg.newShader([[
 	}
 ]])
 
+local CARD_ART_H = 240 -- the card without its text panel
+local card_styles = require("CardStyles") -- the colours of each lane type's cards, cut out by the shader
+
 local function draw_slot(card, sector)
 	local cx, cy = play.slot_centre(sector)
 	local dx, dy, sx, sy, alpha, flash = effects.card(card)
@@ -415,9 +422,15 @@ local function draw_slot(card, sector)
 	local rim = borders.colour(stats.rarity == 5 and "Rainbow" or stats.border)
 	local pulse = 0.5 + 0.5 * math.sin(time * 4)
 	card.card_object:setFilter("nearest", "nearest")
-	snake_shader:send("time", time)
-	snake_shader:send("seed", sector * 1.7)
-	snake_shader:send("sway", card.frozen and 0 or 1)
+	local style = card_styles[data.get_type(card)]
+	local bgs = {}
+	for i = 1, 6 do
+		local c = style.bgs[i] or style.bgs[1]
+		bgs[i] = { c[1] / 255, c[2] / 255, c[3] / 255 }
+	end
+	snake_shader:send("bgs", unpack(bgs))
+	snake_shader:send("bg_count", #style.bgs)
+	snake_shader:send("frame", { style.frame[1] / 255, style.frame[2] / 255, style.frame[3] / 255 })
 	snake_shader:send("rim", rim and { rim[1], rim[2], rim[3], 0.55 + 0.4 * pulse } or { 0, 0, 0, 0 })
 	snake_shader:send("tint", card.frozen and { 0.6, 0.85, 1.2 } or (card.poison and { 0.7, 1.15, 0.6 } or { 1, 1, 1 }))
 	lg.push()
@@ -425,11 +438,11 @@ local function draw_slot(card, sector)
 	lg.scale(SNAKE_SCALE * sx, SNAKE_SCALE * sy)
 	lg.setShader(snake_shader)
 	lg.setColor(1, 1, 1, alpha)
-	lg.draw(card.card_object, -img_widths / 2, -img_heights / 2)
+	lg.draw(card.card_object, -img_widths / 2, -CARD_ART_H / 2)
 	if flash > 0 then
 		lg.setBlendMode("add")
 		lg.setColor(1, 1, 1, flash * 0.8)
-		lg.draw(card.card_object, -img_widths / 2, -img_heights / 2)
+		lg.draw(card.card_object, -img_widths / 2, -CARD_ART_H / 2)
 		lg.setBlendMode("alpha")
 	end
 	lg.setShader()
@@ -443,7 +456,18 @@ function render.playing()
 
 	count = count + 1
 	buttons.playing["Forfeit"]:draw()
-	buttons.playing["Card Background"]:draw()
+	local tray = buttons.playing["Card Background"] -- the hand's tray: dark leather with a gold rim
+	lg.setColor(0.1, 0.07, 0.06, 0.92)
+	lg.rectangle("fill", tray.x, tray.y, tray.width, tray.height, 16, 16)
+	lg.setColor(0.2, 0.14, 0.1, 0.9)
+	lg.rectangle("fill", tray.x + 8, tray.y + 8, tray.width - 16, tray.height - 16, 12, 12)
+	lg.setColor(0.85, 0.68, 0.28)
+	lg.setLineWidth(4)
+	lg.rectangle("line", tray.x + 2, tray.y + 2, tray.width - 4, tray.height - 4, 16, 16)
+	lg.setLineWidth(1)
+	lg.setColor(0.55, 0.4, 0.15)
+	lg.rectangle("line", tray.x + 10, tray.y + 10, tray.width - 20, tray.height - 20, 10, 10)
+	lg.setColor(1, 1, 1)
 	buttons.playing["End Turn"]:draw()
 
 	lg.setColor(1, 1, 1)
@@ -507,8 +531,8 @@ function render.playing()
 			local ease = 1 - (1 - glide) ^ 3
 			draw_x, draw_y = card.glide_x + (x - card.glide_x) * ease, card.glide_y + (y_pos - card.glide_y) * ease
 		end
-		card:draw(draw_x, draw_y, 0)
-		card_hitboxes[card] = { x, y_pos, i ~= #player_hand and x_offset or 165, img_heights }
+		card:draw(draw_x, draw_y, 0, HAND_SCALE)
+		card_hitboxes[card] = { x, y_pos, i ~= #player_hand and x_offset or img_widths * HAND_SCALE, img_heights * HAND_SCALE }
 	end
 
 	for sector, card in pairs(played_cards) do

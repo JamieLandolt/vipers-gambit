@@ -40,7 +40,7 @@ function collection.load()
 		owned[name] = true
 	end
 	for i = 4, #lines do
-		owned[lines[i]] = true
+		owned[lines[i]] = data.stats_by_name[lines[i]] and true or nil -- (names of removed snakes are dropped)
 	end
 
 	-- deck.txt: one snake name per line
@@ -49,7 +49,7 @@ function collection.load()
 	if saved then
 		deck_set = {}
 		for name in saved:gmatch("[^\n]+") do
-			deck_set[name] = true
+			deck_set[name] = data.stats_by_name[name] and true or nil
 		end
 	end
 end

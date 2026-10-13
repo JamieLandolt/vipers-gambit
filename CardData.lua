@@ -6,8 +6,6 @@ local lore = require("Lore")
 local card_stats = {
 	Snake = stats(2, 3, 2, "N/A", "Basic", 1, nil, "N/A"),
 	Big_Snake = stats(3, 3, 10, "N/A", "Basic", 2, nil, "N/A"),
-	Baby_Snake = stats(1, 6, 1, "N/A", "Basic", 2, nil, "N/A"),
-	Well_Fed_Snake = stats(2, 4, 2, "N/A", "Basic", 1, nil, "N/A"),
 	Anaconda = stats(6, 8, 8, "N/A", "Basic", 3, nil, "N/A"),
 	Copperhead = stats(5, 10, 5, "N/A", "Basic", 3, nil, "N/A"),
 	Zombie_Snake = stats(3, 5, 5, "N/A", "Basic", 2, nil, "N/A"),
@@ -60,7 +58,7 @@ end
 
 -- Each snake has one type; lanes only accept certain types (see play.lane_types), except Rainbow which fits any lane
 local type_lists = {
-	Land = { "Snake", "Big_Snake", "Baby_Snake", "Well_Fed_Snake", "Cannibal_Snake", "Cobra", "King_Cobra", "Albino_Cobra", "Horned_Viper", "Grey_Snake", "Dirt_Snake", "Sand_Snake" },
+	Land = { "Snake", "Big_Snake", "Cannibal_Snake", "Cobra", "King_Cobra", "Albino_Cobra", "Horned_Viper", "Grey_Snake", "Dirt_Snake", "Sand_Snake" },
 	Water = { "Anaconda", "Extra_Long_Python", "Frost_Cobra", "Sea_Snake", "Toxic_Snake", "Mud_Snake", "Ball_Python", "Garter_Snake", "Copperhead" },
 	Tree = { "Boa_Constrictor", "Tree_Boa", "Vine_Snake", "Grass_Snake", "Worm_Snake", "Black_Mamba", "Kingsnake", "Corn_Snake", "Brown_Snake" },
 	Rainbow = { "Coral_Snake", "Rattlesnake", "Gaboon_Viper", "Golden_Snake" }, -- fits any lane
