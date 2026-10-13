@@ -1,0 +1,94 @@
+name	cost	attack	defense	rarity	type	border	lore
+Dust_Adder	1	2	2	1	Land	Basic	Dusty and quick, it vanishes into the dry ground.
+Rock_Snake	2	3	5	1	Land	Basic	It sleeps among boulders so long that moss mistakes it for stone.
+Hog_Nosed_Snake	2	4	4	1	Land	Basic	When cornered it rolls over and plays dead, badly.
+Scrub_Racer	1	3	1	1	Land	Basic	Too fast for anything in the scrub to catch.
+Clay_Snake	2	4	4	1	Land	Fire	Baked red by the sun, it hardens at the first sign of a fight.
+Rust_Viper	2	5	3	1	Land	Fire	Its scales flake like old iron, and its bite is just as hard.
+Dune_Viper	3	10	3	2	Land	Basic	It drifts sideways over the dunes, leaving only wavy tracks.
+Mesa_Adder	3	7	7	2	Land	Fire	Banded like the red cliffs it hides in.
+Bull_Snake	4	6	11	2	Land	Basic	Hisses like a rattler and hits like a bull.
+Prairie_Rattler	3	8	6	2	Land	Venom	Hear the rattle and you are already in range.
+Stone_Constrictor	4	4	13	2	Land	Basic	It squeezes until the pebbles in its path turn to sand.
+Iron_Snake	3	4	9	2	Land	Basic	Forged by a thousand rainy seasons in the old mine.
+Sandstorm_Asp	4	12	9	3	Land	Gold	Wears the desert wind like a golden hood.
+Tiger_Snake	5	15	9	3	Land	Fire	Stripes like a tiger and a temper to match.
+Bushmaster	6	15	15	3	Land	Basic	The largest viper in the dry forest, and the most patient.
+Basalt_Serpent	5	6	17	3	Land	Fire	Cracks glow orange where the lava still sleeps beneath its scales.
+Obsidian_Wyrm	6	19	8	4	Land	Fire	Black glass scales, red veins, and a hunger that never cools.
+Colossus_Python	6	10	19	4	Land	Basic	It has swallowed three explorers and still looks for more.
+Pond_Snake	1	2	2	1	Water	Basic	Always found where the lilies are thickest.
+Reed_Snake	1	2	2	1	Water	Basic	Thin as a reed and just as hard to spot.
+Brook_Snake	2	3	5	1	Water	Basic	It follows the stream wherever the water takes it.
+Eel_Snake	2	4	4	1	Water	Basic	Half eel, half snake, all slippery.
+Ripple_Snake	1	2	2	1	Water	Frost	Each ring on its skin is a ripple that never fades.
+Moray_Viper	3	8	5	2	Water	Basic	Its jaws snap from the reef before the fish even sees it.
+Cottonmouth	3	8	6	2	Water	Venom	It gapes pale and wide before it strikes.
+Reef_Adder	3	6	7	2	Water	Basic	A flash of orange and blue on the coral.
+Tide_Snake	2	4	5	2	Water	Frost	It rises and falls with the moon.
+Kelp_Snake	2	4	5	2	Water	Basic	It wears the forest of the sea on its back.
+Lagoon_Python	4	6	11	2	Water	Basic	Warm shallows, golden spots, and a long, lazy squeeze.
+Tempest_Serpent	5	15	10	3	Water	Basic	Lightning follows wherever it swims.
+Abyssal_Eel	5	11	12	3	Water	Shadow	Lured by its glowing lights, few ever surface again.
+Pearl_Serpent	4	8	12	3	Water	Gold	Its scales shimmer like the inside of a shell.
+Siren_Snake	4	10	11	3	Water	Rainbow	Its song sounds like someone you miss.
+Glacier_Adder	5	15	9	3	Water	Frost	Frozen in a glacier for a thousand years, and angry about it.
+Maelstrom_Serpent	6	16	17	4	Water	Frost	It coils into a whirlpool and drags ships to the deep.
+Coral_Dragon	5	15	11	4	Water	Fire	Reef kings once crowned it a dragon, and it never argued.
+Storm_Leviathan	6	10	19	4	Water	Frost	When it breaches, the sky turns to follow.
+Leaf_Snake	1	2	2	1	Tree	Basic	Hangs among the leaves and fools the wind.
+Twig_Snake	1	2	2	1	Tree	Basic	Not a branch, whatever the birds think.
+Moss_Snake	2	3	5	1	Tree	Basic	Slow, damp and fuzzy with green.
+Bark_Snake	2	4	4	1	Tree	Basic	Rough scales, rougher manners.
+Fern_Snake	1	2	2	1	Tree	Basic	Unfurls at dawn like a young fern.
+Orchid_Snake	2	6	2	1	Tree	Venom	Beautiful, and every bit as poisonous as it looks.
+Emerald_Boa	4	7	10	2	Tree	Gold	A green jewel wound around a branch.
+Jungle_Racer	2	5	4	2	Tree	Venom	It races the monkeys and wins.
+Canopy_Viper	3	6	7	2	Tree	Venom	Its red tail flickers like a flower to lure the unwary.
+Bamboo_Pit_Viper	3	8	5	2	Tree	Venom	Sits so still that bamboo grows around it.
+Liana_Snake	2	4	5	2	Tree	Basic	A vine that learned to bite.
+Chameleon_Snake	3	7	6	2	Tree	Rainbow	Its colours change with its mood, mostly angry.
+Mossback_Python	5	8	17	3	Tree	Basic	Entire ferns grow on its back, and it lets them.
+Thornback_Viper	4	11	8	3	Tree	Venom	Every inch of its spine is a warning.
+Blossom_Boa	5	10	14	3	Tree	Basic	Spring follows it everywhere, in pink.
+Amber_Tree_Viper	4	12	9	3	Tree	Gold	Golden eyes, golden scales, a golden branch to hang from.
+Venom_Vine	4	14	5	3	Tree	Venom	Its purple bands drip with poison.
+Elderwood_Wyrm	6	16	17	4	Tree	Basic	Older than the forest, and the forest is very old.
+Canopy_King	5	12	14	4	Tree	Gold	All the branches bow when it passes.
+Wisp_Snake	1	2	2	1	Spirit	Frost	A glimmer on the marsh that follows you home.
+Gloom_Snake	2	3	5	1	Spirit	Shadow	It brings the dark to every room.
+Ash_Snake	1	2	2	1	Spirit	Shadow	What remains after the fire has forgotten.
+Mist_Snake	1	2	2	1	Spirit	Frost	Hard to hit when it is mostly fog.
+Wraith_Adder	3	7	6	2	Spirit	Shadow	Its glowing eyes are the last thing most things see.
+Bone_Viper	3	8	5	2	Spirit	Shadow	A viper that forgot to stop after dying.
+Phantom_Racer	2	5	4	2	Spirit	Frost	You only see it after it has passed through you.
+Dusk_Snake	3	7	6	2	Spirit	Shadow	Born where the sunset meets the first star.
+Cursed_Snake	3	8	6	2	Spirit	Venom	Bound in rags and bitter to the last.
+Grave_Snake	2	3	5	2	Spirit	Shadow	It guards the old stones, and the old stones guard it.
+Banshee_Serpent	4	8	12	3	Spirit	Frost	Its wail turns warriors to statues.
+Lich_Snake	5	12	14	3	Spirit	Venom	A dead king's mind in a living green body.
+Soul_Eater	5	15	9	3	Spirit	Shadow	Every soul it swallows adds one more spark.
+Nightmare_Adder	4	14	6	3	Spirit	Shadow	Coils in the corner of every bad dream.
+Plague_Wraith	3	6	8	3	Spirit	Venom	A sickly green mist wearing a snake's shape.
+Reaper_Serpent	6	19	8	4	Spirit	Shadow	It does not strike. It simply arrives.
+Void_Wyrm	6	16	18	4	Spirit	Shadow	A hole in the night in the shape of a snake.
+Phantom_King	5	11	15	4	Spirit	Frost	Rules a court of the quietly dead.
+Candy_Snake	1	2	2	1	Rainbow	Rainbow	Sweet to look at, sticky to fight.
+Confetti_Snake	1	2	2	1	Rainbow	Rainbow	Every day is a party where it lives.
+Jelly_Snake	2	3	5	1	Rainbow	Rainbow	Wobbles, shines and is surprisingly hard to bite.
+Prism_Adder	3	8	6	2	Rainbow	Rainbow	Split the light and you will find it in the middle.
+Carnival_Snake	3	7	6	2	Rainbow	Rainbow	The best show in town, and it wants an audience.
+Opal_Snake	2	4	5	2	Rainbow	Rainbow	Milky and bright, with a fire inside.
+Parrot_Snake	4	10	7	2	Rainbow	Rainbow	Squawks, preens and bites with a hooked grin.
+Aurora_Serpent	5	12	12	3	Rainbow	Rainbow	Wears the northern lights like a cape.
+Kaleido_Viper	4	15	6	3	Rainbow	Rainbow	Turn it just a little and it becomes someone else.
+Sunset_Boa	5	11	13	3	Rainbow	Fire	Every evening the sky borrows its colours.
+Chromatic_Wyrm	6	16	17	4	Rainbow	Rainbow	A dragon in every colour, flawless in none.
+Spectrum_Basilisk	5	18	8	4	Rainbow	Rainbow	One glance and the rainbow rules you.
+Jormungandr	9	14	19	5	Water	Rainbow	The sea serpent that circles the world, and its frozen breath sinks fleets.
+Quetzalcoatl	8	15	17	5	Tree	Gold	The feathered serpent who brought the rain and the dawn on emerald wings.
+Apophis	8	16	14	5	Spirit	Shadow	Every night it swallows the sun, and every dawn the sun barely escapes.
+Ouroboros	9	13	19	5	Rainbow	Rainbow	It devours its own tail and is reborn in every colour of light.
+Nagaraja	7	12	18	5	Land	Gold	The golden serpent king whose many hoods shelter the mountain of the sun.
+Skinny_Snake	1	2	1	1	Land	Basic	So thin it slips through the cracks of the Dustwild roads.
+Spiral_Snake	3	4	5	2	Water	Basic	Coils into a whirlpool that pulls its prey under.

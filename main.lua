@@ -5,6 +5,9 @@ local assets = require("Assets")
 local build_ui = require("Ui")
 local play = require("Play")
 local render = require("Render")
+local collection = require("Collection")
+local charmers = require("Charmers")
+local settings = require("Settings")
 
 reference_window_width = 1440
 reference_window_height = 872
@@ -25,9 +28,13 @@ player_hand = {}
 opponent_hand = {}
 held_card = nil
 info_card = nil
+info_return = "playing" -- screen the info page's Back button returns to
+level_unlocked = nil -- level opened by the last win
+confirm_forfeit = false -- the forfeit confirmation is showing
+pack_cards = {} -- names pulled from the most recent pack
 -- Set by play.new_game: turn, health, max_health, max_venom, venom, winner
 audio = true
-unlocked = 1 -- highest level the player can pick, saved in progress.txt
+unlocked = 1 -- highest level the player can pick, saved in save.txt
 animation_time = 0 -- how long it has been playing
 animation_length = 0.1 -- how long it lasts
 animation = false
@@ -40,9 +47,11 @@ buttons = {
 	collection = {},
 	playing = {},
 	paused = {},
+	pack = {},
 	ended = {},
 	info = {},
 	universal = {},
+	reset_confirm = {},
 }
 game = {
 	state = {
@@ -53,13 +62,13 @@ game = {
 		collection = false,
 		playing = false,
 		paused = false,
+		pack = false,
 		ended = false,
 		info = false,
 	},
 }
 
 local debug_text = "Debug Text"
-local debugger_enabled = true
 local w, h = 1440, 900
 
 function resize(num, type)
@@ -77,10 +86,6 @@ function play_sound(sound)
 	if audio then
 		la.play(sound)
 	end
-end
-
-function toggle_audio()
-	audio = not audio
 end
 
 function debugger(text)
@@ -150,8 +155,10 @@ function love.load()
 	hover_sound = la.newSource("assets/audio/hover.mp3", "static")
 
 	love.window.setMode(reference_window_width, reference_window_height, { resizable = true, vsync = 0 })
-	unlocked = tonumber(love.filesystem.read("progress.txt") or "") or 1
+	collection.load()
+	charmers.load()
 	build_ui()
+	settings.load() -- after build_ui, which lays out for the reference window size
 end
 
 function love.update(dt)
@@ -159,7 +166,7 @@ function love.update(dt)
 
 	-- Keep the window at the reference aspect ratio
 	local aspect_ratio = 1440 / 872
-	if math.abs(w / h - aspect_ratio) > 0.008 then
+	if not settings.fullscreen and math.abs(w / h - aspect_ratio) > 0.008 then
 		h = w / aspect_ratio
 		love.window.setMode(w, h, { resizable = true })
 	end
@@ -168,8 +175,11 @@ function love.update(dt)
 	h = lg.getHeight()
 
 	handle_animations(dt)
+	settings.update()
 	if game.state["playing"] then
-		if turn == "Player" then
+		if confirm_forfeit then
+			return
+		elseif turn == "Player" then
 			-- Checks where to place a card if one has been let go since last update
 			play.place_card()
 		else
@@ -180,6 +190,26 @@ end
 
 function love.mousepressed(x, y, button)
 	if button ~= 1 then
+		return
+	end
+
+	if game.state["settings"] then
+		if settings.confirm_reset then
+			for _, name in ipairs({ "Yes", "No" }) do
+				buttons.reset_confirm[name]:checkPressed(x, y)
+			end
+			return
+		end
+		if settings.press(x, y) then
+			return
+		end
+	end
+
+	-- While the forfeit confirmation is up, only Yes and No respond
+	if game.state["playing"] and confirm_forfeit then
+		for _, name in ipairs({ "Yes", "No" }) do
+			buttons.playing[name]:checkPressed(x, y)
+		end
 		return
 	end
 
@@ -198,6 +228,25 @@ function love.mousepressed(x, y, button)
 		end
 	end
 
+	if game.state["collection"] and not pressed then
+		local name = render.collection_card_at(x, y)
+		if name then
+			info_card, info_return = require("Card")(name .. ".png", img_widths, img_heights), "collection"
+			play_sound(hover_sound)
+			animation, animation_time = true, 0
+			update_animation_screen("info")
+		end
+	end
+
+	if game.state["character_select"] then
+		local name = render.charmer_at(x, y)
+		if name then
+			chosen_avatar = name
+			charmers.save()
+			play_sound(hover_sound)
+		end
+	end
+
 	if game.state["level_select"] then
 		local level = render.level_at(x, y)
 		if level and level <= unlocked then
@@ -209,6 +258,12 @@ function love.mousepressed(x, y, button)
 
 	-- Check if card is clicked with no card in hand
 	if game.state["playing"] and turn == "Player" then
+		-- Clicking one of your snakes on the field uses its activated ability
+		for slot = 5, 8 do
+			if played_cards[slot] and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
+				play.activate(slot)
+			end
+		end
 		for card, hitbox in pairs(card_hitboxes) do
 			if play.is_hitbox(x, y, hitbox) then
 				for i, c in pairs(player_hand) do
@@ -236,7 +291,7 @@ function love.draw()
 
 	render[get_game_state()]()
 
-	if debugger_enabled then
+	if settings.debug then
 		lg.setColor(1, 0, 0)
 		lg.printf(tostring(debug_text), assets.debug_font, 10, 70, reference_window_width)
 		lg.setColor(1, 1, 1)

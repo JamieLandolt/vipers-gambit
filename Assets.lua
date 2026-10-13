@@ -11,6 +11,7 @@ end
 
 local assets = {
 	font = lg.newFont("assets/Jersey15-Regular.ttf", 50),
+	small_font = lg.newFont("assets/Jersey15-Regular.ttf", 28),
 	debug_font = lg.newFont("assets/Jersey15-Regular.ttf", 20),
 	backgrounds = {
 		lg.newImage("assets/Sprites/DefenseBackground.png"),
@@ -28,15 +29,20 @@ local assets = {
 		audio_disabled = lg.newImage("assets/icons/audio_disabled.png"),
 	},
 	cards = {},
+	card_names = {}, -- same order as cards
+	card_by_name = {},
 }
 
-for _, name in ipairs({ "gabe", "jamie", "alem", "josh", "michael", "darcy" }) do
-	assets.avatars[name] = lg.newImage("assets/characters/" .. name .. ".jpg")
+for _, c in ipairs(require("Charmers").list) do
+	assets.avatars[c.name] = lg.newImage("assets/characters/" .. c.portrait)
 end
 
 for _, file in ipairs(love.filesystem.getDirectoryItems("assets/Snake_Cards")) do
 	if file:match("%.png$") then
-		table.insert(assets.cards, lg.newImage("assets/Snake_Cards/" .. file))
+		local image, name = lg.newImage("assets/Snake_Cards/" .. file), file:sub(1, -5)
+		table.insert(assets.cards, image)
+		table.insert(assets.card_names, name)
+		assets.card_by_name[name] = image
 	end
 end
 

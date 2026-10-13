@@ -1,6 +1,6 @@
 -- Balatro-style background: the snake picture swirls apart and becomes a looping paint swirl.
 local MORPH_TIME = 8    -- seconds for the picture to dissolve into pure colour
-local SWIRL_SPEED = 1   -- animation speed of the swirl
+local SWIRL_SPEED = 0.25  -- animation speed of the swirl
 local PIXELS_TALL = 110 -- paint resolution (pixel-art look)
 local SNAKE_MASK = 0.15  -- g-b threshold separating snake (green/tan) from the purple background
 local SOFTNESS = 0.45   -- colour blend width between palette colours (small = sharper bands, must be > 0)
@@ -27,7 +27,7 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
     vec2 q = (puv - 0.5) * vec2(size.x / size.y, 1.0);
     float r = length(q);
     float s = m;
-    float a = atan(q.y, q.x) + s * ((2.2 + 0.4 * min(6.0, speed)) * r - 1.0 - speed * 0.05);
+    float a = atan(q.y, q.x) + s * ((2.2 + 2.4 * m) * r - 1.0) - speed * 0.3;
     vec2 sw = vec2(cos(a), sin(a)) * r;
     vec2 imgOff = (sw - q) * vec2(size.y / size.x, 1.0);
 

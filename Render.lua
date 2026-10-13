@@ -3,8 +3,15 @@ local lg = love.graphics
 local assets = require("Assets")
 local data = require("CardData")
 local play = require("Play")
+local effects = require("Effects")
+local abilities = require("Abilities")
+local borders = require("Borders")
+local collection = require("Collection")
 local opponents = require("Opponents")
 local shader = require("Shader")
+local title = require("Title")
+local charmers = require("Charmers")
+local settings = require("Settings")
 
 local render = {}
 
@@ -21,42 +28,219 @@ local function background()
 	lg.scale(4 / 3)
 end
 
+local menu_start, last_menu = 0, -1
+
+-- The title drops in letter by letter while the menu slides down into its resting place
 function render.menu()
 	scroll_offset_y = 0
 	background()
-	for _, name in ipairs({ "Button Background", "Play Game", "Collection", "Character", "Settings" }) do
-		buttons.menu[name]:draw()
+	if time - last_menu > 0.25 then
+		menu_start = time
+	end
+	last_menu = time
+	local t = time - menu_start
+
+	title.draw(t)
+	local slide = math.max(0, math.min(1, (t - 0.3) / 1.5))
+	local offset = -(1 - slide * slide * (3 - 2 * slide)) * title.MENU_DROP
+	for _, name in ipairs({ "Button Background", "Play Game", "Collection", "Charmers", "Settings" }) do
+		-- Move the button itself (not just the drawing) so its hitbox follows it while it slides
+		local button = buttons.menu[name]
+		button.rest_y = button.rest_y or button.y
+		button.y = button.rest_y + offset
+		button:draw()
 	end
 end
 
+-- Calls fn(index, x, y) for each card in the collection grid, in the current sort order
+local function each_collection_card(fn)
+	local per_row = math.floor((reference_window_width - 69) / img_widths)
+	local rows = math.ceil(#assets.card_names / per_row)
+	local x, y = 69, math.max(math.min(scroll_offset_y * 5, 0), reference_window_height - 140 - rows * img_heights) + 70
+	for _, i in ipairs(collection.order(assets.card_names)) do
+		if x + img_widths > reference_window_width then
+			x, y = 69, y + img_heights
+		end
+		fn(i, x, y)
+		x = x + img_widths
+	end
+end
+
+-- Name of the owned snake under the given window position, if any
+function render.collection_card_at(window_x, window_y)
+	local rx, ry = window_x * reference_window_width / lg.getWidth(), window_y * reference_window_height / lg.getHeight()
+	local found
+	each_collection_card(function(i, x, y)
+		if collection.has(assets.card_names[i]) and rx >= x and rx < x + img_widths and ry >= y and ry < y + img_heights then
+			found = assets.card_names[i]
+		end
+	end)
+	return found
+end
+
 function render.collection()
-	local offset_x = 69
-	local offset_y = math.min(scroll_offset_y * 5, 0)
 	background()
 
-	for _, image in pairs(assets.cards) do
-		if offset_x + resize(img_widths, 1) > reference_window_width then
-			offset_x = 69
-			offset_y = offset_y + img_heights
+	local hovered = render.collection_card_at(mouse.x, mouse.y)
+	each_collection_card(function(i, x, y)
+		local owned = collection.has(assets.card_names[i])
+		-- Snakes you haven't unlocked are drawn as dark silhouettes
+		lg.setColor(owned and { 1, 1, 1 } or { 0.12, 0.1, 0.18 })
+		lg.draw(assets.cards[i], x, y)
+		if owned then
+			borders.draw(data.stats_by_name[assets.card_names[i]].border, x, y, img_widths, img_heights, data.stats_by_name[assets.card_names[i]].rarity)
 		end
-		lg.draw(image, offset_x, offset_y + 70)
-		offset_x = offset_x + img_widths
-	end
+		if assets.card_names[i] == hovered then
+			-- Hover: a pulsing glow and border kept inside the card so neighbours are untouched
+			local pulse = 0.5 + 0.5 * math.sin(time * 6)
+			lg.setBlendMode("add")
+			lg.setColor(1, 1, 1, 0.1 + 0.1 * pulse)
+			lg.draw(assets.cards[i], x, y)
+			lg.setBlendMode("alpha")
+			lg.setColor(0.95, 0.85, 0.25, 0.6 + 0.4 * pulse)
+			lg.setLineWidth(4)
+			lg.rectangle("line", x + 2, y + 2, img_widths - 4, img_heights - 4)
+			lg.setLineWidth(1)
+		end
+	end)
+	lg.setColor(1, 1, 1)
 
 	buttons.collection["Collection Header"]:draw()
+	buttons.collection["Sort"]:draw()
+	buttons.collection["Open Pack"]:update_text(collection.pack_ready() and "Open Pack" or "Pack: tomorrow")
+	buttons.collection["Open Pack"]:draw()
 	buttons.universal["Back"]:draw()
+end
+
+function render.pack()
+	background()
+	lg.setColor(1, 1, 1)
+	lg.printf(#pack_cards > 0 and "New snakes!" or "You own every snake you can pull", assets.font, 0, 80, reference_window_width, "center")
+	local gap = 40
+	local x = (reference_window_width - #pack_cards * (img_widths * 2) - (#pack_cards - 1) * gap) / 2
+	for _, name in ipairs(pack_cards) do
+		lg.push()
+		lg.translate(x, 200)
+		lg.scale(2)
+		lg.draw(assets.card_by_name[name])
+		borders.draw(data.stats_by_name[name].border, 0, 0, img_widths, img_heights, data.stats_by_name[name].rarity)
+		lg.pop()
+		x = x + img_widths * 2 + gap
+	end
+	buttons.pack["Done"]:draw()
+end
+
+-- Charmer cards: 6 across, 2 down, in reference-window units
+local CARD_W, CARD_H, CARD_GAP, PORTRAIT_H = 215, 372, 17, 200
+local crops = {}
+
+local function card_pos(i)
+	local x0 = (reference_window_width - 6 * CARD_W - 5 * CARD_GAP) / 2
+	return x0 + (i - 1) % 6 * (CARD_W + CARD_GAP), 88 + math.floor((i - 1) / 6) * (CARD_H + CARD_GAP)
+end
+
+-- Returns the name of the charmer card under the given window position
+function render.charmer_at(x, y)
+	local rx, ry = x * reference_window_width / lg.getWidth(), y * reference_window_height / lg.getHeight()
+	for i, c in ipairs(charmers.list) do
+		local cx, cy = card_pos(i)
+		if rx > cx and rx < cx + CARD_W and ry > cy and ry < cy + CARD_H then
+			return c.name
+		end
+	end
+end
+
+-- Draws a charmer's portrait cropped to fill w x h
+local function portrait(name, x, y, w, h)
+	local image = assets.avatars[name]
+	local iw, ih = image:getDimensions()
+	if not crops[name] then
+		local cw, ch = math.min(iw, ih * w / h), math.min(ih, iw * h / w)
+		crops[name] = lg.newQuad((iw - cw) / 2, 0, cw, ch, iw, ih)
+	end
+	local _, _, cw = crops[name]:getViewport()
+	lg.draw(image, crops[name], x, y, 0, w / cw)
 end
 
 function render.character_select()
 	background()
+	buttons.character_select["Charmers Header"]:draw()
 	buttons.universal["Back"]:draw()
+	local hovered = render.charmer_at(mouse.x, mouse.y)
+	for i, c in ipairs(charmers.list) do
+		local x, y = card_pos(i)
+		local selected = c.name == chosen_avatar
+		lg.setColor(selected and green or (hovered == c.name and { 0.97, 0.9, 0.2 } or { 15 / 255, 140 / 255, 220 / 255 }))
+		lg.rectangle("fill", x - 5, y - 5, CARD_W + 10, CARD_H + 10, 5, 5)
+		lg.setColor(hovered == c.name and { 0.45, 0.25, 0.65 } or purple)
+		lg.rectangle("fill", x, y, CARD_W, CARD_H, 5, 5)
+		lg.setColor(1, 1, 1)
+		portrait(c.name, x + 10, y + 10, CARD_W - 20, PORTRAIT_H)
+		if selected then
+			lg.setColor(green)
+			lg.rectangle("fill", x + 10, y + 10, 100, 26)
+			lg.setColor(1, 1, 1)
+			lg.printf("Selected", assets.debug_font, x + 10, y + 12, 100, "center")
+		end
+		lg.printf(c.name, assets.small_font, x + 10, y + PORTRAIT_H + 14, CARD_W - 20, "center")
+		lg.setColor(green)
+		lg.printf(c.charm .. " (" .. c.cost .. " venom)", assets.debug_font, x + 10, y + PORTRAIT_H + 48, CARD_W - 20, "center")
+		lg.setColor(1, 1, 1)
+		lg.printf(c.text, assets.debug_font, x + 12, y + PORTRAIT_H + 74, CARD_W - 24, "center")
+	end
 end
 
 function render.settings()
 	background()
 	buttons.universal["Back"]:draw()
-	buttons.settings["Toggle Audio"]:draw()
-	buttons.settings[audio and "Audio Enabled" or "Audio Disabled"]:draw()
+	local p, blue = settings.panel, { 15 / 255, 140 / 255, 220 / 255 }
+	lg.setColor(blue)
+	lg.rectangle("fill", p.x - 5, p.y - 5, p.w + 10, p.h + 10, 8, 8)
+	lg.setColor(0.1, 0.05, 0.2, 0.92)
+	lg.rectangle("fill", p.x, p.y, p.w, p.h, 5, 5)
+
+	local font, left, right = assets.font, p.x + 40, p.x + p.w - 40
+	for _, item in ipairs(settings.items) do
+		if item.heading then
+			lg.setColor(green)
+			lg.print(item.heading, assets.small_font, left, item.y + 8)
+			lg.setLineWidth(2)
+			lg.line(left, item.y + 40, right, item.y + 40)
+		else
+			lg.setColor(1, 1, 1)
+			lg.print(item.label, font, left, item.y + (62 - font:getHeight()) / 2)
+			if item.icon then
+				local icon = audio and assets.icons.audio_enabled or assets.icons.audio_disabled
+				lg.draw(icon, left + font:getWidth(item.label) + 20, item.y + 9, 0, 44 / icon:getHeight())
+			end
+			if item.slider then
+				local x, y, w = settings.CX, settings.slider_y, settings.SW
+				lg.setColor(blue)
+				lg.rectangle("fill", x, y - 5, w, 10, 5, 5)
+				lg.setColor(green)
+				lg.rectangle("fill", x, y - 5, w * settings.volume, 10, 5, 5)
+				lg.setColor(blue)
+				lg.circle("fill", x + w * settings.volume, y, 22)
+				lg.setColor(settings.dragging and green or purple)
+				lg.circle("fill", x + w * settings.volume, y, 17)
+				lg.setColor(1, 1, 1)
+				lg.print(math.floor(settings.volume * 100 + 0.5) .. "%", font, x + w + 35, item.y + (62 - font:getHeight()) / 2)
+			else
+				buttons.settings[item.label]:update_text(item.text())
+				buttons.settings[item.label]:draw()
+			end
+		end
+	end
+
+	if settings.confirm_reset then
+		lg.setColor(0, 0, 0, 0.8)
+		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+		lg.setColor(1, 1, 1)
+		lg.printf("Reset all progress?", font, 0, reference_window_height / 2 - 130, reference_window_width, "center")
+		lg.printf("Levels, snakes and packs go back to a new game.", assets.small_font, 0, reference_window_height / 2 - 60, reference_window_width, "center")
+		buttons.reset_confirm["Yes"]:draw()
+		buttons.reset_confirm["No"]:draw()
+	end
 end
 
 -- The level snake is 192x540 art pixels drawn at 7.5 reference units each; its centre line
@@ -85,23 +269,38 @@ function render.level_at(x, y)
 	end
 end
 
+local level_start, last_level = 0, -1
+
+-- The swirling background dissolves into the snake and its levels over about a second and a half
 function render.level_select()
-	lg.setColor(1, 1, 1)
+	if time - last_level > 0.25 then
+		level_start = time
+	end
+	last_level = time
+	local fade = math.min((time - level_start) / 1.4, 1)
+	fade = fade * fade * (3 - 2 * fade)
+	if fade < 1 then
+		background()
+	end
+
+	lg.setColor(1, 1, 1, fade)
 	lg.draw(assets.level_snake, 0, level_offset_y(), 0, ART_SCALE / 10)
 
 	local hovered = render.level_at(mouse.x, mouse.y)
 	for i, opponent in ipairs(opponents) do
 		local x, y = level_node(i)
-		lg.setColor(i > unlocked and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple))
+		local fill = i > unlocked and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple)
+		lg.setColor(fill[1], fill[2], fill[3], fade)
 		lg.circle("fill", x, y, NODE_RADIUS)
-		lg.setColor(0, 0, 0)
+		lg.setColor(0, 0, 0, fade)
 		lg.setLineWidth(5)
 		lg.circle("line", x, y, NODE_RADIUS)
-		lg.setColor(1, 1, 1)
+		lg.setColor(1, 1, 1, fade)
 		lg.printf(tostring(i), assets.font, x - NODE_RADIUS, y - 25, NODE_RADIUS * 2, "center")
 		local right = x > reference_window_width / 2
 		lg.printf(opponent.name, assets.font, right and x - NODE_RADIUS - 415 or x + NODE_RADIUS + 15, y - 25, 400, right and "right" or "left")
 	end
+	lg.setColor(1, 1, 1)
 	buttons.universal["Back"]:draw()
 end
 
@@ -123,7 +322,7 @@ local function draw_stats(sector, offset)
 	lg.scale(1 / background_scale)
 
 	lg.scale(digit_scale)
-	for _, digits in ipairs({ { assets.defenses, played_cards[sector].hp or stats.defense, defense_x }, { assets.attacks, stats.attack, attack_x } }) do
+	for _, digits in ipairs({ { assets.defenses, played_cards[sector].hp or stats.defense, defense_x }, { assets.attacks, abilities.attack(played_cards[sector], sector), attack_x } }) do
 		local sprites, value, x = digits[1], digits[2], digits[3] + 5 + slot
 		lg.draw(sprites[math.floor(value / 10) + 1], (x - 10) / digit_scale, (y + 5) / digit_scale)
 		lg.draw(sprites[value % 10 + 1], (x + 11) / digit_scale, (y + 5) / digit_scale)
@@ -131,16 +330,71 @@ local function draw_stats(sector, offset)
 	lg.scale(1 / digit_scale)
 end
 
+-- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
+local function draw_slot(card, sector)
+	local cx, cy = play.slot_centre(sector)
+	local dx, dy, sx, sy, alpha, flash = effects.card(card)
+	lg.push()
+	lg.translate(cx + dx, cy + dy)
+	lg.scale(0.8 * sx, 0.8 * sy)
+	lg.setColor(1, 1, 1, alpha)
+	lg.draw(card.card_object, -img_widths / 2, -img_heights / 2)
+	borders.draw(data.get_stats(card).border, -img_widths / 2, -img_heights / 2, img_widths, img_heights, data.get_stats(card).rarity)
+	if flash > 0 then
+		lg.setBlendMode("add")
+		lg.setColor(1, 1, 1, flash * 0.8)
+		lg.draw(card.card_object, -img_widths / 2, -img_heights / 2)
+		lg.setBlendMode("alpha")
+	end
+	lg.pop()
+end
+
 function render.playing()
 	background()
 
 	count = count + 1
-	buttons.universal["Back"]:draw()
+	buttons.playing["Forfeit"]:draw()
 	buttons.playing["Card Background"]:draw()
 	buttons.playing["End Turn"]:draw()
 
 	lg.setColor(1, 1, 1)
 	lg.draw(assets.playing_field, 245, 15)
+
+	-- Lane labels, and a green tint on the empty player slots the held card may go in
+	for _, box in ipairs(play.field_hitboxes) do
+		local lane = play.lane_types[(box[5] - 1) % 4 + 1]
+		local label = {}
+		for _, snake_type in ipairs({ "Land", "Water", "Tree", "Spirit" }) do
+			if lane[snake_type] then
+				table.insert(label, snake_type)
+			end
+		end
+		lg.setColor(1, 1, 1, 0.6)
+		lg.print(table.concat(label, " / "), assets.debug_font, box[1] + 10, box[2] + 6)
+		if held_card and box[5] > 4 and not played_cards[box[5]] and play.lane_accepts(held_card, box[5]) then
+			lg.setColor(0.45, 0.8, 0.3, 0.25)
+			lg.rectangle("fill", box[1] + 8, box[2] + 8, box[3] - 16, box[4] - 16)
+		end
+		lg.setColor(1, 1, 1)
+	end
+
+	-- Each side's charmer: portrait and name, plus the player's Charm button (covered by Info while a card is held)
+	for side, spot in pairs({ Opponent = { 1215, 78 }, Player = { 1215, 548 } }) do
+		local c = charmers.of(side, play.level)
+		lg.setColor(1, 1, 1)
+		portrait(c.name, spot[1], spot[2], 60, 72)
+		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
+		lg.setColor(0.6, 0.9, 0.4)
+		lg.printf(c.charm .. " (" .. c.cost .. ")", assets.debug_font, spot[1] + 68, spot[2] + 44, 145, "left")
+	end
+	local charm = buttons.playing["Charm"]
+	charm:update_text(play.charm_used.Player and "Charm used" or "Charm")
+	charm:draw()
+	if not play.charm_ready("Player") then
+		lg.setColor(0, 0, 0, 0.55)
+		lg.rectangle("fill", charm.x - 5, charm.y - 5, charm.width + 10, charm.height + 10, 5, 5)
+	end
+	lg.setColor(1, 1, 1)
 
 	if held_card then
 		buttons.playing["Info"]:draw()
@@ -155,8 +409,10 @@ function render.playing()
 	end
 
 	for sector, card in pairs(played_cards) do
-		local box = play.field_hitboxes[sector]
-		card:draw(box[1] + 54, box[2] + 34, 0, 0.8)
+		draw_slot(card, sector)
+	end
+	for _, ghost in ipairs(effects.ghosts()) do
+		draw_slot(ghost.card, ghost.sector)
 	end
 
 	lg.setColor(1, 1, 1)
@@ -180,15 +436,54 @@ function render.playing()
 		end
 	end
 
-	-- Health bars and turn indicator on the right of the field
-	for side, y in pairs({ Opponent = 30, Player = 500 }) do
-		lg.setColor(0, 0, 0)
-		lg.rectangle("fill", 1210, y, 210, 40)
-		lg.setColor(0.8, 0.1, 0.1)
-		lg.rectangle("fill", 1215, y + 5, 200 * health[side] / max_health[side], 30)
-		lg.setColor(1, 1, 1)
-		lg.printf(health[side] .. " HP", assets.debug_font, 1215, y + 8, 200, "center")
+	-- A pulsing ! marks your snakes whose activated ability you can afford right now
+	local pulse = 0.5 + 0.5 * math.sin(time * 6)
+	for sector = 5, 8 do
+		if played_cards[sector] and turn == "Player" and abilities.ready(played_cards[sector], "Player") then
+			local box = play.field_hitboxes[sector]
+			lg.setColor(1, 0.9, 0.2, 0.6 + 0.4 * pulse)
+			lg.circle("fill", box[1] + box[3] - 28, box[2] + 28, 16)
+			lg.setColor(0, 0, 0)
+			lg.printf("!", assets.font, box[1] + box[3] - 44, box[2] + 8, 32, "center")
+		end
 	end
+
+	-- Hovering a snake on the field explains it
+	if not held_card then
+		for sector, card in pairs(played_cards) do
+			if play.is_hitbox(mouse.x, mouse.y, play.field_hitboxes[sector]) then
+				local stats = data.get_stats(card)
+				local status = {}
+				for _, flag in ipairs({ "poison", "frozen", "shield" }) do
+					if card[flag] then
+						table.insert(status, flag == "shield" and ("shield " .. card.shield) or flag)
+					end
+				end
+				lg.setColor(0, 0, 0, 0.85)
+				lg.rectangle("fill", 1200, 325, 235, 170)
+				lg.setColor(1, 1, 1)
+				lg.printf(
+					card.card_path:sub(1, -5):gsub("_", " ") .. "\n" .. stats.ability .. "\n" .. stats.border .. ": " .. borders.text(stats.border)
+						.. (#status > 0 and ("\n" .. table.concat(status, ", ")) or ""),
+					assets.debug_font, 1208, 330, 220
+				)
+			end
+		end
+	end
+
+	-- Health bars and turn indicator on the right of the field
+	for side, y in pairs(play.bar_y) do
+		local shake, flash = effects.bar(side)
+		lg.setColor(0, 0, 0)
+		lg.rectangle("fill", 1210 + shake, y, 210, 40)
+		lg.setColor(0.8, 0.1, 0.1)
+		lg.rectangle("fill", 1215 + shake, y + 5, 200 * health[side] / max_health[side], 30)
+		lg.setColor(1, 1, 1, flash * 0.7)
+		lg.rectangle("fill", 1210 + shake, y, 210, 40)
+		lg.setColor(1, 1, 1)
+		lg.printf(health[side] .. " HP", assets.debug_font, 1215 + shake, y + 8, 200, "center")
+	end
+	effects.draw()
 	lg.setColor(1, 1, 1)
 	lg.printf(turn == "Player" and "Your Turn" or "Opponent's Turn", assets.font, 1200, 190, 230, "center")
 	lg.setColor(1, 1, 1)
@@ -200,12 +495,26 @@ function render.playing()
 			0
 		)
 	end
+
+	if confirm_forfeit then
+		lg.setColor(0, 0, 0, 0.7)
+		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+		lg.setColor(1, 1, 1)
+		lg.printf("Forfeit this match?", assets.font, 0, reference_window_height / 2 - 100, reference_window_width, "center")
+		buttons.playing["Yes"]:draw()
+		buttons.playing["No"]:draw()
+	end
 end
 
 function render.ended()
 	background()
 	lg.setColor(1, 1, 1)
-	lg.printf(winner == "Player" and "Victory!" or "Defeat", assets.font, 0, 250, reference_window_width / 3, "center", 0, 3, 3)
+	local won = winner == "Player"
+	lg.printf(won and ("Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 220, reference_window_width / 3, "center", 0, 3, 3)
+	if won then
+		local message = level_unlocked and ("Level " .. level_unlocked .. " unlocked!") or (play.level == #opponents and "You beat every opponent!" or "")
+		lg.printf(message, assets.font, 0, 400, reference_window_width, "center")
+	end
 	buttons.ended["Continue"]:draw()
 end
 
@@ -224,11 +533,9 @@ function render.info()
 	local rows = {
 		{ "Cost: ", info.cost, 0.7 },
 		{ "Defense: ", info.defense, 1.7 },
-		{ "Tier: ", info.border, 2.7 },
+		{ "Type: ", data.get_type(info_card), 2.7 },
 		{ "Attack: ", info.attack, 3.7 },
-		{ "Rarity: ", info.rarity, 4.7 },
-		{ "Ability: ", info.ability, 5.7 },
-		{ "Lore: ", info.lore, 6.7 },
+		{ "Tier: ", info.rarity .. (info.tier and " " .. info.tier or ""), 4.7 },
 	}
 	for _, row in ipairs(rows) do
 		lg.print(
@@ -237,6 +544,15 @@ function render.info()
 			reference_window_width / 2,
 			info_background_y + reference_window_height * row[3] / 10
 		)
+	end
+	-- Longer text wraps in the smaller font
+	local text_width = reference_window_width * 0.37
+	for _, block in ipairs({
+		{ "Ability: " .. info.ability, 5.3 },
+		{ info.border .. " border: " .. borders.text(info.border), 6.4 },
+		{ info.lore, 7.5 },
+	}) do
+		lg.printf(block[1], assets.small_font, reference_window_width / 2, info_background_y + reference_window_height * block[2] / 10, text_width)
 	end
 end
 
