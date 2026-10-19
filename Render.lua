@@ -343,13 +343,15 @@ local ICON_INFO = {
 
 -- Every icon with its position: the filter groups left to right, then the reset icon
 local function filter_icons()
-	local list, x = {}, 425
+	local list, x = {}, 330
 	for _, group in ipairs(collection.FILTER_GROUPS) do
-		for _, key in ipairs(group.keys) do
-			table.insert(list, { group.id, key, x, 86 })
-			x = x + ICON + 8
+		if group.id ~= "kind" then -- (the Snakes, Brews and Spells sections are picked on the landing page)
+			for _, key in ipairs(group.keys) do
+				table.insert(list, { group.id, key, x, 86 })
+				x = x + ICON + 8
+			end
+			x = x + 14
 		end
-		x = x + 14
 	end
 	table.insert(list, { "reset", "reset", x, 86 })
 	return list
@@ -585,7 +587,6 @@ function render.collection()
 		draw_sections()
 		buttons.collection["Collection Header"]:update_text("Collection " .. collection.owned_count() .. "/" .. #data.deck)
 		buttons.collection["Collection Header"]:draw()
-		buttons.collection["Open Pack"]:draw()
 		buttons.collection["Back"]:draw()
 		coach.start("coach_collection", {
 			{ rect = { 75, TILE_Y, 1290, TILE_H }, text = "Pick a section" },
@@ -594,7 +595,7 @@ function render.collection()
 	end
 	if not collection.deck_mode and not collection.sacrifice_mode then
 		coach.start("coach_collection2", {
-			{ rect = { 425, 84, 760, 42 }, text = "Filter" },
+			{ rect = { 330, 84, 760, 42 }, text = "Filter" },
 			{ rect = function() local c = buttons.collection["Sort"]; return { c.x, c.y, c.width, c.height } end, text = "Sort" },
 			{ rect = { 20, 130, 860, 690 }, text = "Click a card for details" },
 		})
@@ -612,6 +613,19 @@ function render.collection()
 	lg.setLineWidth(3)
 	lg.rectangle("line", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
 	lg.setLineWidth(1)
+	for _, corner in ipairs({ { -15, -8 }, { GRID_W + 15, -8 }, { -15, GRID_BOTTOM - GRID_Y + 8 }, { GRID_W + 15, GRID_BOTTOM - GRID_Y + 8 } }) do
+		lg.setColor(rim[1], rim[2], rim[3]) -- studs on the corners of the panel
+		lg.circle("fill", GRID_X + corner[1], GRID_Y + corner[2], 6)
+	end
+	if not collection.deck_mode and not collection.sacrifice_mode then -- how much of the collection you have
+		local have, total = collection.owned_count(), #data.deck
+		lg.setColor(0, 0, 0, 0.55)
+		lg.rectangle("fill", GRID_X - 15, 131, GRID_W + 30, 10, 5, 5)
+		lg.setColor(0.95, 0.78, 0.25)
+		lg.rectangle("fill", GRID_X - 15, 131, (GRID_W + 30) * have / total, 10, 5, 5)
+		lg.setColor(1, 1, 1, 0.35)
+		lg.rectangle("fill", GRID_X - 15, 132, (GRID_W + 30) * have / total, 3, 2, 2)
+	end
 	lg.setScissor(0, GRID_Y * sc, (GRID_X + GRID_W + CELL_GAP) * sc, (GRID_BOTTOM - GRID_Y) * sc)
 	each_collection_card(function(i, gx, gy)
 		lg.push()
@@ -619,11 +633,24 @@ function render.collection()
 		lg.scale(CARD_SCALE)
 		local x, y = 0, 0
 		local owned = collection.has(assets.card_names[i])
+		local tier_colour = RARITY_COLOUR[data.stats_by_name[assets.card_names[i]].rarity]
+		if assets.card_names[i] == under then -- the card under the mouse lifts a little
+			lg.translate(img_widths / 2, img_heights / 2)
+			lg.scale(1.06)
+			lg.translate(-img_widths / 2, -img_heights / 2)
+		end
+		lg.setBlendMode("add") -- a soft glow in the card's tier colour (faint for cards you have not found)
+		lg.setColor(tier_colour[1], tier_colour[2], tier_colour[3], owned and 0.22 or 0.06)
+		lg.rectangle("fill", -9, -9, img_widths + 18, img_heights + 18, 18, 18)
+		lg.setBlendMode("alpha")
 		-- Snakes you haven't unlocked are drawn as dark silhouettes
 		lg.setColor(owned and { 1, 1, 1 } or { 0.12, 0.1, 0.18 })
 		lg.draw(assets.cards[i], x, y)
 		if owned then
 			require("CardText").draw(assets.card_names[i], x, y) -- (borders only show on a snake's own page, and in play)
+		else
+			lg.setColor(tier_colour[1], tier_colour[2], tier_colour[3], 0.45)
+			lg.printf("?", assets.font, 0, img_heights / 2 - 60, img_widths / 3, "center", 0, 3, 3)
 		end
 		local name = assets.card_names[i]
 		if owned then -- how many copies of the snake you own (duplicates and variants included)
@@ -708,11 +735,7 @@ function render.collection()
 			buttons.collection["Summon"]:draw()
 		end
 	end
-	if not collection.sacrifice_mode then
-		buttons.collection["Borders"]:draw()
-	end
-	if not collection.sacrifice_mode then -- (imbuing is not the place to buy packs)
-		buttons.collection["Open Pack"]:draw()
+	if not collection.sacrifice_mode then -- (the snake eyes you can spend on packs)
 		lg.setColor(0, 0, 0, 0.7)
 		lg.rectangle("fill", reference_window_width - 400, 14, 250, 40, 8, 8)
 		lg.setColor(1, 0.85, 0.2)

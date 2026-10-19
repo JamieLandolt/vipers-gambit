@@ -119,13 +119,6 @@ return function()
 	buttons.reset_confirm["Yes"] = b("Yes", settings.reset_progress, nil, w / 2 - button_width - 20, h / 2, button_width, button_height)
 	buttons.reset_confirm["No"] = b("No", function() settings.confirm_reset = false end, nil, w / 2 + 20, h / 2, button_width, button_height)
 
-	buttons.collection["Open Pack"] = b("Packs", function()
-		if collection.sacrifice_mode then
-			return
-		end
-		shop_return = "collection"
-		update_animation_screen("shop")
-	end, nil, w - 140, 5, 135, button_height)
 	-- Leaves a section page, imbue mode or deck editing: back to the section list, the altar it came from, or the menu
 	local function collection_back()
 		if collection.sacrifice_mode and collection.return_to then
@@ -168,11 +161,6 @@ return function()
 			collection.message, collection.message_t = "You don't have everything the Snake God asks for", time
 		end
 	end, nil, 880, 790, 360, button_height)
-	buttons.collection["Borders"] = b("Borders", function()
-		if not collection.sacrifice_mode then
-			update_animation_screen("borders")
-		end
-	end, nil, 150, 5, 200, button_height)
 	buttons.borders["Back"] = b("Back", function()
 		if border_view then
 			border_view = nil
