@@ -2152,7 +2152,7 @@ local snake_shader = lg.newShader([[
 		vec2 px = uv * art;
 		if (px.x < 2.0 || px.x > 31.0 || px.y < 2.0 || px.y > 62.0) return vec4(0.0);
 		if (px.y < 9.0 && px.x < 10.0) return vec4(0.0);  // cost number and tier icon
-		if (px.y >= 38.0) return vec4(0.0);               // attack, defense and rarity bars
+		if (px.y >= 46.0) return vec4(0.0);               // the card below its art (the picture now reaches row 45)
 		vec4 c = Texel(tex, uv);
 		for (int i = 0; i < 6; i++) {
 			if (i < bg_count && distance(c.rgb, bgs[i]) < 0.02) return vec4(0.0);  // card background
