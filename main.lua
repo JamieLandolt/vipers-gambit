@@ -508,6 +508,18 @@ function love.draw()
 	lg.translate(-shake_x, -shake_y)
 	coach.draw()
 
+	-- Something new is waiting on the main menu: ring the Back button on the screens that lead there
+	local state = get_game_state()
+	if not (state == "menu" or state == "playing" or state == "ended" or state == "info" or state == "pack") and #hub.spotlight() > 0 then
+		local back = buttons.universal["Back"]
+		local pulse = 0.5 + 0.5 * math.sin(time * 5)
+		lg.setColor(1, 0.9, 0.3, 0.6 + 0.4 * pulse)
+		lg.setLineWidth(3 + 3 * pulse)
+		lg.rectangle("line", back.x - 4, back.y - 4, back.width + 8, back.height + 8, 12, 12)
+		lg.setLineWidth(1)
+		lg.setColor(1, 1, 1)
+	end
+
 	local toast = achievements.current()
 	if toast then -- an achievement banner slides down from the top
 		local slide = math.min((time - toast.t) * 4, 1)
