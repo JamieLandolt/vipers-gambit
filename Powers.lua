@@ -156,7 +156,6 @@ P.Grey_Snake = {
 		end
 	end,
 }
-P.Dirt_Snake = { text = "Swaps its own attack and defense when played", play = function(c) swap(c.card, c.slot) end }
 P.Sand_Snake = {
 	text = "Neighbours gain 1 attack when it is destroyed",
 	death = function(c)
