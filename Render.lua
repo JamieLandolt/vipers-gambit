@@ -2467,6 +2467,12 @@ function render.playing()
 				card_popup(card, mx + 24, my - 130, card.hp, status)
 			end
 		end
+		for card, box in pairs(card_hitboxes) do -- snakes in the hand too
+			if play.is_hitbox(mouse.x, mouse.y, box) then
+				local mx = mouse.x * reference_window_width / lg.getWidth()
+				card_popup(card, mx - POPUP_W / 2, 250)
+			end
+		end
 		if popup_card and time - popup_t < 5 then
 			card_popup(popup_card, popup_x * reference_window_width / lg.getWidth() + 24, popup_y * reference_window_height / lg.getHeight() - 250)
 		end
