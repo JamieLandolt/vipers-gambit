@@ -698,8 +698,12 @@ function play.resolve_combat(side)
 			end
 		end
 	end
-	for _, c in pairs(played_cards) do
+	-- This turn's extra attack runs out now, but it stays on the card while the attacks play out
+	local wait = effects.settled and math.max(effects.settled() - time, 0) or 0
+	for slot, c in pairs(played_cards) do
+		local before = abilities.attack(c, slot)
 		c.temp, c.fresh = nil, nil
+		lose_later(c, abilities.attack(c, slot) - before, wait, "atk")
 	end
 end
 
