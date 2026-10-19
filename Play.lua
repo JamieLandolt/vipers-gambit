@@ -423,7 +423,7 @@ function play.new_game(level, challenge)
 	local c = challenge or {}
 	profile = opponents[level] or opponents[1]
 	turn = "Player"
-	local mine, theirs = math.floor(STARTING_HEALTH * (c.player_health or 1)), math.floor((profile.health or STARTING_HEALTH) * (c.opp_health or 1))
+	local mine, theirs = math.floor(STARTING_HEALTH * (c.player_health or 1)) + collection.health_bonus(), math.floor((profile.health or STARTING_HEALTH) * (c.opp_health or 1))
 	max_health = { Player = mine, Opponent = theirs }
 	health = { Player = mine, Opponent = theirs }
 	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) + (c.opp_venom or 0) } -- start_turn adds the first point, so turn 1 has 2

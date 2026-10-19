@@ -31,7 +31,7 @@ if os.getenv("EXTRA") then -- starters plus N random other snakes: a player who 
 	end
 	for _ = 1, tonumber(os.getenv("EXTRA")) do player_deck[#player_deck + 1] = table.remove(pool, math.random(#pool)) end
 end
-package.preload["Collection"] = function() return { deck = function() return player_deck end, save = function() end, mark_hint = function() end, reward = function() return 0 end, record_win = function() end, beaten_base = function() return true end, challenges_done = function() return 0 end, endless = function() return 0 end, wins = function() return 0 end } end
+package.preload["Collection"] = function() return { deck = function() return player_deck end, save = function() end, mark_hint = function() end, reward = function() return 0 end, record_win = function() end, health_bonus = function() return 0 end, beaten_base = function() return true end, challenges_done = function() return 0 end, endless = function() return 0 end, wins = function() return 0 end } end
 function contains(t, v) for _, x in ipairs(t) do if x == v then return true end end return false end
 function update_game_state(s) state = s end
 function play_sound() end

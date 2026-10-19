@@ -152,6 +152,8 @@ function collection.reset()
 	love.filesystem.remove("tokens.txt")
 	collection.seen, rivals = nil, nil
 	love.filesystem.remove("rivals.txt")
+	love.filesystem.remove("charmer_wins.txt")
+	charmer_wins = nil
 	for _, name in ipairs(STARTERS) do
 		owned[name] = 1
 	end
@@ -455,6 +457,44 @@ function collection.border_holders(border)
 	return list
 end
 
+-- Wins with each of your charmers (charmer_wins.txt, one "name wins" line each): every 3 wins with any charmer gives
+-- all your charmers 5 more health in battle
+collection.WINS_PER_BONUS, collection.BONUS_HEALTH = 3, 5
+local charmer_wins
+
+local function load_charmer_wins()
+	if not charmer_wins then
+		charmer_wins = {}
+		for name, wins in (love.filesystem.read("charmer_wins.txt") or ""):gmatch("([^\n]-) (%d+)\n?") do
+			charmer_wins[name] = tonumber(wins)
+		end
+	end
+	return charmer_wins
+end
+
+function collection.charmer_wins(name)
+	return load_charmer_wins()[name] or 0
+end
+
+-- The extra health every charmer has from all those wins
+function collection.health_bonus()
+	local milestones = 0
+	for _, wins in pairs(load_charmer_wins()) do
+		milestones = milestones + math.floor(wins / collection.WINS_PER_BONUS)
+	end
+	return milestones * collection.BONUS_HEALTH
+end
+
+function collection.add_charmer_win(name)
+	local all = load_charmer_wins()
+	all[name] = (all[name] or 0) + 1
+	local lines = {}
+	for n, wins in pairs(all) do
+		lines[#lines + 1] = n .. " " .. wins
+	end
+	love.filesystem.write("charmer_wins.txt", table.concat(lines, "\n") .. "\n")
+end
+
 -- Record against each opponent (rivals.txt, one "level wins challenges endless" line per level): matches won, how many of the
 -- level's three challenges are cleared, and endless rematches won. Saves from before challenges had tiers (challenges.txt) count as one.
 local function load_rivals()
@@ -493,6 +533,7 @@ end
 -- A win over `level` (`challenge` is the fight's challenge table, if it was one)
 function collection.record_win(level, challenge)
 	local r = rival(level)
+	collection.add_charmer_win(chosen_avatar)
 	collection.drop_snake(level, r.wins == 0)
 	r.wins = r.wins + 1
 	if challenge and challenge.endless then

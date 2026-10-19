@@ -1724,6 +1724,9 @@ function render.character_select()
 	end
 	lesson[#lesson + 1] = { rect = { x1, y1, PER_ROW * CARD_W + (PER_ROW - 1) * CARD_GAP, 2 * CARD_H + 20 }, text = "Click a card to choose. Some have small pictures to pick a different look" }
 	coach.start("coach_charmers", lesson) -- first visit
+	lg.setColor(1, 0.85, 0.3)
+	lg.printf("Every " .. collection.WINS_PER_BONUS .. " wins with a charmer gives all your charmers +" .. collection.BONUS_HEALTH .. " health. Bonus now: +" .. collection.health_bonus() .. " health. (The number in brackets is wins to go.)", assets.small_font, 0, 800, reference_window_width, "center")
+	lg.setColor(1, 1, 1)
 	buttons.character_select["Charmers Header"]:draw()
 	buttons.universal["Back"]:draw()
 	local hovered = render.charmer_at(mouse.x, mouse.y)
@@ -1763,6 +1766,14 @@ function render.character_select()
 		end
 		lg.setColor(1, 1, 1)
 		lg.printf(c.name, assets.debug_font, x + 6, y + PORTRAIT_H + LOOKS_H + 24, CARD_W - 12, "center")
+		if charmers.is_unlocked(i) then -- wins with this charmer, and how many more until the next health bonus
+			local wins = collection.charmer_wins(c.name)
+			lg.setColor(0, 0, 0, 0.75)
+			lg.rectangle("fill", x + CARD_W - 86, y + PORTRAIT_H - 18, 76, 24, 4, 4)
+			lg.setColor(1, 0.85, 0.3)
+			lg.printf("Wins " .. wins .. " (" .. (collection.WINS_PER_BONUS - wins % collection.WINS_PER_BONUS) .. ")", assets.debug_font, x + CARD_W - 86, y + PORTRAIT_H - 15, 76, "center")
+			lg.setColor(1, 1, 1)
+		end
 		if not charmers.is_unlocked(i) then
 			lg.setColor(0, 0, 0, 0.72)
 			lg.rectangle("fill", x, y, CARD_W, CARD_H, 5, 5)
