@@ -5,7 +5,7 @@ local collection = require("Collection")
 
 -- User settings, saved as key=value lines in settings.txt. The settings screen is built from
 -- settings.items (Ui.lua makes the buttons, Render.lua draws the rows).
-local settings = { volume = 1, mute = false, fullscreen = false, debug = false, speed = 2, confirm_reset = false, dragging = false, turn_log = false, reduce_motion = false, infinite_venom = false }
+local settings = { volume = 1, mute = false, fullscreen = false, debug = false, speed = 2, confirm_reset = false, dragging = false, turn_log = false, reduce_motion = false, infinite_venom = false, zoom_snakes = true }
 
 local SPEEDS = { { "Slow", 1.2 }, { "Normal", 0.7 }, { "Fast", 0.3 } } -- seconds between opponent actions
 local ROW, HEADING = 48, 40
@@ -32,6 +32,7 @@ function settings.apply()
 	audio = not settings.mute
 	reduce_motion = settings.reduce_motion
 	play.ai_delay = SPEEDS[settings.speed][2]
+	play.zoom_snakes = settings.zoom_snakes
 	if settings.fullscreen ~= big_window then
 		set_big_window(settings.fullscreen)
 	end
@@ -46,6 +47,7 @@ function settings.save()
 		"turn_log=" .. (settings.turn_log and 1 or 0),
 		"reduce_motion=" .. (settings.reduce_motion and 1 or 0),
 		"infinite_venom=" .. (settings.infinite_venom and 1 or 0),
+		"zoom_snakes=" .. (settings.zoom_snakes and 1 or 0),
 		"speed=" .. settings.speed,
 		"title=" .. title.styles[title.style].name,
 	}
@@ -60,6 +62,7 @@ function settings.load()
 	settings.volume = math.min(math.max(tonumber(t.volume) or 1, 0), 1)
 	settings.mute, settings.fullscreen, settings.debug = t.mute == "1", t.fullscreen == "1", t.debug == "1"
 	settings.turn_log, settings.reduce_motion, settings.infinite_venom = t.turn_log == "1", t.reduce_motion == "1", t.infinite_venom == "1"
+	settings.zoom_snakes = t.zoom_snakes ~= "0"
 	settings.speed = SPEEDS[tonumber(t.speed)] and tonumber(t.speed) or 2
 	for i, style in ipairs(title.styles) do
 		if style.name == t.title then

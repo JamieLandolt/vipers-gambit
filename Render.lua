@@ -1805,6 +1805,8 @@ function render.playing()
 
 	count = count + 1
 	buttons.playing["Forfeit"]:draw()
+	buttons.playing["Zoom"]:update_text(settings.zoom_snakes and "Zoom: On" or "Zoom: Off")
+	buttons.playing["Zoom"]:draw()
 	local tray = buttons.playing["Card Background"] -- the hand's tray: dark leather with a gold rim
 	lg.setColor(0.1, 0.07, 0.06, 0.92)
 	lg.rectangle("fill", tray.x, tray.y, tray.width, tray.height, 16, 16)

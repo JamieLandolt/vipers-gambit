@@ -67,7 +67,8 @@ local function place_effect(placed, sector)
 	play.note((sector > 4 and "You play " or "Opponent plays ") .. play.name_of(placed))
 	play.reveal(sector <= 4, placed)
 	placed.fresh = true -- some abilities only work the turn a snake is played
-	if effects.settled and data.get_stats(placed).kind == "snake" then -- (headless tests and the sim have no clock)
+	if effects.settled and play.zoom_snakes and not play.zoomed[placed.card_path] and data.get_stats(placed).kind == "snake" then -- (headless tests and the sim have no clock)
+		play.zoomed[placed.card_path] = true -- only the first time each snake is played in a battle
 		play.spotlight = { card = placed, ends = time + SPOTLIGHT } -- zoom in on every snake played (see render.spotlight)
 	end
 	local cx, cy = play.slot_centre(sector)
@@ -423,7 +424,7 @@ function play.new_game(level, challenge)
 	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) + (c.opp_venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
-	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited, play.spotlight = nil, nil, false, nil, nil, false, nil
+	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited, play.spotlight, play.zoomed = nil, nil, false, nil, nil, false, nil, {}
 	play.log, play.lost_snake = {}, false
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
 	effects.clear()
@@ -453,7 +454,7 @@ function play.new_guest(host_charmer)
 	max_health, health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }, { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
 	max_venom, venom = { Player = 1, Opponent = 1 }, { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
-	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited, play.spotlight = nil, nil, false, nil, nil, false, nil
+	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited, play.spotlight, play.zoomed = nil, nil, false, nil, nil, false, nil, {}
 	play.log, play.lost_snake = {}, false
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
 	card_hitboxes = {}
