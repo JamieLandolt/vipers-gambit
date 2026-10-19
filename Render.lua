@@ -1851,8 +1851,7 @@ function render.playing()
 	for side, spot in pairs({ Opponent = { 1215, 78 }, Player = { 1215, 548 } }) do
 		local c = charmers.of(side, play.level)
 		lg.setColor(1, 1, 1)
-		local who = side == "Opponent" and not play.versus and opponents[play.level] or c
-		portrait(who.name, spot[1], spot[2], 60, 72)
+		portrait(side == "Opponent" and not play.versus and opponents[play.level].portrait or c.name, spot[1], spot[2], 60, 72)
 		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
 		if play.charms_open() then
 			lg.setColor(0.6, 0.9, 0.4)

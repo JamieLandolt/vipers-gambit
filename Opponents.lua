@@ -11,29 +11,29 @@ local styles = {
 
 -- Opponents start with a third of the listed extra venom (rounded down) and 5 less health than before, so early fights
 -- cannot play more snakes on their first turns than the player can
-local function opponent(level, name, portrait, charmer, style, venom)
-	return { name = name, portrait = portrait, charmer = charmer, style = styles[style], venom = math.floor(venom / 3), health = 40 + 5 * level }
+local function opponent(level, portrait, charmer, style, venom)
+	return { name = charmer, portrait = portrait, charmer = charmer, style = styles[style], venom = math.floor(venom / 3), health = 40 + 5 * level }
 end
 
 local list = {
-	{ "Garden Keeper", "opponents/garden_keeper.png", "Tide Priestess", "defensive", 2 },
-	{ "Pond Skulker", "opponents/pond_skulker.png", "Yuki Frostveil", "balanced", 2 },
-	{ "Venom Rookie", "opponents/venom_rookie.png", "Dr. Fang", "aggro", 6 },
-	{ "Dune Wanderer", "opponents/dune_wanderer.png", "Ember Queen", "balanced", 4 },
-	{ "Crypt Warden", "opponents/crypt_warden.png", "Yuki Frostveil", "defensive", 1 },
-	{ "Reed Stalker", "opponents/reed_stalker.png", "Ember Queen", "balanced", 4 },
-	{ "Fang Brawler", "opponents/fang_brawler.png", "Dr. Fang", "aggro", 1 },
-	{ "Bog Hermit", "opponents/bog_hermit.png", "Tide Priestess", "defensive", 3 },
-	{ "Tide Priestess", "opponents/tide_priestess.png", "Tide Priestess", "balanced", 0 },
-	{ "Constrictor", "opponents/constrictor.png", "Warden Basalt", "defensive", 1 },
-	{ "Mist Witch", "opponents/mist_witch.png", "Yuki Frostveil", "balanced", 0 },
-	{ "Cinder Monk", "opponents/cinder_monk.png", "Ember Queen", "balanced", 0 },
-	{ "Ember Queen", "opponents/ember_queen.png", "Ember Queen", "aggro", 0 },
-	{ "Canyon Duelist", "opponents/canyon_duelist.png", "Yuki Frostveil", "balanced", 1 },
-	{ "Night Stalker", "opponents/night_stalker.png", "Yuki Frostveil", "aggro", 0 },
-	{ "Golden Heir", "opponents/golden_heir.png", "Dr. Fang", "balanced", 0 },
-	{ "Emerald Emperor", "opponents/emerald_emperor.png", "Tide Priestess", "balanced", 4 },
-	{ "The Viper King", "opponents/viper_king.png", "Ember Queen", "balanced", 0 },
+	{ "opponents/garden_keeper.png", "Tide Priestess", "defensive", 2 },
+	{ "opponents/pond_skulker.png", "Yuki Frostveil", "balanced", 2 },
+	{ "opponents/venom_rookie.png", "Dr. Fang", "aggro", 6 },
+	{ "opponents/dune_wanderer.png", "Ember Queen", "balanced", 4 },
+	{ "opponents/crypt_warden.png", "Yuki Frostveil", "defensive", 1 },
+	{ "opponents/reed_stalker.png", "Ember Queen", "balanced", 4 },
+	{ "opponents/fang_brawler.png", "Dr. Fang", "aggro", 1 },
+	{ "opponents/bog_hermit.png", "Tide Priestess", "defensive", 3 },
+	{ "opponents/tide_priestess.png", "Tide Priestess", "balanced", 0 },
+	{ "opponents/constrictor.png", "Warden Basalt", "defensive", 1 },
+	{ "opponents/mist_witch.png", "Yuki Frostveil", "balanced", 0 },
+	{ "opponents/cinder_monk.png", "Ember Queen", "balanced", 0 },
+	{ "opponents/ember_queen.png", "Ember Queen", "aggro", 0 },
+	{ "opponents/canyon_duelist.png", "Yuki Frostveil", "balanced", 1 },
+	{ "opponents/night_stalker.png", "Yuki Frostveil", "aggro", 0 },
+	{ "opponents/golden_heir.png", "Dr. Fang", "balanced", 0 },
+	{ "opponents/emerald_emperor.png", "Tide Priestess", "balanced", 4 },
+	{ "opponents/viper_king.png", "Ember Queen", "balanced", 0 },
 }
 
 -- Level 1 fights with the starter snakes the player begins with; every level after swaps one more worst snake (lowest
@@ -63,7 +63,7 @@ end
 
 local opponents = {}
 for level, e in ipairs(list) do
-	opponents[level] = opponent(level, e[1], e[2], e[3], e[4], e[5])
+	opponents[level] = opponent(level, e[1], e[2], e[3], e[4])
 	-- the deck is built on first use: CardData cannot be required while Assets is still loading (it would be a require loop)
 	setmetatable(opponents[level], { __index = function(entry, key)
 		if key == "deck" then

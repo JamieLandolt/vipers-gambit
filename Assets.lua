@@ -34,9 +34,9 @@ for _, c in ipairs(require("Charmers").list) do
 	assets.avatars[c.name] = lg.newImage(require("Charmers").file(c))
 end
 
--- Each campaign opponent has its own portrait
+-- Each campaign opponent has its own portrait, kept under its file name (the opponent's name is its charmer's)
 for _, o in ipairs(require("Opponents")) do
-	assets.avatars[o.name] = assets.avatars[o.name] or lg.newImage("assets/" .. o.portrait)
+	assets.avatars[o.portrait] = assets.avatars[o.portrait] or lg.newImage("assets/" .. o.portrait)
 end
 
 for _, file in ipairs(love.filesystem.getDirectoryItems("assets/Snake_Cards")) do
