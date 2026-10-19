@@ -598,14 +598,15 @@ function render.collection()
 	local under = card_under(mouse.x, mouse.y) -- the pane shows any hovered card, owned or not
 	pane_name = under or pane_name
 	local sc = lg.getWidth() / reference_window_width
-	if collection.deck_mode then -- the deck page: a green felt table under your own cards
-		lg.setColor(0.04, 0.22, 0.1, 0.7)
-		lg.rectangle("fill", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
-		lg.setColor(0.35, 0.8, 0.4, 0.8)
-		lg.setLineWidth(3)
-		lg.rectangle("line", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
-		lg.setLineWidth(1)
-	end
+	-- a panel under the grid: green felt for the deck page, deep purple with a gold rim for the collection
+	local felt = collection.deck_mode and { 0.04, 0.22, 0.1 } or { 0.1, 0.05, 0.2 }
+	local rim = collection.deck_mode and { 0.35, 0.8, 0.4 } or { 0.82, 0.66, 0.25 }
+	lg.setColor(felt[1], felt[2], felt[3], 0.75)
+	lg.rectangle("fill", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
+	lg.setColor(rim[1], rim[2], rim[3], 0.8)
+	lg.setLineWidth(3)
+	lg.rectangle("line", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
+	lg.setLineWidth(1)
 	lg.setScissor(0, GRID_Y * sc, (GRID_X + GRID_W + CELL_GAP) * sc, (GRID_BOTTOM - GRID_Y) * sc)
 	each_collection_card(function(i, gx, gy)
 		lg.push()

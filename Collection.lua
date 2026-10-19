@@ -405,6 +405,9 @@ end
 
 -- Is the card shown with the current filters? (the lane type filter only applies to snakes)
 function collection.shown(name)
+	if collection.deck_mode and not collection.has(name) then
+		return false -- the deck page only lists what you own
+	end
 	local kind = stat(name, "kind")
 	if not collection.filter_on("kind", kind) or not collection.filter_on("tier", stat(name, "rarity")) then
 		return false
