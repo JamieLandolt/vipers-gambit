@@ -63,7 +63,7 @@ charmers.list = {
 		apply = function(play, side)
 			return each(foe(side), function(slot) play.wound(slot, 2) end)
 		end },
-	{ name = "Ember Queen", colour = { 1, 0.5, 0.1 }, portrait = "ember.png", charm = "Cinder Blessing", cooldown = 3, cost = 4, text = "All your snakes gain 2 attack for good.",
+	{ name = "Ember Queen", colour = { 1, 0.5, 0.1 }, portrait = "ember.png", charm = "Cinder Blessing", cooldown = 3, cost = 2, text = "All your snakes gain 2 attack for good.",
 		apply = function(play, side)
 			return each(side, function(slot, card)
 				card.bonus = (card.bonus or 0) + 2

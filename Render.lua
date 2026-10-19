@@ -2233,6 +2233,10 @@ function render.level_select()
 	end
 	lg.setColor(1, 1, 1)
 	buttons.universal["Back"]:draw()
+	if charmer_guide then
+		local back = buttons.universal["Back"]
+		require("Hub").ring(back.x, back.y, back.width, back.height)
+	end
 	if hovered and hovered >= 1 and play.level_open(hovered) and not level_choice then
 		render.level_tooltip(hovered)
 	end
@@ -2798,7 +2802,9 @@ function render.playing()
 	end
 end
 
+local charmer_hover
 function render.ended()
+	thumb_hits = {}
 	background()
 	local won = winner == "Player"
 	local top = won and 55 or 230 -- a defeat has no reward snakes, so its panel is short and centred
@@ -2823,6 +2829,9 @@ function render.ended()
 		for i, drop in ipairs(drops) do
 			local cx = reference_window_width / 2 + (i - 1 - (#drops - 1) / 2) * gap
 			lg.setColor(1, 1, 1)
+			local cw, ch = img_widths * scale, img_heights * scale
+			local rx, ry = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+			thumb_hits[#thumb_hits + 1] = { cx - cw / 2, 435, cw, ch, drop.name, rx >= cx - cw / 2 and rx <= cx + cw / 2 and ry >= 435 and ry <= 435 + ch }
 			lg.printf((i == 2 and "Bonus snake: " or "New snake: ") .. drop.name:gsub("_", " ") .. " (" .. drop.border .. ")", assets.small_font, cx - gap / 2, 395, gap, "center")
 			lg.push()
 			lg.translate(cx - img_widths * scale / 2, 435)
@@ -2838,6 +2847,16 @@ function render.ended()
 	continue.home_y = continue.home_y or continue.y
 	continue.y = won and continue.home_y or top + 300
 	continue:draw()
+	thumb_popup()
+	if charmer_hover then -- hovering the new charmer's name shows who they are and their charm
+		local c = charmer_hover
+		charmer_hover = nil
+		local x, y = (reference_window_width - 640) / 2, 330
+		panel(x, y, 640, 150, { 0.4, 1, 0.5 })
+		lg.setColor(1, 1, 1)
+		portrait(c.name, x + 16, y + 14, 84, 100)
+		charmer_info(c, x + 116, y + 14, "Charmer", 99)
+	end
 end
 
 -- Host or join a two-player match

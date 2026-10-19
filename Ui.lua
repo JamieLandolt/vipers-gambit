@@ -62,6 +62,7 @@ return function()
 		if locked("Charmers") then
 			return
 		end
+		charmer_guide = nil
 		update_animation_screen("character_select")
 	end, nil, left, row(1), button_width, button_height)
 	buttons.hub_popup["Collection"] = b("Collection", function()

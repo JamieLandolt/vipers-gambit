@@ -318,6 +318,7 @@ function play.check_end()
 				unlocked, level_unlocked = unlocked + 1, unlocked + 1
 				local charmer = require("Charmers").list[(unlocked - 1) / require("LevelNodes").per_region + 1]
 				charmer_unlocked = charmer and charmer.name
+				charmer_guide = charmer_unlocked and true or nil -- circles Back, Gameplay and Charmers until the player opens Charmers
 				collection.save()
 			end
 			if winner == "Player" and play.level > 0 then

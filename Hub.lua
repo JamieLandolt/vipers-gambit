@@ -43,6 +43,16 @@ local RULES = {
 		{ "tip_sac", "New: Sacrifice!", function() return collection.sacrifice_unlocked() end } } },
 }
 
+-- A pulsing circle that points at something to click next (used after a new charmer unlocks: Back, Gameplay, Charmers)
+function hub.ring(x, y, w, h)
+	local pulse = 0.5 + 0.5 * math.sin(time * 5)
+	lg.setColor(1, 0.9, 0.2, 0.7 + 0.3 * pulse)
+	lg.setLineWidth(5)
+	lg.circle("line", x + w / 2, y + h / 2, math.max(w, h) / 2 + 12 + 4 * pulse)
+	lg.setLineWidth(1)
+	lg.setColor(1, 1, 1)
+end
+
 local function item_open(item)
 	return item.id ~= "trophy" or collection.achievements_unlocked()
 end
@@ -210,6 +220,9 @@ function hub.draw_screen(screen)
 		lg.rectangle("fill", item.x - text_w / 2, item.y + 20, text_w, 36, 8, 8) -- (the same label as the main menu's icons)
 		lg.setColor(hovered == item and { 0.7, 1, 0.45 } or { 0.98, 0.94, 0.7 })
 		lg.printf(label, assets.small_font, item.x - 150, item.y + 22, 300, "center")
+		if charmer_guide and item.name == "Charmers" then
+			hub.ring(bx, by + bob, bw, bh + 50)
+		end
 	end
 	lg.setColor(1, 1, 1)
 	if hub.note and time - hub.note_t < 2.5 then
@@ -286,6 +299,14 @@ function hub.draw(t)
 		end
 	end
 	lg.setColor(1, 1, 1)
+	if charmer_guide and #spots == 0 then
+		for i, item in ipairs(ITEMS) do
+			if item.id == "book" then
+				local bx, by, bw, bh = box(item)
+				hub.ring(bx, by + math.sin(time * 1.8 + i * 1.3) * 8, bw, bh)
+			end
+		end
+	end
 	if hub.note and time - hub.note_t < 2.5 then
 		lg.setColor(0, 0, 0, 0.85)
 		lg.rectangle("fill", 370, 40, 700, 56, 8, 8)
