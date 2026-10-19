@@ -8,7 +8,7 @@ local assets = require("Assets")
 local effects = {}
 local list = {}
 
-local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9, sound = 0.3, shake = 0.35 }
+local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9, sound = 0.3, shake = 0.35, callout = 1.4 }
 local FALL = 0.25 -- how long a placed card takes to land
 
 -- Floating texts that mean something get an icon, colour, particles and a sound of their own
@@ -250,6 +250,23 @@ function effects.draw()
 				require("Sounds").play(e.name)
 			elseif e.kind == "dead" then
 				sparks(e.cx, e.cy, math.min(age / 0.5, 1), 14, { 0.9, 0.2, 0.2 }, 200)
+			elseif e.kind == "callout" then -- who did what: a ring bursting from the snake and a label above it
+				local u = math.min(age / LIFE.callout, 1)
+				local c = e.colour or { 1, 0.85, 0.3 }
+				lg.setLineWidth(7 * (1 - u))
+				lg.setColor(c[1], c[2], c[3], 1 - u)
+				lg.circle("line", e.cx, e.cy, 20 + 150 * math.min(u * 1.6, 1))
+				lg.setLineWidth(1)
+				local font = assets.small_font
+				local w = font:getWidth(e.text) + 30
+				local x, y = math.max(10, math.min(e.cx - w / 2, reference_window_width - w - 10)), math.max(10, e.cy - 150 - 12 * u)
+				local fade = u < 0.8 and 1 or (1 - u) / 0.2
+				lg.setColor(0, 0, 0, 0.8 * fade)
+				lg.rectangle("fill", x, y, w, 34, 8, 8)
+				lg.setColor(c[1], c[2], c[3], fade)
+				lg.rectangle("line", x, y, w, 34, 8, 8)
+				lg.setColor(1, 1, 1, fade)
+				lg.print(e.text, font, x + 15, y + 5)
 			elseif e.kind == "float" and e.style then
 				styled_float(e, age)
 			elseif e.kind == "float" then

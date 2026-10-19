@@ -1,3 +1,4 @@
+time = 0
 -- Headless balance simulator. Run from the project root:  luajit tools/sim.lua
 --   (default)      bot player vs each level's AI: win rate, match length, stalemates
 --   MODE=matrix    ability power: win-rate contribution of each ability kind x tier (mirror decks)

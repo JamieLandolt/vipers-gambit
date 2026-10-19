@@ -61,8 +61,17 @@ function play.reveal(is_opponent, played)
 	end
 end
 
+-- Says what just happened at a spot on the field: a ring bursts there and a label shows above it
+function play.callout(text, cx, cy, colour)
+	effects.add("callout", { text = text, cx = cx, cy = cy, colour = colour })
+end
+
 local function place_effect(placed, sector)
 	play.note((sector > 4 and "You play " or "Opponent plays ") .. play.name_of(placed))
+	if sector <= 4 then
+		local x, y = play.slot_centre(sector)
+		play.callout("Opponent plays " .. play.name_of(placed):gsub("_", " "), x, y)
+	end
 	play.reveal(sector <= 4, placed)
 	placed.fresh = true -- some abilities only work the turn a snake is played
 	if data.border_of(placed) == "Rainbow" and data.get_stats(placed).kind == "snake" then -- its +1/+1 starts the moment it is played
@@ -340,7 +349,7 @@ function play.start_turn()
 	play.charm_used[turn] = false
 	play.charm_cd[turn] = math.max(0, play.charm_cd[turn] - 1)
 	max_venom[turn] = math.min(max_venom[turn] + 1, MAX_VENOM)
-	venom[turn] = max_venom[turn]
+	venom[turn] = math.min(venom[turn] + max_venom[turn], MAX_VENOM) -- unspent venom carries over
 	if turn == "Player" then
 		local deck, deck_borders = player_deck()
 		fill_hand(player_hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
@@ -712,6 +721,11 @@ function play.resolve_combat(side)
 	end
 end
 
+local ABILITY_COLOUR = {
+	strike = { 1, 0.35, 0.3 }, drain = { 0.85, 0.2, 0.5 }, heal = { 0.4, 1, 0.55 }, shield = { 0.55, 0.8, 1 },
+	empower = { 1, 0.6, 0.2 }, refresh = { 1, 0.95, 0.4 }, bolster = { 1, 0.8, 0.3 },
+}
+
 -- Pay venom to use the snake in `slot`'s activated ability (once per turn)
 function play.activate(slot)
 	if play.versus == "guest" then
@@ -728,6 +742,8 @@ function play.activate(slot)
 	venom[side] = venom[side] - cost
 	card.used = true
 	play.note(play.name_of(card) .. " uses its ability")
+	local ax, ay = play.slot_centre(slot)
+	play.callout(play.name_of(card):gsub("_", " ") .. ": " .. kind, ax, ay, ABILITY_COLOUR[kind])
 
 	local ahead = slot > 4 and slot - 4 or slot + 4
 	if kind == "strike" or kind == "drain" then
@@ -788,6 +804,9 @@ function play.use_charm(side)
 	play.charm_pulse = { side = side, t = time, colour = charmer.colour or { 1, 1, 1 } } -- drawn round the charmer (see render.playing)
 	play.note((side == "Player" and "You use " or "Opponent uses ") .. charmer.charm)
 	play.float_bar(side, charmer.charm)
+	if side == "Opponent" then
+		play.callout("Opponent uses " .. charmer.charm, 1315, play.bar_y.Opponent, charmer.colour)
+	end
 	play_sound(hover_sound)
 	play.check_end()
 	return true
@@ -845,6 +864,9 @@ function play.use_support(side)
 				play.note((side == "Player" and "You use " or "Opponent uses ") .. play.name_of(c))
 				play.reveal(side == "Opponent", c)
 				effects.add("sound", { name = st.kind == "brew" and "brew" or "spell" })
+				if side == "Opponent" then
+					play.callout("Opponent uses " .. play.name_of(c):gsub("_", " "), 720, 230, def.colour)
+				end
 				table.remove(hand, i)
 				venom[side] = venom[side] - st.cost
 				play.check_end()
@@ -917,7 +939,7 @@ function play.opponent_turn(dt)
 		return
 	end
 	ai_timer = ai_timer + dt
-	if ai_timer < play.ai_delay then
+	if ai_timer < play.ai_delay + 0.4 then -- (a little slower than the setting, so each action can be followed)
 		return
 	end
 	ai_timer = 0
