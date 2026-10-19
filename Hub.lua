@@ -16,9 +16,9 @@ local ITEMS = {
 -- What each locked thing inside the Play and Gameplay popups needs
 local NEEDS = {
 	Charmers = { "Beat the 2nd opponent to unlock Charmers", function() return collection.unlock_all or unlocked >= 3 end },
-	Lanes = { "Beat the 2nd opponent to unlock Lanes", function() return collection.unlock_all or unlocked >= 3 end },
+	Lanes = { "Beat the 3rd opponent to unlock Lanes", function() return collection.unlock_all or unlocked >= 4 end },
 	Collection = { "Beat the 5th opponent to unlock the Collection", function() return collection.unlock_all or unlocked >= 6 end },
-	Deck = { "Beat the 5th opponent to unlock deck building", function() return collection.deck_unlocked() end },
+	Deck = { "Beat the 3rd opponent to unlock deck building", function() return collection.deck_unlocked() end },
 	Imbue = { "Beat the 10th opponent to unlock Imbue", function() return collection.imbue_unlocked() end },
 	Sacrifice = { "Beat the 10th opponent to awaken the Snake God", function() return collection.sacrifice_unlocked() end },
 	Versus = { "Beat the 10th opponent to unlock Versus", function() return collection.unlock_all or unlocked >= 11 end },
@@ -34,7 +34,8 @@ end
 local RULES = {
 	packs = { tips = { { "tip_packs", "New: Packs! Spend the snake eyes you win on new cards.", function() return unlocked >= 2 end } } },
 	play = { tips = { { "tip_versus", "New: Versus!", function() return collection.unlock_all or unlocked >= 11 end } } },
-	book = { tips = { { "tip_charmers", "New: Charmers and Lanes!", function() return collection.unlock_all or unlocked >= 3 end },
+	book = { tips = { { "tip_charmers", "New: Charmers!", function() return collection.unlock_all or unlocked >= 3 end },
+		{ "tip_lanes", "New: Lanes!", function() return collection.unlock_all or unlocked >= 4 end },
 		{ "tip_book", "New: Collection!", function() return collection.unlock_all or unlocked >= 6 end },
 		{ "tip_deck", "New: Deck building!", function() return collection.deck_unlocked() end },
 		{ "tip_altar", "New: Imbue!", function() return collection.imbue_unlocked() end },

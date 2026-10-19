@@ -480,9 +480,9 @@ function collection.record_win(level, challenge)
 end
 
 -- Imbuing opens up once you have beaten the 10th opponent, and so does the Snake God's altar (sacrifice)
--- Deck building opens with the Collection, after the 5th opponent
+-- Deck building opens after the 3rd opponent
 function collection.deck_unlocked()
-	return collection.unlock_all or unlocked >= 6
+	return collection.unlock_all or unlocked >= 4
 end
 
 -- The collection opens on a page of sections (snakes, brews, spells, borders); `section` is the kind being browsed
