@@ -4,10 +4,10 @@ local lg = love.graphics
 -- Every card has a border; each one gives the snake a different passive effect (applied in Play.lua).
 local borders = {
 	Basic = { text = "No special effect" },
-	Venom = { colour = { 0.45, 0.9, 0.2 }, text = "Poison: its hits poison the target for 2 turns (-1 defense each turn)" },
+	Venom = { colour = { 0.45, 0.9, 0.2 }, text = "Poison: its hits poison the target for 2 turns (-1 health each turn)" },
 	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: damage beyond a kill hits the owner's health 1.5x (rounded up)" },
-	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Shrouded: 1.5x defense (rounded up)" },
-	Rainbow = { text = "Prismatic: gains +1 attack and +1 defense every turn" },
+	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Shrouded: 1.5x health (rounded up)" },
+	Rainbow = { text = "Prismatic: gains +1 attack and +1 health every turn" },
 	Stone = { colour = { 0.65, 0.65, 0.7 }, text = "Fortified: takes 2 less damage from every hit" },
 	-- Support cards (brews and spells) have their own frames: a double line with flask-shaped or star-shaped corners
 	Brew = { colour = { 0.3, 0.95, 0.7 }, text = "Support: a brew, drunk by one of your snakes" },
@@ -23,7 +23,7 @@ function borders.text(name)
 	return borders[name].text
 end
 
--- "Shadow border (Shrouded): 1.5x defense (rounded up)"
+-- "Shadow border (Shrouded): 1.5x health (rounded up)"
 function borders.describe(name)
 	local effect, rest = borders[name].text:match("^(.-): (.*)$")
 	return effect and (name .. " border (" .. effect .. "): " .. rest) or (name .. " border: " .. borders[name].text)

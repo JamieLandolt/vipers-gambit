@@ -8,7 +8,7 @@ local ACTIVE = { strike = true, heal = true, shield = true, empower = true, drai
 
 local DESCRIPTIONS = {
 	strike = function(a) return ("Pay %d venom: hit the card ahead for %d"):format(a[2], a[1]) end,
-	heal = function(a) return ("Pay %d venom: restore %d defense"):format(a[2], a[1]) end,
+	heal = function(a) return ("Pay %d venom: restore %d health"):format(a[2], a[1]) end,
 	shield = function(a) return ("Pay %d venom: gain a %d point shield"):format(a[2], a[1]) end,
 	empower = function(a) return ("Pay %d venom: +%d attack for good"):format(a[2], a[1]) end,
 	drain = function(a) return ("Pay %d venom: hit the card ahead for %d and heal that much"):format(a[2], a[1]) end,

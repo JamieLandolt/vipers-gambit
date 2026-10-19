@@ -394,7 +394,7 @@ local function draw_info_pane()
 	if snake then
 		stat_chip("Cost", st.cost, x, y, 82, { 0.4, 0.85, 0.4 })
 		stat_chip("Attack", owned and st.attack or "?", x + 94, y, 82, { 1, 0.4, 0.4 })
-		stat_chip("Defense", owned and st.defense or "?", x + 188, y, 82, { 0.45, 0.6, 1 })
+		stat_chip("Health", owned and st.defense or "?", x + 188, y, 82, { 0.45, 0.6, 1 })
 	else
 		stat_chip("Cost", st.cost, x, y, 82, { 0.4, 0.85, 0.4 })
 		stat_chip("Use", st.kind == "brew" and "Drink" or "Cast", x + 94, y, 176, { 0.7, 0.5, 1 })
@@ -1156,7 +1156,7 @@ function render.pack()
 	end
 	if hovered_pull then -- what the hovered card does
 		local name, st = hovered_pull[1], hovered_pull[2]
-		local text = name:gsub("_", " ") .. "\n" .. (st.kind == "snake" and ("Snake, " .. data.get_type({ card_path = name .. ".png" }) .. "  Atk " .. st.attack .. "  Def " .. st.defense) or (st.kind == "brew" and "Brew" or "Spell")) .. "\n" .. st.ability
+		local text = name:gsub("_", " ") .. "\n" .. (st.kind == "snake" and ("Snake, " .. data.get_type({ card_path = name .. ".png" }) .. "  Atk " .. st.attack .. "  Health " .. st.defense) or (st.kind == "brew" and "Brew" or "Spell")) .. "\n" .. st.ability
 		local border = st.kind == "snake" and st.border or nil
 		if border and border ~= "Basic" then
 			text = text .. "\n" .. borders.describe(border)
@@ -2009,7 +2009,7 @@ function render.playing()
 		local ry = math.max(hy - 44, 0)
 		lg.rectangle("fill", hx - 10, ry, img_widths + 20, 38, 6, 6)
 		lg.setColor(1, short and 0.4 or 1, short and 0.4 or 1)
-		lg.printf(short and ("Need " .. st.cost .. " venom") or (st.kind ~= "snake" and ("Cost " .. st.cost .. (st.kind == "brew" and "  drop on your snake" or "  drop on the field")) or ("Cost " .. st.cost .. "  Atk " .. st.attack .. "  Def " .. st.defense)), assets.small_font, hx - 10, ry + 2, img_widths + 20, "center")
+		lg.printf(short and ("Need " .. st.cost .. " venom") or (st.kind ~= "snake" and ("Cost " .. st.cost .. (st.kind == "brew" and "  drop on your snake" or "  drop on the field")) or ("Cost " .. st.cost .. "  Atk " .. st.attack .. "  Health " .. st.defense)), assets.small_font, hx - 10, ry + 2, img_widths + 20, "center")
 		lg.setColor(1, 1, 1)
 	end
 
@@ -2128,7 +2128,7 @@ function render.spotlight()
 	lg.setColor(tier[1], tier[2], tier[3], fade)
 	lg.print(data.get_type(sp.card) .. "  |  Tier " .. info.rarity, assets.small_font, x, cy + 58)
 	lg.setColor(1, 0.85, 0.2, fade)
-	lg.print("Cost " .. info.cost .. "   Attack " .. info.attack .. "   Defense " .. info.defense, assets.small_font, x, cy + 104)
+	lg.print("Cost " .. info.cost .. "   Attack " .. info.attack .. "   Health " .. info.defense, assets.small_font, x, cy + 104)
 	lg.setColor(1, 1, 1, fade)
 	lg.printf(info.ability or "No ability", assets.small_font, x, cy + 160, w)
 	lg.setColor(1, 1, 1)
@@ -2180,7 +2180,7 @@ function render.info()
 	stat_chip("Cost", info.cost, x, y, 150, { 0.4, 0.85, 0.4 })
 	if snake then
 		stat_chip("Attack", info.attack, x + 170, y, 150, { 1, 0.4, 0.4 })
-		stat_chip("Defense", info.defense, x + 340, y, 150, { 0.45, 0.6, 1 })
+		stat_chip("Health", info.defense, x + 340, y, 150, { 0.45, 0.6, 1 })
 	else
 		stat_chip("Use", info.kind == "brew" and "Drink" or "Cast", x + 170, y, 320, { 0.7, 0.5, 1 })
 		lg.setColor(0.8, 0.85, 1)

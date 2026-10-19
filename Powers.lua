@@ -47,7 +47,7 @@ local function buff(card, attack, defense)
 	card.bonus = (card.bonus or 0) + attack
 	card.hp = (card.hp or defense_of(card)) + defense
 	if slot then
-		float(slot, (attack ~= 0 and (attack > 0 and "+" or "") .. attack .. " atk " or "") .. (defense ~= 0 and (defense > 0 and "+" or "") .. defense .. " def" or ""), attack + defense > 0)
+		float(slot, (attack ~= 0 and (attack > 0 and "+" or "") .. attack .. " atk " or "") .. (defense ~= 0 and (defense > 0 and "+" or "") .. defense .. " health" or ""), attack + defense > 0)
 	end
 end
 
@@ -55,7 +55,7 @@ local function heal(card, amount)
 	local max = defense_of(card)
 	if (card.hp or max) < max then
 		card.hp = math.min((card.hp or max) + amount, max)
-		float(slot_of(card), "+" .. amount .. " def", true)
+		float(slot_of(card), "+" .. amount .. " health", true)
 	end
 end
 
@@ -127,10 +127,10 @@ P.Coral_Snake = {
 	end,
 }
 P.Garter_Snake = {
-	text = "Neighbours gain 1 defense when it is played",
+	text = "Neighbours gain 2 health when it is played",
 	play = function(c)
 		for _, n in ipairs(neighbours(c.slot)) do
-			buff(n.card, 0, 1)
+			buff(n.card, 0, 2)
 		end
 	end,
 }
@@ -148,7 +148,7 @@ P.Grass_Snake = { text = "Deals 1 damage to the card ahead at the start of your 
 P.Brown_Snake = { text = "+1 attack", bonus = function() return 1 end }
 P.Candy_Snake = { text = "Gain 1 venom when it is played", play = function(c) add_venom(c.side, 1) end }
 P.Grey_Snake = {
-	text = "Hardens: +1 defense each turn, up to 3 times",
+	text = "Hardens: +1 health each turn, up to 3 times",
 	turn = function(c)
 		if (c.card.stone or 0) < 3 then
 			c.card.stone = (c.card.stone or 0) + 1
@@ -185,11 +185,10 @@ P.Cannibal_Snake = {
 }
 P.Kingsnake = { text = "Heals 3 health when it destroys a snake", kill = function(c) heal_side(c.side, 3) end }
 P.Ball_Python = {
-	text = "Curls up: +2 defense per neighbour when played",
+	text = "Neighbours gain 4 health when it is played",
 	play = function(c)
-		local count = #neighbours(c.slot)
-		if count > 0 then
-			buff(c.card, 0, 2 * count)
+		for _, n in ipairs(neighbours(c.slot)) do
+			buff(n.card, 0, 4)
 		end
 	end,
 }
@@ -247,7 +246,7 @@ P.Rattlesnake = {
 	end,
 }
 P.Boa_Constrictor = {
-	text = "Embrace: heals each neighbour 2 defense at the start of your turn",
+	text = "Embrace: heals each neighbour 2 health at the start of your turn",
 	turn = function(c)
 		for _, n in ipairs(neighbours(c.slot)) do
 			heal(n.card, 2)
@@ -280,7 +279,7 @@ P.Lava_Snake = {
 	end,
 }
 P.Shadow_Snake = {
-	text = "Inversion: swaps the attack and defense of the card ahead when played",
+	text = "Inversion: swaps the attack and health of the card ahead when played",
 	play = function(c)
 		if played_cards[c.foe] then
 			swap(played_cards[c.foe], c.foe)
@@ -308,7 +307,7 @@ P.King_Cobra = {
 	end,
 }
 P.Albino_Cobra = {
-	text = "Moon curse: swaps attack and defense of the enemy with the most attack at the start of your turn",
+	text = "Moon curse: swaps attack and health of the enemy with the most attack at the start of your turn",
 	turn = function(c)
 		local best
 		for _, f in ipairs(foes_of(other(c.side) == "Player" and "Opponent" or "Player")) do
@@ -352,7 +351,7 @@ P.Jormungandr = {
 	end,
 }
 P.Quetzalcoatl = {
-	text = "Dawn: when played, all your snakes heal 5 defense and gain 1 attack, and you gain 2 venom",
+	text = "Dawn: when played, all your snakes heal 5 health and gain 1 attack, and you gain 2 venom",
 	play = function(c)
 		for _, a in ipairs(allies_of(c.side)) do
 			heal(a.card, 5)
@@ -373,14 +372,14 @@ P.Apophis = {
 	end,
 }
 P.Ouroboros = {
-	text = "Rebirth: fully heals and gains 1 attack and 1 defense at the start of your turn",
+	text = "Rebirth: fully heals and gains 1 attack and 1 health at the start of your turn",
 	turn = function(c)
 		heal(c.card, 99)
 		buff(c.card, 1, 1)
 	end,
 }
 P.Nagaraja = {
-	text = "Hooded guard: the card ahead has 3 less attack, and your other snakes gain 3 defense when it is played",
+	text = "Hooded guard: the card ahead has 3 less attack, and your other snakes gain 3 health when it is played",
 	foe_attack = 3,
 	play = function(c)
 		for _, a in ipairs(allies_of(c.side)) do

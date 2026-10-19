@@ -344,7 +344,7 @@ local SORTS = {
 	{ "Name", function(name) return name end },
 	{ "Cost", function(name) return stat(name, "cost") end },
 	{ "Attack", function(name) return stat(name, "attack") end },
-	{ "Defense", function(name) return stat(name, "defense") end },
+	{ "Health", function(name) return stat(name, "defense") end },
 	{ "Rarity", function(name) return stat(name, "rarity") end },
 }
 local sort_mode, order, ordered_for = 1, nil, nil
