@@ -1446,7 +1446,7 @@ function render.briefing(level)
 	lg.setColor(0, 0, 0, 0.88)
 	lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
 	lg.setColor(1, 1, 1)
-	lg.printf("Level " .. level .. ": " .. opponent.name, assets.font, 0, 25, reference_window_width, "center")
+	lg.printf("Level " .. level .. ": " .. charmers.of("Opponent", level).name, assets.font, 0, 25, reference_window_width, "center")
 	lg.setColor(1, 0.85, 0.2)
 	draw_vials(reference_window_width - 250, 20)
 	coach.start("coach_briefing", {
@@ -1507,9 +1507,7 @@ function render.level_tooltip(level)
 	lg.rectangle("line", x, y, w, h, 12, 12)
 	lg.setColor(1, 1, 1)
 	portrait(charmer.name, x + 15, y + 15, 80, 96)
-	lg.printf(opponent.name, assets.small_font, x + 110, y + 12, w - 125, "left")
-	lg.setColor(1, 0.85, 0.2)
-	lg.printf("Charmer: " .. charmer.name, assets.small_font, x + 110, y + 46, w - 125, "left")
+	lg.printf(charmer.name, assets.small_font, x + 110, y + 12, w - 125, "left")
 	lg.setColor(1, 1, 1)
 	lg.printf(opponent.health .. " HP, " .. #opponent.deck .. " card deck", assets.small_font, x + 110, y + 80, w - 125, "left")
 	if play.charms_open(level) then
@@ -1535,7 +1533,7 @@ function render.level_select()
 
 	local hovered = render.level_at(mouse.x, mouse.y)
 	for i = 1, #opponents do
-		local name = opponents[i].name
+		local name = charmers.of("Opponent", i).name
 		local x, y = level_node(i)
 		local fill = not play.level_open(i) and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple)
 		if i == 1 and not tutorial.done then -- the new-player hint: level 1 pulses until the first match has been played
@@ -1855,7 +1853,7 @@ function render.playing()
 		lg.setColor(1, 1, 1)
 		local who = side == "Opponent" and not play.versus and opponents[play.level] or c
 		portrait(who.name, spot[1], spot[2], 60, 72)
-		lg.printf(who.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
+		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
 		if play.charms_open() then
 			lg.setColor(0.6, 0.9, 0.4)
 			lg.printf(c.charm .. " (" .. c.cost .. ")", assets.debug_font, spot[1] + 68, spot[2] + 44, 145, "left")
