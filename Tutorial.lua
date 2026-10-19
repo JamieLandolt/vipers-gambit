@@ -75,7 +75,7 @@ local basic = {
 			local r = hand_rect(function() return true end)
 			return r and { r } or {}
 		end },
-	{ text = "Your venom refills at the start of every turn, and you get 1 more than last turn. Unspent venom is lost, so use it!", next = true,
+	{ text = "Your venom refills at the start of every turn, and you get 1 more than last turn. Unspent venom carries over, up to 10.", next = true,
 		point = function() return { { 170, 482, 76, 76 } } end },
 	{ text = "Press End Turn. Your snakes hit the snake opposite, or their health.",
 		point = function() return { button_rect("End Turn") } end,
@@ -96,7 +96,9 @@ local tips = {
 	[3] = { { text = "Abilities: every snake has one, and you pay venom to use it. Hover a snake on the field to read its ability here.", next = true,
 			point = function() return { { 1200, 325, 235, 170 } } end },
 		{ text = "A ! over your snake means you can pay venom to use its ability. Click the snake. Once per turn.", next = true,
-			point = function() return { { 245, 285, 950, 270 } } end } },
+			point = function() return { { 245, 285, 950, 270 } } end },
+		{ text = "Sacrifice: drag one of your snakes from the field onto your hand and let go. It dies for free, which clears its lane for a better snake.", next = true,
+			point = function() return { { 245, 285, 950, 270 }, TRAY } end } },
 	[4] = { { text = "Charm: your charmer's own power. It costs venom, then needs a few turns to recharge.", next = true,
 			point = function() return { button_rect("Charm") } end },
 		{ text = "Every charmer's charm is different. Pick yours from the main menu.", next = true,
