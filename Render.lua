@@ -580,7 +580,7 @@ function render.collection()
 		coach.start("coach_deck", {
 			{ rect = { 20, 130, 860, 690 }, text = "Click to add or remove" },
 			{ rect = function() local c = buttons.collection["Collection Header"]; return { c.x, c.y, c.width, c.height } end, text = "Deck size" },
-			{ rect = function() local c = buttons.collection["Sacrifice"]; return { c.x, c.y, c.width, c.height } end, text = "Auto-fill: replaces your deck with your rarest snakes" },
+			{ rect = function() local c = buttons.collection["Sacrifice"]; return { c.x, c.y, c.width, c.height } end, text = "Auto-fill: your best 3 snakes of each lane type" },
 		})
 	elseif collection.sacrifice_mode then
 		coach.start("coach_imbue2", {

@@ -232,10 +232,40 @@ end
 
 collection.chosen = chosen
 
--- Rebuilds the deck from the strongest snakes you own
+-- Auto-fill: an even deck of the strongest owned snakes, PER_TYPE copies of each lane type (Rainbow snakes fit any lane, so
+-- they are left out); if that leaves fewer than MIN_DECK, the strongest of the rest fill it
+collection.PER_TYPE = 3
 function collection.auto_deck()
-	deck_set = nil
-	collection.start_deck_edit()
+	local names = {}
+	for _, name in ipairs(data.deck) do
+		if collection.has(name) and stat(name, "kind") == "snake" then
+			table.insert(names, name)
+		end
+	end
+	table.sort(names, function(a, b)
+		return stat(a, "rarity") > stat(b, "rarity") or (stat(a, "rarity") == stat(b, "rarity") and a < b)
+	end)
+	deck_set = {}
+	local size, per_type = 0, {}
+	local function add(name)
+		deck_set[name] = (deck_set[name] or 0) + 1
+		size = size + 1
+	end
+	for _, name in ipairs(names) do
+		local kind = data.get_type({ card_path = name .. ".png" })
+		for _ = 1, collection.count(name) do
+			if kind ~= "Rainbow" and (per_type[kind] or 0) < collection.PER_TYPE then
+				per_type[kind] = (per_type[kind] or 0) + 1
+				add(name)
+			end
+		end
+	end
+	for _, name in ipairs(names) do -- too few of some types to reach the minimum: top up with the strongest left
+		while size < collection.MIN_DECK and (deck_set[name] or 0) < collection.count(name) do
+			add(name)
+		end
+	end
+	save_deck()
 end
 
 -- Copies of a snake in the deck (before a deck is chosen, every copy you own is in it)
