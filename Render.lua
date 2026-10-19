@@ -1198,7 +1198,9 @@ function render.pack()
 end
 
 -- Charmer cards: up to 5 across and as many rows as needed, in reference-window units
-local CARD_W, CARD_H, CARD_GAP, PORTRAIT_H, PER_ROW = 170, 330, 12, 150, 5
+local CARD_W, CARD_H, CARD_GAP, PORTRAIT_H, PER_ROW = 170, 384, 12, 150, 5
+local LOOKS_Y = PORTRAIT_H + 18 -- the strip of looks under the portrait, then the name and charm below it
+local LOOKS_H = 54
 local crops = {}
 
 local function card_pos(i)
@@ -1218,12 +1220,14 @@ function render.charmer_at(x, y)
 	end
 end
 
--- Small pictures of a charmer's other looks along the bottom of its portrait: { x, y, w, h, look number } each
+-- The four look slots in the strip under a charmer's portrait: { x, y, w, h, look number } each (a charmer with no extra
+-- looks has just its one picture in the first slot, the rest stay empty)
+local LOOK_SLOTS = 4
 local function skin_boxes(i)
-	local c, boxes = charmers.list[i], {}
+	local boxes = {}
 	local x, y = card_pos(i)
-	for n = 1, charmers.skin_count(c) do
-		boxes[n] = { x + 12 + (n - 1) * 36, y + 10 + PORTRAIT_H - 44, 32, 39, n }
+	for n = 1, LOOK_SLOTS do
+		boxes[n] = { x + 12 + (n - 1) * 38, y + LOOKS_Y, 34, 40, n }
 	end
 	return boxes
 end
@@ -1232,8 +1236,8 @@ end
 function render.skin_at(x, y)
 	local rx, ry = x * reference_window_width / lg.getWidth(), y * reference_window_height / lg.getHeight()
 	for i = 1, charmers.PICKABLE do
-		for _, b in ipairs(charmers.is_unlocked(i) and skin_boxes(i) or {}) do
-			if rx > b[1] and rx < b[1] + b[3] and ry > b[2] and ry < b[2] + b[4] then
+		for _, b in ipairs(charmers.is_unlocked(i) and charmers.skin_count(charmers.list[i]) > 1 and skin_boxes(i) or {}) do
+			if b[5] <= charmers.skin_count(charmers.list[i]) and rx > b[1] and rx < b[1] + b[3] and ry > b[2] and ry < b[2] + b[4] then
 				return charmers.list[i].name, b[5]
 			end
 		end
@@ -1260,7 +1264,7 @@ function render.character_select()
 	local charm_known = collection.unlock_all or unlocked >= 4 -- charm powers are taught at level 4, so stay hidden until then
 	local lesson = { { rect = { x1, y1, CARD_W, CARD_H }, text = "A charmer is your hero. Pick one to fight beside you." } }
 	if charm_known then
-		lesson[2] = { rect = { x1, y1 + PORTRAIT_H + 36, CARD_W, 110 }, text = "Each charmer has a charm: a power you can use for venom, then it needs time to recharge" }
+		lesson[2] = { rect = { x1, y1 + PORTRAIT_H + LOOKS_H + 44, CARD_W, 110 }, text = "Each charmer has a charm: a power you can use for venom, then it needs time to recharge" }
 	end
 	lesson[#lesson + 1] = { rect = { x1, y1, PER_ROW * CARD_W + (PER_ROW - 1) * CARD_GAP, 2 * CARD_H + 20 }, text = "Click a card to choose. Some have small pictures to pick a different look" }
 	coach.start("coach_charmers", lesson) -- first visit
@@ -1283,24 +1287,26 @@ function render.character_select()
 			lg.setColor(1, 1, 1)
 			lg.printf("Selected", assets.debug_font, x + 10, y + 12, 90, "center")
 		end
+		local looks = charmers.skin_count(c)
 		for _, b in ipairs(charmers.is_unlocked(i) and skin_boxes(i) or {}) do -- the looks to choose from
-			local file = "assets/characters/" .. c.portrait:gsub("%..+$", "") .. "_" .. b[5] .. ".png"
-			skin_images[file] = skin_images[file] or lg.newImage(file)
-			local image = skin_images[file]
-			local current = (charmers.skin[c.name] or 1) == b[5]
-			lg.setColor(0, 0, 0, 0.7)
+			lg.setColor(0, 0, 0, 0.45)
 			lg.rectangle("fill", b[1] - 3, b[2] - 3, b[3] + 6, b[4] + 6, 4, 4)
-			lg.setColor(1, 1, 1)
-			lg.draw(image, b[1], b[2], 0, b[3] / image:getWidth(), b[4] / image:getHeight())
-			if current then
-				lg.setColor(green)
-				lg.setLineWidth(3)
-				lg.rectangle("line", b[1] - 3, b[2] - 3, b[3] + 6, b[4] + 6, 4, 4)
-				lg.setLineWidth(1)
+			if b[5] <= math.max(looks, 1) then
+				local file = "assets/characters/" .. c.portrait:gsub("%..+$", "") .. (looks > 0 and "_" .. b[5] or "") .. ".png"
+				skin_images[file] = skin_images[file] or lg.newImage(file)
+				local image = skin_images[file]
+				lg.setColor(1, 1, 1)
+				lg.draw(image, b[1], b[2], 0, b[3] / image:getWidth(), b[4] / image:getHeight())
+				if (charmers.skin[c.name] or 1) == b[5] then
+					lg.setColor(green)
+					lg.setLineWidth(3)
+					lg.rectangle("line", b[1] - 3, b[2] - 3, b[3] + 6, b[4] + 6, 4, 4)
+					lg.setLineWidth(1)
+				end
 			end
 		end
 		lg.setColor(1, 1, 1)
-		lg.printf(c.name, assets.debug_font, x + 6, y + PORTRAIT_H + 16, CARD_W - 12, "center")
+		lg.printf(c.name, assets.debug_font, x + 6, y + PORTRAIT_H + LOOKS_H + 24, CARD_W - 12, "center")
 		if not charmers.is_unlocked(i) then
 			lg.setColor(0, 0, 0, 0.72)
 			lg.rectangle("fill", x, y, CARD_W, CARD_H, 5, 5)
@@ -1308,9 +1314,9 @@ function render.character_select()
 			lg.printf("Locked\nBeat " .. charmers.region_needed(i) .. " to unlock", assets.debug_font, x + 8, y + PORTRAIT_H / 2, CARD_W - 16, "center")
 		elseif charm_known then
 			lg.setColor(green)
-			lg.printf(c.charm .. " (" .. c.cost .. " venom, cooldown " .. c.cooldown .. ")", assets.debug_font, x + 8, y + PORTRAIT_H + 40, CARD_W - 16, "center")
+			lg.printf(c.charm .. " (" .. c.cost .. " venom, cooldown " .. c.cooldown .. ")", assets.debug_font, x + 8, y + PORTRAIT_H + LOOKS_H + 48, CARD_W - 16, "center")
 			lg.setColor(1, 1, 1)
-			lg.printf(c.text, assets.debug_font, x + 8, y + PORTRAIT_H + 100, CARD_W - 16, "center")
+			lg.printf(c.text, assets.debug_font, x + 8, y + PORTRAIT_H + LOOKS_H + 108, CARD_W - 16, "center")
 		end
 	end
 end
