@@ -298,12 +298,14 @@ function play.check_end()
 				end_match()
 				return true
 			end
-			level_unlocked = nil -- set when this win opens the next level
+			level_unlocked, charmer_unlocked = nil, nil -- set when this win opens the next level, or a new charmer
 			if tutorial.active then -- the guided first match ends with the match
 				tutorial.finish()
 			end
 			if winner == "Player" and play.level == unlocked and unlocked < #opponents then
 				unlocked, level_unlocked = unlocked + 1, unlocked + 1
+				local charmer = require("Charmers").list[(unlocked - 1) / require("LevelNodes").per_region + 1]
+				charmer_unlocked = charmer and charmer.name
 				collection.save()
 			end
 			if winner == "Player" and play.level > 0 then

@@ -2043,6 +2043,10 @@ function render.ended()
 	if won then
 		local message = play.versus and (require("Versus").status == "The other player left" and "The other player left" or "") or level_unlocked and ("Level " .. level_unlocked .. " unlocked!") or (play.level == #opponents and "You beat every opponent!" or "")
 		lg.printf(message, assets.font, 0, 400, reference_window_width, "center")
+		if charmer_unlocked then
+			lg.setColor(0.4, 1, 0.5)
+			lg.printf("New charmer unlocked: " .. charmer_unlocked .. "!", assets.font, 0, 440, reference_window_width, "center")
+		end
 	end
 	lg.setColor(1, 0.85, 0.2)
 	draw_eyes("+", collection.last_reward or 0, 0, 480, reference_window_width, "center", assets.font)

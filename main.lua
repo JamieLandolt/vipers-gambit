@@ -41,6 +41,7 @@ field_press = nil -- { slot, at }: a snake on the field being pressed; a short p
 HOLD_TIME = 0.4 -- seconds to hold a snake before its info opens
 info_return = "playing" -- screen the info page's Back button returns to
 level_unlocked = nil -- level opened by the last win
+charmer_unlocked = nil -- name of the charmer the last win opened
 confirm_forfeit = false -- the forfeit confirmation is showing
 pack_cards = {} -- names pulled from the most recent pack
 -- Set by play.new_game: turn, health, max_health, max_venom, venom, winner
