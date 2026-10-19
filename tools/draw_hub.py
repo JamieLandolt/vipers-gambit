@@ -295,7 +295,7 @@ if __name__ == "__main__":
 def charmer_cutouts(folder="assets/characters"):
     """Stand-up versions of the pickable charmers' portraits (backdrop removed by flood fill up to the outline), saved as stand_<file>."""
     from collections import deque
-    for name in ("raja", "yuki", "moss", "fang", "zora", "baba"):
+    for name in ("yuki", "fang"):
         img = Image.open(f"{folder}/{name}.png").convert("RGBA")
         px = img.load()
         w, h = img.size

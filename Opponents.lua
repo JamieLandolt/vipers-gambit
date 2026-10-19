@@ -16,24 +16,24 @@ local function opponent(level, name, portrait, charmer, style, venom, deck)
 end
 
 local list = {
-	{ "Garden Keeper", "opponents/garden_keeper.png", "Brother Moss", "defensive", 2, { "Garter_Snake", "Corn_Snake", "Vine_Snake", "Rock_Snake", "Mud_Snake", "Coral_Snake" } },
+	{ "Garden Keeper", "opponents/garden_keeper.png", "Tide Priestess", "defensive", 2, { "Garter_Snake", "Corn_Snake", "Vine_Snake", "Rock_Snake", "Mud_Snake", "Coral_Snake" } },
 	{ "Pond Skulker", "opponents/pond_skulker.png", "Yuki Frostveil", "balanced", 2, { "Sea_Snake", "Corn_Snake", "Fern_Snake", "Skeleton_Snake", "Ball_Python", "Garter_Snake" } },
 	{ "Venom Rookie", "opponents/venom_rookie.png", "Dr. Fang", "aggro", 6, { "Dust_Adder", "Grass_Snake", "Jelly_Snake", "Sea_Snake", "Skinny_Snake", "Rock_Snake" } },
-	{ "Dune Wanderer", "opponents/dune_wanderer.png", "Baba Jaro", "balanced", 4, { "Rust_Viper", "Grey_Snake", "Prairie_Rattler", "Horned_Viper", "Skinny_Snake", "Hog_Nosed_Snake", "Stoneskin_Tonic" } },
-	{ "Crypt Warden", "opponents/crypt_warden.png", "Madame Zora", "defensive", 1, { "Phantom_Racer", "Dusk_Snake", "Pale_Snake", "Dirt_Snake", "Mist_Snake", "Brown_Snake", "Ghost_Tonic" } },
-	{ "Reed Stalker", "opponents/reed_stalker.png", "Raja Kaal", "balanced", 4, { "Worm_Snake", "Moss_Snake", "Mossback_Python", "Brown_Snake", "Candy_Snake", "Sand_Snake", "Regrowth_Brew" } },
+	{ "Dune Wanderer", "opponents/dune_wanderer.png", "Warden Basalt", "balanced", 4, { "Rust_Viper", "Grey_Snake", "Prairie_Rattler", "Horned_Viper", "Skinny_Snake", "Hog_Nosed_Snake", "Stoneskin_Tonic" } },
+	{ "Crypt Warden", "opponents/crypt_warden.png", "Yuki Frostveil", "defensive", 1, { "Phantom_Racer", "Dusk_Snake", "Pale_Snake", "Dirt_Snake", "Mist_Snake", "Brown_Snake", "Ghost_Tonic" } },
+	{ "Reed Stalker", "opponents/reed_stalker.png", "Ember Queen", "balanced", 4, { "Worm_Snake", "Moss_Snake", "Mossback_Python", "Brown_Snake", "Candy_Snake", "Sand_Snake", "Regrowth_Brew" } },
 	{ "Fang Brawler", "opponents/fang_brawler.png", "Dr. Fang", "aggro", 1, { "Canopy_Viper", "Black_Mamba", "Twig_Snake", "Sand_Snake", "Leaf_Snake", "Venom_Elixir" } },
-	{ "Bog Hermit", "opponents/bog_hermit.png", "Brother Moss", "defensive", 3, { "Moray_Viper", "Frost_Cobra", "Copperhead", "Pond_Snake", "Worm_Snake", "Healing_Rain" } },
+	{ "Bog Hermit", "opponents/bog_hermit.png", "Tide Priestess", "defensive", 3, { "Moray_Viper", "Frost_Cobra", "Copperhead", "Pond_Snake", "Worm_Snake", "Healing_Rain" } },
 	{ "Tide Priestess", "opponents/tide_priestess.png", "Tide Priestess", "balanced", 0, { "Coral_Dragon", "Copperhead", "Frost_Cobra", "Ripple_Snake", "Scrub_Racer", "Twig_Snake", "Sand_Snake", "Frostbrew" } },
-	{ "Constrictor", "opponents/constrictor.png", "Baba Jaro", "defensive", 1, { "Basalt_Serpent", "Extra_Long_Python", "Emerald_Boa", "Blossom_Boa", "Skinny_Snake", "Dirt_Snake", "Scrub_Racer", "Guardian_Ward", "Stoneskin_Tonic" } },
-	{ "Mist Witch", "opponents/mist_witch.png", "Madame Zora", "balanced", 0, { "Banshee_Serpent", "Lich_Snake", "Wisp_Snake", "Eel_Snake", "Bark_Snake", "Dust_Adder", "Smoke_Draught" } },
-	{ "Cinder Monk", "opponents/cinder_monk.png", "Raja Kaal", "balanced", 0, { "Blood_Cobra", "Clay_Snake", "Coral_Dragon", "Rust_Viper", "Sea_Snake", "Vine_Snake", "Ripple_Snake", "Rage_Draught", "Lightning_Storm" } },
+	{ "Constrictor", "opponents/constrictor.png", "Warden Basalt", "defensive", 1, { "Basalt_Serpent", "Extra_Long_Python", "Emerald_Boa", "Blossom_Boa", "Skinny_Snake", "Dirt_Snake", "Scrub_Racer", "Guardian_Ward", "Stoneskin_Tonic" } },
+	{ "Mist Witch", "opponents/mist_witch.png", "Yuki Frostveil", "balanced", 0, { "Banshee_Serpent", "Lich_Snake", "Wisp_Snake", "Eel_Snake", "Bark_Snake", "Dust_Adder", "Smoke_Draught" } },
+	{ "Cinder Monk", "opponents/cinder_monk.png", "Ember Queen", "balanced", 0, { "Blood_Cobra", "Clay_Snake", "Coral_Dragon", "Rust_Viper", "Sea_Snake", "Vine_Snake", "Ripple_Snake", "Rage_Draught", "Lightning_Storm" } },
 	{ "Ember Queen", "opponents/ember_queen.png", "Ember Queen", "aggro", 0, { "Clay_Snake", "Tiger_Snake", "Basalt_Serpent", "Dust_Adder", "Orchid_Snake", "Lightning_Storm", "Rage_Draught" } },
 	{ "Canyon Duelist", "opponents/canyon_duelist.png", "Yuki Frostveil", "balanced", 1, { "Wraith_Adder", "Prism_Adder", "Jelly_Snake", "Vine_Snake", "Brown_Snake", "Smoke_Draught", "Arcane_Insight" } },
-	{ "Night Stalker", "opponents/night_stalker.png", "Madame Zora", "aggro", 0, { "Skeleton_Snake", "Nightmare_Adder", "Ash_Snake", "Brown_Snake", "Hog_Nosed_Snake", "Rock_Snake", "Frost_Nova", "Ghost_Tonic" } },
+	{ "Night Stalker", "opponents/night_stalker.png", "Yuki Frostveil", "aggro", 0, { "Skeleton_Snake", "Nightmare_Adder", "Ash_Snake", "Brown_Snake", "Hog_Nosed_Snake", "Rock_Snake", "Frost_Nova", "Ghost_Tonic" } },
 	{ "Golden Heir", "opponents/golden_heir.png", "Dr. Fang", "balanced", 0, { "Pearl_Serpent", "Quetzalcoatl", "Emerald_Boa", "Dirt_Snake", "Brook_Snake", "Rock_Snake", "Guardian_Ward", "Stoneskin_Tonic" } },
-	{ "Emerald Emperor", "opponents/emerald_emperor.png", "Brother Moss", "balanced", 4, { "Kingsnake", "Emerald_Boa", "Moss_Snake", "Leaf_Snake", "Coral_Snake", "Confetti_Snake", "Venom_Elixir", "Regrowth_Brew" } },
-	{ "The Viper King", "opponents/viper_king.png", "Raja Kaal", "balanced", 0, { "Basalt_Serpent", "Canopy_Viper", "Elderwood_Wyrm", "Wisp_Snake", "Brown_Snake", "Meteor_Strike" } },
+	{ "Emerald Emperor", "opponents/emerald_emperor.png", "Tide Priestess", "balanced", 4, { "Kingsnake", "Emerald_Boa", "Moss_Snake", "Leaf_Snake", "Coral_Snake", "Confetti_Snake", "Venom_Elixir", "Regrowth_Brew" } },
+	{ "The Viper King", "opponents/viper_king.png", "Ember Queen", "balanced", 0, { "Basalt_Serpent", "Canopy_Viper", "Elderwood_Wyrm", "Wisp_Snake", "Brown_Snake", "Meteor_Strike" } },
 }
 
 -- Each time you face the same charmer again, its deck swaps its worst snake (lowest attack + defense) for a better one of the
@@ -63,13 +63,20 @@ end
 
 local opponents, seen = {}, {}
 for level, e in ipairs(list) do
-	local deck = { unpack(e[6]) }
 	local times = seen[e[3]] or 0 -- how many times this charmer has already been fought
 	seen[e[3]] = times + 1
-	for _ = 1, times do
-		upgrade(deck)
-	end
-	opponents[level] = opponent(level, e[1], e[2], e[3], e[4], e[5], deck)
+	opponents[level] = opponent(level, e[1], e[2], e[3], e[4], e[5], nil)
 	opponents[level].health = opponents[level].health + 5 * times
+	-- the upgraded deck is built on first use: CardData cannot be required while Assets is still loading (it would be a require loop)
+	setmetatable(opponents[level], { __index = function(entry, key)
+		if key == "deck" then
+			local deck = { unpack(e[6]) }
+			for _ = 1, times do
+				upgrade(deck)
+			end
+			rawset(entry, "deck", deck)
+			return deck
+		end
+	end })
 end
 return opponents

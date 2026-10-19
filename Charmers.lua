@@ -35,13 +35,6 @@ local function defense(card)
 end
 
 charmers.list = {
-	{ name = "Raja Kaal", portrait = "raja.png", charm = "Poison Piper", cooldown = 2, cost = 3, text = "Poison every enemy snake for 3 turns.",
-		apply = function(play, side)
-			return each(foe(side), function(slot, card)
-				card.poison = 3
-				play.float(slot, "poison")
-			end)
-		end },
 	{ name = "Yuki Frostveil", portrait = "yuki.png", charm = "Frost Flute", cooldown = 1, cost = 3, text = "Freeze the strongest enemy snake.",
 		apply = function(play, side)
 			local best, best_slot, best_attack = nil, nil, -1
@@ -57,18 +50,6 @@ charmers.list = {
 			end
 			return best ~= nil
 		end },
-	{ name = "Brother Moss", portrait = "moss.png", charm = "Heal Hymn", cooldown = 1, cost = 3, text = "Heal all your snakes for 3.",
-		apply = function(play, side)
-			local healed = false
-			each(side, function(slot, card)
-				local hp = card.hp or defense(card)
-				if hp < defense(card) then
-					card.hp, healed = math.min(hp + 3, defense(card)), true
-					play.float(slot, "+3 hp")
-				end
-			end)
-			return healed
-		end },
 	{ name = "Dr. Fang", portrait = "fang.png", charm = "Venom Surge", cooldown = 2, cost = 1, text = "Pay 1 venom, gain 4.",
 		apply = function(play, side)
 			if venom[side] >= play.MAX_VENOM then
@@ -76,29 +57,6 @@ charmers.list = {
 			end
 			venom[side] = math.min(venom[side] + 4, play.MAX_VENOM)
 			play.float_bar(side, "+4 venom")
-			return true
-		end },
-	{ name = "Madame Zora", portrait = "zora.png", charm = "Mesmerise", cooldown = 3, cost = 1, text = "Enemy snakes shuffle one lane over and take 2 damage.",
-		apply = function(play, side)
-			local base = side == "Player" and 1 or 5
-			local moved = {}
-			for i = 0, 3 do
-				moved[(i + 1) % 4] = played_cards[base + i]
-			end
-			if #snakes(foe(side)) < 2 then
-				return false
-			end
-			for i = 0, 3 do
-				played_cards[base + i] = moved[i]
-				if moved[i] then
-					play.float(base + i, "mesmerised")
-				end
-			end
-			for i = 0, 3 do
-				if played_cards[base + i] then
-					play.wound(base + i, 2)
-				end
-			end
 			return true
 		end },
 	{ name = "Tide Priestess", portrait = "tide.png", charm = "Tidal Wave", cooldown = 2, cost = 3, text = "2 damage to every enemy snake.",
@@ -120,13 +78,6 @@ charmers.list = {
 			health[side] = math.min(health[side] + 8, max_health[side])
 			play.float_bar(side, "+8 health")
 			return true
-		end },
-	{ name = "Baba Jaro", portrait = "baba.png", charm = "Snake Cloak", cooldown = 2, cost = 4, text = "Give all your snakes a 2 point shield.",
-		apply = function(play, side)
-			return each(side, function(slot, card)
-				card.shield = (card.shield or 0) + 2
-				play.float(slot, "+2 shield")
-			end)
 		end },
 }
 

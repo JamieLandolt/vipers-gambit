@@ -23,7 +23,7 @@ time = 0
 
 -- Shared state (global because Button, Avatar, Play and Render read it)
 mouse = {}
-chosen_avatar = "Raja Kaal"
+chosen_avatar = "Yuki Frostveil"
 chosen_opponent = "Ice King"
 scroll_offset_y = 0
 count = 0
