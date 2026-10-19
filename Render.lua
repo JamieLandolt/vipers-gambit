@@ -2370,8 +2370,13 @@ function render.playing()
 	end
 
 	-- Each side's charmer: portrait and name, plus the player's Charm button (covered by Info while a card is held)
+	local charm_tip
 	for side, spot in pairs({ Opponent = { 1215, 78 }, Player = { 1215, 548 } }) do
 		local c = charmers.of(side, play.level)
+		local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+		if play.charms_open() and mx >= spot[1] and mx <= spot[1] + 215 and my >= spot[2] and my <= spot[2] + 72 then
+			charm_tip = { side, c, spot }
+		end
 		lg.setColor(1, 1, 1)
 		portrait(side == "Opponent" and not play.versus and opponents[play.level].portrait or c.name, spot[1], spot[2], 60, 72)
 		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
@@ -2549,6 +2554,29 @@ function render.playing()
 		lg.printf("Forfeit this match?", assets.font, 0, reference_window_height / 2 - 100, reference_window_width, "center")
 		buttons.playing["Yes"]:draw()
 		buttons.playing["No"]:draw()
+	end
+	if charm_tip then -- hovering a charmer shows its charm
+		local side, c, spot = charm_tip[1], charm_tip[2], charm_tip[3]
+		local w = 440
+		local _, lines = assets.small_font:getWrap(c.text, w - 40)
+		local h = 130 + #lines * assets.small_font:getHeight()
+		local x, y = spot[1] - w - 14, math.max(10, math.min(spot[2] - 20, reference_window_height - h - 10))
+		lg.setColor(0.07, 0.04, 0.14, 0.97)
+		lg.rectangle("fill", x, y, w, h, 12, 12)
+		lg.setColor(1, 0.85, 0.2)
+		lg.setLineWidth(3)
+		lg.rectangle("line", x, y, w, h, 12, 12)
+		lg.setLineWidth(1)
+		lg.setColor(1, 1, 1)
+		lg.print(c.name, assets.font, x + 20, y + 12)
+		lg.setColor(0.6, 0.9, 0.4)
+		lg.print(c.charm .. "  (" .. c.cost .. " venom, cooldown " .. c.cooldown .. ")", assets.small_font, x + 20, y + 56)
+		lg.setColor(0.9, 0.9, 1)
+		lg.printf(c.text, assets.small_font, x + 20, y + 88, w - 40)
+		lg.setColor(0.7, 0.85, 1)
+		local state = play.charm_used[side] and "Used this turn" or (play.charm_cd[side] > 0 and ("Recharging: " .. play.charm_cd[side] .. " more turn" .. (play.charm_cd[side] > 1 and "s" or "")) or "Ready to use")
+		lg.print(state, assets.debug_font, x + 20, y + h - 28)
+		lg.setColor(1, 1, 1)
 	end
 end
 
