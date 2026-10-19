@@ -26,9 +26,8 @@ collection.pack_kind = 0 -- the pack just opened (an index in PACKS), or 0 for a
 -- Snakes you can never pull from a pack (only the unlock-all override shows them)
 local UNOBTAINABLE = { "Cobra", "King_Cobra", "Albino_Cobra", "Blood_Cobra", "Frost_Cobra", "Golden_Snake" }
 -- Only T1 snakes, covering every lane type; the other T1s and everything else come from packs
-local STARTERS = { "Sand_Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
+local STARTERS = data.starters
 
-collection.STARTERS = STARTERS
 collection.MIN_DECK, collection.MAX_DECK = 8, 20
 collection.deck_mode = false -- the collection screen is editing the deck
 

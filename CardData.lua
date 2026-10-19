@@ -144,4 +144,7 @@ local function border_of(card)
 	return card.border or get_stats(card).border
 end
 
-return { deck = deck, border_of = border_of, get_stats = get_stats, get_type = get_type, card_types = card_types, stats_by_name = card_stats }
+-- The snakes a new player starts with (and the opponent on level 1)
+local starters = { "Sand_Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
+
+return { starters = starters, deck = deck, border_of = border_of, get_stats = get_stats, get_type = get_type, card_types = card_types, stats_by_name = card_stats }
