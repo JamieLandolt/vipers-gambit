@@ -14,6 +14,8 @@ brew install --cask love
 winget install OpenJS.LOVE
 ```
 
+No `winget`? Download the Windows installer from https://love2d.org and run it.
+
 **Linux** (Ubuntu or Debian; other distros: https://love2d.org)
 ```bash
 sudo apt install love
@@ -23,7 +25,7 @@ sudo apt install love
 
 ```bash
 git clone https://github.com/JamieLandolt/vipers-gambit
-cd SnakeGame
+cd vipers-gambit
 love .
 ```
 
