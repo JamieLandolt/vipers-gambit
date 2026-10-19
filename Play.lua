@@ -947,10 +947,10 @@ function play.place_card()
 	end
 	local sector = field_sector_under_mouse()
 	if time - (held_since or 0) < 0.25 and math.abs(mouse.x - held_at[1]) + math.abs(mouse.y - held_at[2]) < 12 then
-		-- a quick click rather than a drag: the snake goes back to the hand and its info popup shows
+		-- a quick click rather than a drag: the snake just goes back to the hand
 		table.insert(player_hand, math.min(held_index or #player_hand + 1, #player_hand + 1), held_card)
 		sort_hand(player_hand)
-		popup_card, popup_t, popup_x, popup_y, held_card = held_card, time, mouse.x, mouse.y, nil
+		held_card = nil
 		play_sound(hover_sound)
 		return
 	elseif play.versus == "guest" then

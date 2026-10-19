@@ -2512,8 +2512,7 @@ function render.playing()
 		end
 	end
 
-	-- Hovering a snake (on the field or in the hand) explains it once the mouse has rested on it for half a second;
-	-- a clicked hand snake shows the same popup for a few seconds
+	-- Hovering a snake (on the field or in the hand) explains it once the mouse has rested on it for half a second
 	if not held_card and not (field_press and field_press.drag) then
 		local target, draw
 		for sector, card in pairs(played_cards) do
@@ -2540,9 +2539,6 @@ function render.playing()
 		end
 		if draw and time - hover_since >= HOVER_DELAY then
 			draw()
-		end
-		if popup_card and time - popup_t < 5 then
-			card_popup(popup_card, popup_x * reference_window_width / lg.getWidth() + 24, popup_y * reference_window_height / lg.getHeight() - 250)
 		end
 	end
 

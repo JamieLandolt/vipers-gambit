@@ -27,7 +27,7 @@ chosen_avatar = "Yuki Frostveil"
 chosen_opponent = "Ice King"
 scroll_offset_y = 0
 count = 0
-held_since, held_at = 0, { 0, 0 } -- when and where the held snake was picked up (a quick click opens its info)
+held_since, held_at = 0, { 0, 0 } -- when and where the held snake was picked up
 mouse_over_info_background = false
 characters = {} -- (Avatar.lua checks it)
 played_cards = {}
@@ -37,9 +37,7 @@ opponent_hand = {}
 held_card = nil
 held_index = nil -- where the held snake sat in the hand
 info_card = nil
-popup_card, popup_t, popup_x, popup_y = nil, 0, 0, 0 -- the info popup of a clicked hand snake (window position of the click)
 field_press = nil -- { slot, at, x, y, drag }: a snake on the field being pressed; a short press uses its ability, holding opens its info
-HOLD_TIME = 0.4 -- seconds to hold a snake before its info opens
 info_return = "playing" -- screen the info page's Back button returns to
 level_unlocked = nil -- level opened by the last win
 charmer_unlocked = nil -- name of the charmer the last win opened
@@ -137,7 +135,6 @@ function update_game_state(state)
 		game.state[state_name] = false
 	end
 	animation = false
-	popup_card = nil
 	game.state[state] = true
 	if state == "menu" then
 		hub.return_to = nil
@@ -222,17 +219,9 @@ function love.update(dt)
 	end
 	settings.update()
 	versus.update()
-	if field_press and love.mouse.isDown(1) and not field_press.drag then -- dragging a snake off its slot (to retreat it) is not a hold
+	if field_press and love.mouse.isDown(1) and not field_press.drag then -- dragging a snake off its slot retreats it, not a click
 		local mx, my = love.mouse.getPosition()
 		field_press.drag = math.abs(mx - field_press.x) + math.abs(my - field_press.y) > 12
-	end
-	if field_press and love.mouse.isDown(1) and not field_press.drag and time - field_press.at >= HOLD_TIME and game.state["playing"] then
-		local card = played_cards[field_press.slot]
-		field_press = nil
-		if card then
-			info_card, info_return = card, "playing"
-			update_game_state("info")
-		end
 	end
 	if game.state["playing"] then
 		tutorial.update()
@@ -255,7 +244,6 @@ function love.mousepressed(x, y, button)
 	if button ~= 1 then
 		return
 	end
-	popup_card = nil
 
 	if coach.active() then -- a mini tutorial is showing: a click moves it on
 		coach.click()
@@ -412,7 +400,7 @@ function love.mousepressed(x, y, button)
 		map_press = { x = x, y = y, moved = 0 } -- a click opens the level, a drag pans the map (see love.mousereleased)
 	end
 
-	-- A snake on the field: a quick click uses its ability (on release), holding it opens its info page (see love.update)
+	-- A snake on the field: a quick click uses its ability (on release); dragging it onto the hand retreats it
 	if game.state["playing"] and not play.ending and not held_card then
 		for slot = 1, 8 do
 			if played_cards[slot] and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
