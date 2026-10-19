@@ -1,93 +1,43 @@
-"""Draws the level map: a parchment with six regions (each with its own scenery) and the snake winding round them.
+"""Draws the level map: a tall map of six biome bands with scenery, and one smooth snake weaving down through them.
 Usage: python3 tools/draw_levels.py assets/backgrounds/LevelSnake.png LevelNodes.lua
-The map is W x H art pixels saved at SCALE x. LevelNodes.lua gets the node positions (3 per region, the last one the
-region's boss) and the region names/centres for Render.lua. Change SEED for a different, equally tangled path."""
+The map is W x H art pixels saved at SCALE x. LevelNodes.lua gets the node positions (3 per biome, the last one the
+biome's boss) and the biome names/centres for Render.lua."""
 import math, random, sys
 import numpy as np
 from PIL import Image, ImageDraw
 
-W, H, SCALE, R = 300, 960, 6, 10
-SEED = 3
-REGIONS = [  # name, centre, ground colour
-    ("Mossy Garden", (105, 125), (112, 170, 70)),
-    ("Frozen Lake", (195, 275), (196, 226, 236)),
-    ("Venom Swamp", (105, 430), (76, 112, 62)),
-    ("Haunted Ruins", (195, 585), (128, 112, 146)),
-    ("Scorched Desert", (105, 740), (236, 196, 106)),
-    ("Viper Peak", (195, 880), (158, 130, 104)),
-]
-PARCHMENT = [(232, 176, 76), (226, 168, 66), (238, 186, 90)]
+W, H, SCALE, R = 320, 660, 6, 10
+BAND = H // 6
+AMP, WAVE = 78, 230  # the snake's sideways swing and the height of one S
 LEVELS_PER_REGION = 3
+BIOMES = [  # name, ground colour, speckle colour
+    ("Mossy Garden", (112, 170, 70), (84, 140, 56)),
+    ("Frozen Lake", (196, 226, 236), (236, 248, 252)),
+    ("Venom Swamp", (76, 112, 62), (52, 84, 52)),
+    ("Haunted Ruins", (128, 112, 146), (98, 84, 118)),
+    ("Scorched Desert", (236, 196, 106), (214, 166, 80)),
+    ("Viper Peak", (158, 130, 104), (122, 98, 78)),
+]
 
-
-def spline(points, step=0.6):
-    p = [points[0]] + points + [points[-1]]
-    out = []
-    for i in range(1, len(p) - 2):
-        for t in np.linspace(0, 1, 40, endpoint=False):
-            a, b, c, d = (np.array(p[i + k], float) for k in (-1, 0, 1, 2))
-            out.append(0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t ** 3))
-    out.append(np.array(points[-1], float))
-    path = [out[0]]
-    for q in out[1:]:
-        if np.linalg.norm(q - path[-1]) >= step:
-            path.append(q)
-    return np.array(path)
-
-
-def make_path(seed):
-    """Round each region's scenery in a big loop, clockwise then anticlockwise; returns the path and each region's (first, last) waypoint index."""
-    rng = random.Random(seed)
-    pts, spans = [(150.0, 30.0)], []
-    for r, (_, (cx, cy), _) in enumerate(REGIONS):
-        sign = 1 if r % 2 == 0 else -1
-        start = math.radians(200 if r % 2 == 0 else -20) + rng.uniform(-0.2, 0.2)
-        first = len(pts)
-        for k in range(9):
-            angle = start + sign * math.radians(k * 36)
-            rad = 58 + rng.uniform(-4, 6)
-            pts.append((cx + rad * math.cos(angle), cy + rad * math.sin(angle) * 1.12))
-        spans.append((first, len(pts) - 1))
-    return pts, spans
-
-
-def clear_enough(path):
-    arc = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))])
-    sub, sub_arc = path[::6], arc[::6]
-    d = np.linalg.norm(sub[:, None] - sub[None], axis=2)
-    far = np.abs(sub_arc[:, None] - sub_arc[None]) > 6 * R
-    return d[far].min() > 2 * R + 4
-
-
-for seed in range(SEED, SEED + 200):
-    waypoints, spans = make_path(seed)
-    path = spline(waypoints)
-    inside = (path[:, 0] > 30).all() and (path[:, 0] < W - 30).all() and (path[:, 1] < H - 60).all()
-    if inside and clear_enough(path):
-        break
+# ---------------------------------------------------------------- the path: a smooth sine wave down the map
+ys = np.arange(26, H - 34, 0.5)
+path = np.stack([W / 2 + AMP * np.sin(2 * math.pi * (ys - 26) / WAVE), ys], 1)
 tangent = np.gradient(path, axis=0)
 tangent /= np.linalg.norm(tangent, axis=1, keepdims=True)
 arc = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))])
 
-
-# ---------------------------------------------------------------- scenery
+# ---------------------------------------------------------------- ground
 rng = random.Random(5)
+wobble = [rng.uniform(0, 6.28) for _ in range(3)]
 base = Image.new("RGB", (W, H))
 bd = ImageDraw.Draw(base)
-for y in range(H):  # mottled parchment
+for y in range(H):
     for x in range(W):
-        bd.point((x, y), fill=PARCHMENT[(x * 7 + y * 13 + (x * y) // 9) % 17 // 6 % 3])
-for _ in range(900):
-    x, y = rng.randrange(W), rng.randrange(H)
-    bd.ellipse([x, y, x + rng.randint(2, 5), y + rng.randint(1, 3)], fill=(214, 156, 58))
-
-
-def blob(cx, cy, rx, ry, colour):
-    for k in range(7):
-        a = rng.uniform(0, 6.28)
-        d = rng.uniform(0, 0.25)
-        bd.ellipse([cx + rx * d * math.cos(a) - rx * (1 - d), cy + ry * d * math.sin(a) - ry * (1 - d),
-                    cx + rx * d * math.cos(a) + rx * (1 - d), cy + ry * d * math.sin(a) + ry * (1 - d)], fill=colour)
+        yy = y + 5 * math.sin(x / 23 + wobble[0]) + 3 * math.sin(x / 9 + wobble[1])  # wavy borders between biomes
+        b = min(5, max(0, int(yy // BAND)))
+        ground, speck = BIOMES[b][1], BIOMES[b][2]
+        near = abs(yy - (b + 1) * BAND) < 2 and b < 5
+        bd.point((x, y), fill=tuple(int(v * 0.8) for v in ground) if near else (speck if (x * 7 + y * 13 + x * y // 5) % 19 == 0 else ground))
 
 
 def tree(x, y, size=9, leaf=(40, 112, 52), trunk=(88, 58, 36)):
@@ -166,56 +116,102 @@ def skull(x, y):
     bd.point([(x - 2, y - 4), (x + 1, y - 4)], fill=(40, 30, 30))
 
 
-names = {n: (c, g) for n, c, g in REGIONS}
-for name, (cx, cy), ground in REGIONS:
-    blob(cx, cy, 88, 84, tuple(int(v * 0.85) for v in ground))
-    blob(cx, cy, 78, 74, ground)
 
-(cx, cy), _ = names["Mossy Garden"]
-for dx, dy in [(-24, -14), (-8, -26), (14, -22), (26, -6), (-26, 10), (22, 16), (-6, 22), (6, 4), (-14, -2)]:
-    tree(cx + dx, cy + dy, 12 + (dx % 3))
-bd.rectangle([cx - 8, cy + 6, cx + 8, cy + 9], fill=(150, 100, 56), outline=(70, 40, 20))
-bd.rectangle([cx - 8, cy + 9, cx - 6, cy + 14], fill=(70, 40, 20))
-bd.rectangle([cx + 6, cy + 9, cx + 8, cy + 14], fill=(70, 40, 20))
 
-(cx, cy), _ = names["Frozen Lake"]
-bd.ellipse([cx - 40, cy - 16, cx + 40, cy + 32], fill=(150, 200, 230), outline=(90, 140, 190))
-bd.ellipse([cx - 30, cy - 8, cx + 14, cy + 14], fill=(190, 226, 244))
-for dx, dy, h in [(-22, -10, 18), (-8, -18, 26), (6, -8, 22), (24, -14, 16), (-30, 8, 12), (30, 12, 14)]:
-    crystal(cx + dx, cy + dy + 20, h)
+def band_of(y):
+    return min(5, int(y // BAND))
 
-(cx, cy), _ = names["Venom Swamp"]
-bd.ellipse([cx - 38, cy - 14, cx + 38, cy + 30], fill=(60, 100, 56), outline=(30, 56, 36))
-bd.ellipse([cx - 28, cy - 6, cx + 20, cy + 20], fill=(86, 140, 70))
-for dx, dy in [(-22, 4), (-6, 12), (10, 2), (22, 14), (-12, -2)]:
-    lily(cx + dx, cy + dy)
-for dx, dy in [(-34, -4), (-20, -22), (6, -26), (30, -14), (36, 22), (-34, 20)]:
-    dead_tree(cx + dx, cy + dy)
-for dx, dy in [(-4, 34), (16, 30), (-30, 34), (30, 32)]:
-    mushroom(cx + dx, cy + dy)
 
-(cx, cy), _ = names["Haunted Ruins"]
-for dx, dy, h, b in [(-26, -4, 18, False), (-12, -14, 22, True), (4, -8, 16, True), (20, -16, 24, False), (30, 0, 12, True)]:
-    pillar(cx + dx, cy + dy + 14, h, b)
-for dx, dy in [(-24, 22), (-8, 26), (10, 24), (28, 22)]:
-    gravestone(cx + dx, cy + dy)
-bd.line([(cx - 2, cy - 30), (cx - 2, cy - 14)], fill=(56, 40, 46), width=2)
-bd.line([(cx - 7, cy - 25), (cx + 3, cy - 25)], fill=(56, 40, 46), width=2)
+def scatter(biome, items, count):
+    """Drops `count` random pieces of scenery in a biome, clear of the snake and of each other."""
+    placed = []
+    for _ in range(count * 40):
+        if len(placed) >= count:
+            break
+        x, y = rng.randrange(14, W - 14), rng.randrange(biome * BAND + 14, (biome + 1) * BAND - 4)
+        if np.linalg.norm(path - (x, y), axis=1).min() < R + 9 or any(math.hypot(x - a, y - b) < 15 for a, b in placed):
+            continue
+        placed.append((x, y))
+    for x, y in sorted(placed, key=lambda p: p[1]):
+        rng.choice(items)(x, y)
 
-(cx, cy), _ = names["Scorched Desert"]
-for dx, dy, w in [(-30, 22, 24), (6, 28, 30), (-6, -22, 22)]:
-    bd.arc([cx + dx - w, cy + dy - 8, cx + dx + w, cy + dy + 12], 190, 350, fill=(196, 150, 70), width=2)
-pyramid(cx + 4, cy + 6, 24)
-pyramid(cx - 22, cy + 10, 14)
-for dx, dy in [(-30, -8), (28, -10), (-4, 26), (34, 16)]:
-    cactus(cx + dx, cy + dy)
-skull(cx + 20, cy + 26)
 
-(cx, cy), _ = names["Viper Peak"]
-for dx, dy, w, h in [(-26, 12, 26, 28), (22, 14, 24, 24), (-4, 8, 30, 40)]:
-    mountain(cx + dx, cy + dy, w, h)
-temple(cx - 4, cy - 28)
-bd.ellipse([cx + 30, cy + 22, cx + 44, cy + 30], fill=(214, 70, 40), outline=(120, 30, 20))  # lava pool
+def lake(x, y):
+    bd.ellipse([x - 13, y - 5, x + 13, y + 5], fill=(150, 200, 230), outline=(90, 140, 190))
+    bd.ellipse([x - 8, y - 3, x + 2, y + 1], fill=(190, 226, 244))
+
+
+def pond(x, y):
+    bd.ellipse([x - 11, y - 5, x + 11, y + 5], fill=(60, 100, 56), outline=(30, 56, 36))
+    bd.ellipse([x - 7, y - 3, x + 3, y + 1], fill=(86, 140, 70))
+
+
+def bush(x, y):
+    bd.ellipse([x - 5, y - 5, x + 5, y + 1], fill=(52, 124, 56), outline=(24, 70, 36))
+    bd.point([(x - 2, y - 3), (x + 2, y - 2)], fill=(250, 120, 150))
+
+
+def rock(x, y):
+    bd.ellipse([x - 4, y - 4, x + 4, y + 1], fill=(140, 134, 142), outline=(70, 64, 80))
+
+
+def snowman(x, y):
+    bd.ellipse([x - 4, y - 5, x + 4, y + 1], fill=(250, 252, 255), outline=(120, 150, 190))
+    bd.ellipse([x - 3, y - 10, x + 3, y - 4], fill=(250, 252, 255), outline=(120, 150, 190))
+    bd.point([(x - 1, y - 8), (x + 1, y - 8)], fill=(30, 30, 40))
+
+
+def lava(x, y):
+    bd.ellipse([x - 6, y - 3, x + 6, y + 3], fill=(214, 70, 40), outline=(120, 30, 20))
+    bd.ellipse([x - 3, y - 1, x + 2, y + 1], fill=(255, 190, 70))
+
+
+def crystals(x, y):
+    crystal(x, y, 14)
+    crystal(x + 6, y + 2, 9)
+
+
+def trees2(x, y):
+    tree(x, y, 12)
+
+
+def pines(x, y):
+    bd.polygon([(x - 5, y), (x, y - 14), (x + 5, y)], fill=(34, 96, 66), outline=(16, 52, 40))
+    bd.polygon([(x - 4, y - 5), (x, y - 17), (x + 4, y - 5)], fill=(46, 120, 80), outline=(16, 52, 40))
+
+
+def snowy_pine(x, y):
+    pines(x, y)
+    bd.polygon([(x - 2, y - 12), (x, y - 17), (x + 2, y - 12)], fill=(250, 252, 255))
+
+
+def sand_mound(x, y):
+    bd.arc([x - 9, y - 5, x + 9, y + 5], 190, 350, fill=(196, 150, 70), width=2)
+
+
+def small_pyramid(x, y):
+    pyramid(x, y, 14)
+
+
+def peak(x, y):
+    mountain(x, y + 2, 16, 22)
+
+
+def big_peak(x, y):
+    mountain(x, y + 2, 20, 28)
+
+
+SCENES = [
+    (0, [trees2, trees2, trees2, bush, bush, rock], 34),
+    (1, [snowy_pine, snowy_pine, crystals, crystals, lake, snowman, rock], 30),
+    (2, [dead_tree, dead_tree, pond, lily, mushroom, mushroom, lily], 34),
+    (3, [pillar, lambda x, y: pillar(x, y, 12, True), gravestone, gravestone, dead_tree, rock], 32),
+    (4, [cactus, cactus, small_pyramid, sand_mound, sand_mound, skull, rock], 30),
+    (5, [peak, big_peak, peak, lava, rock, rock], 26),
+]
+for biome, items, count in SCENES:
+    scatter(biome, items, count)
+temple(W - 54 if path[-1][0] < W / 2 else 54, H - 58)
 
 # frame
 bd.rectangle([0, 0, W - 1, H - 1], outline=(52, 112, 56), width=6)
@@ -272,16 +268,13 @@ for k in range(5):
 
 Image.fromarray(img).resize((W * SCALE, H * SCALE), Image.NEAREST).save(sys.argv[1])
 
-# Nodes: three per region along its loop, the last one at the loop's end (the region's boss)
-def index_near(wp):
-    return int(np.linalg.norm(path - np.array(wp), axis=1).argmin())
-
-
+# Nodes: three per biome, evenly spaced along the snake's part of that biome; the last one is the biome's boss
 nodes = []
-for first, last in spans:
-    a, b = arc[index_near(waypoints[first])], arc[index_near(waypoints[last])]
-    for f in (0.12, 0.52, 1.0):
-        k = int(np.abs(arc - (a + (b - a) * f)).argmin())
+for b in range(6):
+    ks = np.where((path[:, 1] >= b * BAND) & (path[:, 1] < (b + 1) * BAND))[0]
+    a, z = arc[ks[0]], arc[ks[-1]]
+    for f in (1 / 6, 3 / 6, 5 / 6):
+        k = int(np.abs(arc - (a + (z - a) * f)).argmin())
         nodes.append((float(path[k][0]), float(path[k][1])))
 with open(sys.argv[2], "w") as f:
     f.write("-- Generated by tools/draw_levels.py: the level map's size, where each level's node sits and its regions (art pixels)\n")
@@ -290,7 +283,7 @@ with open(sys.argv[2], "w") as f:
     for x, y in nodes:
         f.write("\t\t{ %.1f, %.1f },\n" % (x, y))
     f.write("\t},\n\tregions = {\n")
-    for name, (cx, cy), _ in REGIONS:
-        f.write('\t\t{ name = "%s", x = %d, y = %d },\n' % (name, cx, cy))
+    for b, (name, _, _) in enumerate(BIOMES):
+        f.write('\t\t{ name = "%s", x = %d, y = %d },\n' % (name, W // 2, b * BAND + BAND // 2))
     f.write("\t},\n}\n")
-print("seed", seed, "length", int(arc[-1]))
+print("length", int(arc[-1]))

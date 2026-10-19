@@ -70,6 +70,11 @@ local basic = {
 			local r = hand_rect(function() return true end)
 			return r and { { r[1] + r[3] * 0.02, r[2] + r[4] * 0.85, r[3] * 0.96, r[4] * 0.13 } } or {}
 		end },
+	{ text = "For the full story, give a snake a quick click to see its stats and ability. Hold a snake on the field to see it there too. Every snake played gets a close-up.", next = true,
+		point = function()
+			local r = hand_rect(function() return true end)
+			return r and { r } or {}
+		end },
 	{ text = "Your venom refills at the start of every turn, and you get 1 more than last turn. Unspent venom is lost, so use it!", next = true,
 		point = function() return { { 170, 482, 76, 76 } } end },
 	{ text = "Press End Turn. Your snakes hit the snake opposite, or their health.",
@@ -108,7 +113,7 @@ local tips = {
 local steps = basic
 
 -- Only the first match (level 1) locks the controls; the later lessons just point things out
-local UNLOCK = { end_turn = 8, ability = 10, charm = 10 }
+local UNLOCK = { end_turn = 9, ability = 11, charm = 11 }
 
 function tutorial.allows(control)
 	return not tutorial.active or tutorial.step >= UNLOCK[control]

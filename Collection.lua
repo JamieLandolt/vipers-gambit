@@ -135,6 +135,7 @@ end
 -- Wipes progress back to a new game (settings are kept)
 function collection.reset()
 	unlocked, collection.unlock_all, last_pack, owned, variants, deck_set, collection.eyes = 1, false, "-", {}, {}, nil, 0
+	chosen_avatar = require("Charmers").list[1].name
 	love.filesystem.remove("deck.txt")
 	love.filesystem.remove("finale.txt")
 	love.filesystem.remove("hints.txt")

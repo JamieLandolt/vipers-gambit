@@ -81,6 +81,15 @@ charmers.list = {
 		end },
 }
 
+-- The first charmer is open from the start; each later one opens once the region before it has been beaten
+function charmers.region_needed(i)
+	return require("LevelNodes").regions[i - 1].name
+end
+
+function charmers.is_unlocked(i)
+	return i <= 1 or require("Collection").unlock_all or unlocked > (i - 1) * require("LevelNodes").per_region
+end
+
 charmers.by_name = {}
 for _, c in ipairs(charmers.list) do
 	charmers.by_name[c.name] = c

@@ -61,14 +61,25 @@ function play.reveal(is_opponent, played)
 	end
 end
 
+local SPOTLIGHT = 2.5 -- seconds a newly played snake is shown close up
+
 local function place_effect(placed, sector)
 	play.note((sector > 4 and "You play " or "Opponent plays ") .. play.name_of(placed))
 	play.reveal(sector <= 4, placed)
 	placed.fresh = true -- some abilities only work the turn a snake is played
+	if effects.settled and data.get_stats(placed).kind == "snake" then -- (headless tests and the sim have no clock)
+		play.spotlight = { card = placed, ends = time + SPOTLIGHT } -- zoom in on every snake played (see render.spotlight)
+	end
 	local cx, cy = play.slot_centre(sector)
 	effects.add("place", { card = placed, cx = cx, cy = cy })
 	powers.trigger("play", placed, sector)
 	play.check_end()
+end
+
+-- The snake being shown close up, if its time is not up
+function play.spotlit()
+	local sp = play.spotlight
+	return sp and time < sp.ends and sp or nil
 end
 
 -- Each lane (column) accepts two snake types. The player can swap them around on the Lanes screen;
@@ -412,7 +423,7 @@ function play.new_game(level, challenge)
 	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) + (c.opp_venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
-	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited = nil, nil, false, nil, nil, false
+	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited, play.spotlight = nil, nil, false, nil, nil, false, nil
 	play.log, play.lost_snake = {}, false
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
 	effects.clear()
@@ -442,7 +453,7 @@ function play.new_guest(host_charmer)
 	max_health, health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }, { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
 	max_venom, venom = { Player = 1, Opponent = 1 }, { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
-	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited = nil, nil, false, nil, nil, false
+	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited, play.spotlight = nil, nil, false, nil, nil, false, nil
 	play.log, play.lost_snake = {}, false
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
 	card_hitboxes = {}
@@ -823,7 +834,7 @@ local ai_timer = 0
 
 -- One action per play.ai_delay so the player can follow what the opponent does
 function play.opponent_turn(dt)
-	if time < (play.ai_hold or 0) then
+	if time < (play.ai_hold or 0) or play.spotlit() then
 		return
 	end
 	ai_timer = ai_timer + dt

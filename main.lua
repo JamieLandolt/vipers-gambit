@@ -37,6 +37,8 @@ opponent_hand = {}
 held_card = nil
 held_index = nil -- where the held snake sat in the hand
 info_card = nil
+field_press = nil -- { slot, at }: a snake on the field being pressed; a short press uses its ability, holding opens its info
+HOLD_TIME = 0.4 -- seconds to hold a snake before its info opens
 info_return = "playing" -- screen the info page's Back button returns to
 level_unlocked = nil -- level opened by the last win
 confirm_forfeit = false -- the forfeit confirmation is showing
@@ -217,6 +219,14 @@ function love.update(dt)
 	end
 	settings.update()
 	versus.update()
+	if field_press and love.mouse.isDown(1) and time - field_press.at >= HOLD_TIME and game.state["playing"] then
+		local card = played_cards[field_press.slot]
+		field_press = nil
+		if card then
+			info_card, info_return = card, "playing"
+			update_game_state("info")
+		end
+	end
 	if game.state["playing"] then
 		tutorial.update()
 		play.update_ending()
@@ -241,6 +251,11 @@ function love.mousepressed(x, y, button)
 
 	if coach.active() then -- a mini tutorial is showing: a click moves it on
 		coach.click()
+		return
+	end
+
+	if game.state["playing"] and play.spotlit() then -- a click skips the close-up of a played snake
+		play.spotlight = nil
 		return
 	end
 
@@ -394,14 +409,17 @@ function love.mousepressed(x, y, button)
 		map_press = { x = x, y = y, moved = 0 } -- a click opens the level, a drag pans the map (see love.mousereleased)
 	end
 
-	-- Check if card is clicked with no card in hand
-	if game.state["playing"] and turn == "Player" and not play.ending then
-		-- Clicking one of your snakes on the field uses its activated ability
-		for slot = 5, 8 do
-			if played_cards[slot] and tutorial.allows("ability") and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
-				play.activate(slot)
+	-- A snake on the field: a quick click uses its ability (on release), holding it opens its info page (see love.update)
+	if game.state["playing"] and not play.ending and not held_card then
+		for slot = 1, 8 do
+			if played_cards[slot] and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
+				field_press = { slot = slot, at = time }
 			end
 		end
+	end
+
+	-- Check if card is clicked with no card in hand
+	if game.state["playing"] and turn == "Player" and not play.ending then
 		for card, hitbox in pairs(card_hitboxes) do
 			if play.is_hitbox(x, y, hitbox) then
 				local found
@@ -435,6 +453,13 @@ function love.keypressed(key)
 end
 
 function love.mousereleased(x, y, button)
+	if button == 1 and field_press then
+		local press = field_press
+		field_press = nil
+		if press.slot > 4 and played_cards[press.slot] and turn == "Player" and not play.ending and tutorial.allows("ability") then
+			play.activate(press.slot)
+		end
+	end
 	if button == 1 and map_press then
 		local press = map_press
 		map_press = nil

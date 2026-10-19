@@ -1212,7 +1212,7 @@ function render.charmer_at(x, y)
 	local rx, ry = x * reference_window_width / lg.getWidth(), y * reference_window_height / lg.getHeight()
 	for i = 1, charmers.PICKABLE do
 		local cx, cy = card_pos(i)
-		if rx > cx and rx < cx + CARD_W and ry > cy and ry < cy + CARD_H then
+		if rx > cx and rx < cx + CARD_W and ry > cy and ry < cy + CARD_H and charmers.is_unlocked(i) then
 			return charmers.list[i].name
 		end
 	end
@@ -1232,7 +1232,7 @@ end
 function render.skin_at(x, y)
 	local rx, ry = x * reference_window_width / lg.getWidth(), y * reference_window_height / lg.getHeight()
 	for i = 1, charmers.PICKABLE do
-		for _, b in ipairs(skin_boxes(i)) do
+		for _, b in ipairs(charmers.is_unlocked(i) and skin_boxes(i) or {}) do
 			if rx > b[1] and rx < b[1] + b[3] and ry > b[2] and ry < b[2] + b[4] then
 				return charmers.list[i].name, b[5]
 			end
@@ -1257,11 +1257,13 @@ end
 function render.character_select()
 	background()
 	local x1, y1 = card_pos(1)
-	coach.start("coach_charmers", { -- first visit
-		{ rect = { x1, y1, CARD_W, CARD_H }, text = "A charmer is your hero. Pick one to fight beside you." },
-		{ rect = { x1, y1 + PORTRAIT_H + 36, CARD_W, 110 }, text = "Each charmer has a charm: a power you can use for venom, then it needs time to recharge" },
-		{ rect = { x1, y1, PER_ROW * CARD_W + (PER_ROW - 1) * CARD_GAP, 2 * CARD_H + 20 }, text = "Click a card to choose. Some have small pictures to pick a different look" },
-	})
+	local charm_known = collection.unlock_all or unlocked >= 4 -- charm powers are taught at level 4, so stay hidden until then
+	local lesson = { { rect = { x1, y1, CARD_W, CARD_H }, text = "A charmer is your hero. Pick one to fight beside you." } }
+	if charm_known then
+		lesson[2] = { rect = { x1, y1 + PORTRAIT_H + 36, CARD_W, 110 }, text = "Each charmer has a charm: a power you can use for venom, then it needs time to recharge" }
+	end
+	lesson[#lesson + 1] = { rect = { x1, y1, PER_ROW * CARD_W + (PER_ROW - 1) * CARD_GAP, 2 * CARD_H + 20 }, text = "Click a card to choose. Some have small pictures to pick a different look" }
+	coach.start("coach_charmers", lesson) -- first visit
 	buttons.character_select["Charmers Header"]:draw()
 	buttons.universal["Back"]:draw()
 	local hovered = render.charmer_at(mouse.x, mouse.y)
@@ -1281,7 +1283,7 @@ function render.character_select()
 			lg.setColor(1, 1, 1)
 			lg.printf("Selected", assets.debug_font, x + 10, y + 12, 90, "center")
 		end
-		for _, b in ipairs(skin_boxes(i)) do -- the looks to choose from
+		for _, b in ipairs(charmers.is_unlocked(i) and skin_boxes(i) or {}) do -- the looks to choose from
 			local file = "assets/characters/" .. c.portrait:gsub("%..+$", "") .. "_" .. b[5] .. ".png"
 			skin_images[file] = skin_images[file] or lg.newImage(file)
 			local image = skin_images[file]
@@ -1299,10 +1301,17 @@ function render.character_select()
 		end
 		lg.setColor(1, 1, 1)
 		lg.printf(c.name, assets.debug_font, x + 6, y + PORTRAIT_H + 16, CARD_W - 12, "center")
-		lg.setColor(green)
-		lg.printf(c.charm .. " (" .. c.cost .. " venom, cooldown " .. c.cooldown .. ")", assets.debug_font, x + 8, y + PORTRAIT_H + 40, CARD_W - 16, "center")
-		lg.setColor(1, 1, 1)
-		lg.printf(c.text, assets.debug_font, x + 8, y + PORTRAIT_H + 100, CARD_W - 16, "center")
+		if not charmers.is_unlocked(i) then
+			lg.setColor(0, 0, 0, 0.72)
+			lg.rectangle("fill", x, y, CARD_W, CARD_H, 5, 5)
+			lg.setColor(1, 1, 1)
+			lg.printf("Locked\nBeat " .. charmers.region_needed(i) .. " to unlock", assets.debug_font, x + 8, y + PORTRAIT_H / 2, CARD_W - 16, "center")
+		elseif charm_known then
+			lg.setColor(green)
+			lg.printf(c.charm .. " (" .. c.cost .. " venom, cooldown " .. c.cooldown .. ")", assets.debug_font, x + 8, y + PORTRAIT_H + 40, CARD_W - 16, "center")
+			lg.setColor(1, 1, 1)
+			lg.printf(c.text, assets.debug_font, x + 8, y + PORTRAIT_H + 100, CARD_W - 16, "center")
+		end
 	end
 end
 
@@ -1362,7 +1371,7 @@ end
 -- The level map is a long winding snake (tools/draw_levels.py draws it and writes LevelNodes.lua, where each level's
 -- node sits). It is drawn at 7.5 reference units per art pixel and can be dragged around in every direction.
 local map = require("LevelNodes")
-local ART_SCALE, NODE_RADIUS = 7.5, 40
+local ART_SCALE, NODE_RADIUS = 4.5, 40
 map_x, map_y = 0, 0 -- where the map's top left sits in the window (pan)
 
 local function clamp_map()
@@ -2006,6 +2015,7 @@ function render.playing()
 	end
 	tutorial.draw()
 	tutorial.draw_pointers()
+	render.spotlight()
 	if tutorial.needs_next() then
 		buttons.playing["Tutorial Next"]:draw()
 	end
@@ -2073,6 +2083,34 @@ function render.versus()
 	buttons.versus["Join"]:draw()
 	lg.setColor(1, 0.85, 0.2)
 	lg.printf(versus.status, assets.small_font, 0, 700, reference_window_width, "center")
+	lg.setColor(1, 1, 1)
+end
+
+-- A snake that was just played is shown close up with its stats and ability (a click skips it)
+function render.spotlight()
+	local sp = play.spotlit()
+	if not sp then
+		return
+	end
+	local info = data.get_stats(sp.card)
+	local tier = RARITY_COLOUR[info.rarity]
+	local fade = math.min(1, (sp.ends - time) * 4, (time - (sp.ends - 2.5)) * 6)
+	lg.setColor(0, 0, 0, 0.75 * fade)
+	lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+	local scale, cx, cy = 1.5, 330, 150
+	lg.setColor(tier[1], tier[2], tier[3], 0.5 * fade)
+	lg.rectangle("fill", cx - 12, cy - 12, img_widths * scale + 24, img_heights * scale + 24, 16, 16)
+	lg.setColor(1, 1, 1, fade)
+	sp.card:draw(cx, cy, 0, scale)
+	local x, w = cx + img_widths * scale + 50, 560
+	lg.setColor(1, 1, 1, fade)
+	lg.print((sp.card.card_path:sub(1, -5):gsub("_", " ")), assets.font, x, cy)
+	lg.setColor(tier[1], tier[2], tier[3], fade)
+	lg.print(data.get_type(sp.card) .. "  |  Tier " .. info.rarity, assets.small_font, x, cy + 58)
+	lg.setColor(1, 0.85, 0.2, fade)
+	lg.print("Cost " .. info.cost .. "   Attack " .. info.attack .. "   Defense " .. info.defense, assets.small_font, x, cy + 104)
+	lg.setColor(1, 1, 1, fade)
+	lg.printf(info.ability or "No ability", assets.small_font, x, cy + 160, w)
 	lg.setColor(1, 1, 1)
 end
 
