@@ -1418,24 +1418,81 @@ end
 local level_start, last_level = 0, -1
 
 -- The swirling background dissolves into the snake and its levels over about a second and a half
--- A row of small card thumbnails for a deck (list of names), wrapped at per_row
+-- A row of small card thumbnails for a deck (list of names), wrapped at per_row; each thumbnail is remembered in thumb_hits
+-- so hovering it can show the card (see card_popup)
 -- With `foe_level`, only the cards that opponent has played against you show; the rest are face down
-local function deck_thumbs(deck, x, y, per_row, foe_level)
-	local scale = 0.26
+local thumb_hits = {}
+local function deck_thumbs(deck, x, y, per_row, foe_level, scale)
+	scale = scale or 0.26
+	local w, h = 165 * scale, 320 * scale
 	for i, name in ipairs(deck) do
 		local col, row = (i - 1) % per_row, math.floor((i - 1) / per_row)
-		local cx, cy = x + col * 50, y + row * 92
+		local cx, cy = x + col * (w + 8), y + row * (h + 9)
 		if foe_level and not collection.hint_seen("foe" .. foe_level .. "_" .. name) then
 			lg.setColor(0.12, 0.09, 0.2)
-			lg.rectangle("fill", cx, cy, 165 * scale, 320 * scale, 6, 6)
+			lg.rectangle("fill", cx, cy, w, h, 6, 6)
 			lg.setColor(0.45, 0.4, 0.6)
-			lg.rectangle("line", cx, cy, 165 * scale, 320 * scale, 6, 6)
-			lg.printf("?", assets.font, cx, cy + 320 * scale / 2 - 25, 165 * scale, "center")
+			lg.rectangle("line", cx, cy, w, h, 6, 6)
+			lg.printf("?", assets.font, cx, cy + h / 2 - 25, w, "center")
 		else
+			local rx, ry = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+			local hover = rx >= cx and rx <= cx + w and ry >= cy and ry <= cy + h
+			if hover then
+				lg.setColor(1, 0.9, 0.3, 0.9)
+				lg.rectangle("fill", cx - 3, cy - 3, w + 6, h + 6, 7, 7)
+			end
 			lg.setColor(1, 1, 1)
 			lg.draw(assets.card_by_name[name], cx, cy, 0, scale)
+			thumb_hits[#thumb_hits + 1] = { cx, cy, w, h, name, hover }
 		end
 	end
+end
+
+-- The card under the mouse in the thumbnails drawn this frame, shown large with its stats and ability
+local function card_popup()
+	local hit
+	for _, t in ipairs(thumb_hits) do
+		hit = t[6] and t or hit
+	end
+	if not hit then
+		return
+	end
+	local info = data.get_stats({ card_path = hit[5] .. ".png" })
+	local snake = info.kind == "snake"
+	local tier = RARITY_COLOUR[info.rarity]
+	local pw, ph, scale = 600, 330, 0.9
+	local x = hit[1] + hit[3] / 2 > reference_window_width / 2 and hit[1] - pw - 12 or hit[1] + hit[3] + 12
+	local y = math.max(10, math.min(hit[2] - 40, reference_window_height - ph - 10))
+	lg.setColor(0.07, 0.04, 0.14, 0.97)
+	lg.rectangle("fill", x, y, pw, ph, 12, 12)
+	lg.setColor(tier[1], tier[2], tier[3])
+	lg.setLineWidth(4)
+	lg.rectangle("line", x, y, pw, ph, 12, 12)
+	lg.setLineWidth(1)
+	lg.push()
+	lg.translate(x + 20, y + 20)
+	lg.scale(scale)
+	lg.setColor(1, 1, 1)
+	lg.draw(assets.card_by_name[hit[5]])
+	require("CardText").draw(hit[5], 0, 0)
+	lg.pop()
+	local tx, tw = x + 190, pw - 210
+	lg.setColor(1, 1, 1)
+	lg.print((hit[5]:gsub("_", " ")), assets.font, tx, y + 18)
+	lg.setColor(tier[1], tier[2], tier[3])
+	lg.print((snake and data.get_type({ card_path = hit[5] .. ".png" }) or (info.kind == "brew" and "Brew" or "Spell")) .. "   |   Tier " .. info.rarity, assets.small_font, tx, y + 74)
+	lg.setColor(0.5, 0.95, 0.4)
+	lg.print("Cost " .. info.cost, assets.small_font, tx, y + 116)
+	if snake then
+		lg.setColor(1, 0.5, 0.45)
+		lg.print("Attack " .. info.attack, assets.small_font, tx + 110, y + 116)
+		lg.setColor(0.55, 0.7, 1)
+		lg.print("Health " .. info.defense, assets.small_font, tx + 250, y + 116)
+	end
+	lg.setColor(1, 0.85, 0.2)
+	lg.print("Ability", assets.small_font, tx, y + 166)
+	lg.setColor(1, 1, 1)
+	lg.printf(info.ability or "None", assets.small_font, tx, y + 198, tw)
 end
 
 local function charmer_info(charmer, x, y, who, level)
@@ -1447,9 +1504,37 @@ local function charmer_info(charmer, x, y, who, level)
 	end
 end
 
+-- A rounded dark panel with a gold rim
+local function panel(x, y, w, h, rim)
+	lg.setColor(0.09, 0.05, 0.18, 0.94)
+	lg.rectangle("fill", x, y, w, h, 14, 14)
+	lg.setColor(rim or { 1, 0.85, 0.2 })
+	lg.setLineWidth(3)
+	lg.rectangle("line", x, y, w, h, 14, 14)
+	lg.setLineWidth(1)
+end
+
+-- One side of the briefing: portrait, charmer and charm, then its deck
+local function side_panel(x, who, charmer, level, rim)
+	panel(x, 120, 640, 340, rim)
+	lg.setColor(1, 1, 1)
+	portrait(charmer.name, x + 16, 136, 84, 100)
+	lg.setColor(rim)
+	lg.print(who, assets.small_font, x + 116, 134)
+	lg.setColor(1, 1, 1)
+	lg.print(charmer.name, assets.font, x + 116, 160)
+	if play.charms_open(level) then
+		lg.setColor(0.6, 0.9, 0.4)
+		lg.print(charmer.charm .. "  (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. ")", assets.debug_font, x + 116, 200)
+		lg.setColor(0.85, 0.85, 0.95)
+		lg.printf(charmer.text, assets.debug_font, x + 116, 220, 500)
+	end
+end
+
 -- The screen shown when a level is clicked
 function render.briefing(level)
 	local opponent = opponents[level]
+	thumb_hits = {}
 	lg.setColor(0, 0, 0, 0.88)
 	lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
 	lg.setColor(1, 1, 1)
@@ -1457,59 +1542,65 @@ function render.briefing(level)
 	lg.setColor(1, 0.85, 0.2)
 	draw_vials(reference_window_width - 250, 20)
 	coach.start("coach_briefing", {
-		{ rect = { reference_window_width / 2 - 250, 86, 520, 36 }, text = "Win a match to earn snake eyes. Spend them on packs." },
-		{ rect = { 780, 215, 560, 150 }, text = "You see their charmer, but their deck stays hidden until they play the cards." },
-		{ rect = { 100, 570, 1240, 140 }, text = "Beat a level to unlock harder challenges here, worth bigger rewards." },
+		{ rect = { reference_window_width / 2 - 250, 76, 520, 36 }, text = "Win a match to earn snake eyes. Spend them on packs." },
+		{ rect = { 740, 120, 640, 340 }, text = "You see their charmer, but their deck stays hidden until they play the cards." },
+		{ rect = { 60, 570, 1320, 140 }, text = "Beat a level to unlock harder challenges here, worth bigger rewards." },
 	})
-	draw_eyes("Win: +", collection.payout(true, level), 0, 90, reference_window_width / 2 - 20, "right")
-	draw_eyes("Lose: +", collection.payout(false, level), reference_window_width / 2 + 20, 90, 400, "left")
+	draw_eyes("Win: +", collection.payout(true, level), 0, 76, reference_window_width / 2 - 20, "right")
+	draw_eyes("Lose: +", collection.payout(false, level), reference_window_width / 2 + 20, 76, 400, "left")
 
 	local deck = collection.deck()
 	local shown = { unpack(deck, 1, 20) } -- a deck is at most 20; before one is chosen every owned snake is in it
-	charmer_info(charmers.by_name[chosen_avatar], 100, 140, "You", level)
+	side_panel(60, "YOU", charmers.by_name[chosen_avatar], level, { 0.45, 0.8, 0.3 })
 	lg.setColor(1, 1, 1)
-	lg.print("Your deck (" .. #deck .. ")" .. (#deck > 20 and ", first 20 shown" or ""), assets.small_font, 100, 225)
-	deck_thumbs(shown, 100, 262, 10)
-	charmer_info(charmers.of("Opponent", level), 790, 140, "Opponent", level)
+	lg.print("Your deck (" .. #deck .. ")" .. (#deck > 20 and ", first 20 shown" or ""), assets.small_font, 80, 256)
+	deck_thumbs(shown, 80, 290, 10, nil, 0.23)
+	side_panel(740, "OPPONENT", charmers.of("Opponent", level), level, { 0.9, 0.35, 0.35 })
 	lg.setColor(1, 1, 1)
-	lg.print("Their deck (" .. #opponent.deck .. ")", assets.small_font, 790, 225)
-	deck_thumbs(opponent.deck, 790, 262, 10, level)
+	lg.print("Their deck (" .. #opponent.deck .. ")", assets.small_font, 760, 256)
+	deck_thumbs(opponent.deck, 760, 290, 10, level, 0.23)
 	lg.setColor(0.7, 0.7, 0.8)
-	lg.print("Cards show once they are played against you", assets.debug_font, 790, 355)
+	lg.print("Cards show once they are played against you", assets.debug_font, 760, 432)
+
+	panel(60, 468, 640, 96, { 1, 0.85, 0.2 })
 	lg.setColor(1, 0.85, 0.2)
-	lg.print("Win a snake: one of these, a third each, with a random border", assets.small_font, 100, 452)
-	lg.setColor(1, 1, 1)
-	deck_thumbs(collection.level_rewards(level), 100, 480, 3)
+	lg.print("Win a snake: one of these, a third each, with a random border", assets.debug_font, 80, 472)
+	deck_thumbs(collection.level_rewards(level), 80, 492, 3, nil, 0.21)
 
 	-- What the next fight is: the plain match, one of the level's challenges, or an endless rematch
 	local fight = play.next_fight(level)
-	lg.setColor(0.1, 0.06, 0.2, 0.95)
-	lg.rectangle("fill", 100, 570, 1240, 140, 10, 10)
-	lg.setColor(1, 0.85, 0.2)
-	lg.rectangle("line", 100, 570, 1240, 140, 10, 10)
+	panel(60, 570, 1320, 140, { 1, 0.85, 0.2 })
 	local wins = collection.wins(level)
+	lg.setColor(1, 0.85, 0.2)
 	if not fight then
-		lg.printf("The first fight", assets.font, 100, 585, 1240, "center")
+		lg.printf("The first fight", assets.font, 60, 585, 1320, "center")
 		lg.setColor(1, 1, 1)
-		lg.printf("Beat them to unlock their challenges", assets.small_font, 100, 650, 1240, "center")
+		lg.printf("Beat them to unlock their challenges", assets.small_font, 60, 650, 1320, "center")
 	else
 		local label = fight.endless and ("Endless rematch " .. fight.endless) or ("Challenge " .. fight.tier .. "/" .. #challenges[level] .. ": " .. fight.name)
-		lg.printf(label .. " (x" .. string.format("%.4g", fight.mult) .. " reward)", assets.font, 100, 585, 1240, "center")
+		lg.printf(label .. " (x" .. string.format("%.4g", fight.mult) .. " reward)", assets.font, 60, 585, 1320, "center")
 		lg.setColor(1, 1, 1)
-		lg.printf(fight.text, assets.small_font, 100, 650, 1240, "center")
+		lg.printf(fight.text, assets.small_font, 60, 650, 1320, "center")
 	end
 	lg.setColor(0.7, 0.9, 1)
-	lg.printf("Your wins against them: " .. wins, assets.small_font, 100, 720, 1240, "center")
+	lg.printf("Your wins against them: " .. wins, assets.small_font, 60, 720, 1320, "center")
 	lg.setColor(1, 1, 1)
 	buttons.level_choice["Play"]:draw()
 	buttons.level_choice["Cancel"]:draw()
+	card_popup()
 end
 
 -- What the opponent on a level node fights with, shown while the node is hovered
 function render.level_tooltip(level)
 	local opponent, charmer = opponents[level], charmers.of("Opponent", level)
 	local nx, ny = level_node(level)
-	local w, h = 520, 180
+	local w = 680
+	local lines = 0
+	if play.charms_open(level) then
+		lines = select(2, assets.small_font:getWrap(charmer.charm .. " (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. "): " .. charmer.text, w - 40)) 
+		lines = #lines
+	end
+	local h = 170 + lines * assets.small_font:getHeight() + (lines > 0 and 20 or 0)
 	local x = nx < reference_window_width / 2 and reference_window_width - w - 40 or 40
 	local y = math.max(10, math.min(ny - h / 2, reference_window_height - h - 10))
 	lg.setColor(0.07, 0.04, 0.14, 0.95)
@@ -1517,13 +1608,13 @@ function render.level_tooltip(level)
 	lg.setColor(1, 0.85, 0.2)
 	lg.rectangle("line", x, y, w, h, 12, 12)
 	lg.setColor(1, 1, 1)
-	portrait(charmer.name, x + 15, y + 15, 80, 96)
-	lg.printf(charmer.name, assets.small_font, x + 110, y + 12, w - 125, "left")
-	lg.setColor(1, 1, 1)
-	lg.printf(opponent.health .. " HP, " .. #opponent.deck .. " card deck", assets.small_font, x + 110, y + 80, w - 125, "left")
+	portrait(charmer.name, x + 20, y + 20, 100, 120)
+	lg.printf(charmer.name, assets.font, x + 140, y + 20, w - 160, "left")
+	lg.setColor(0.8, 0.9, 1)
+	lg.printf(opponent.health .. " HP, " .. #opponent.deck .. " card deck", assets.small_font, x + 140, y + 80, w - 160, "left")
 	if play.charms_open(level) then
 		lg.setColor(0.7, 0.9, 1)
-		lg.printf(charmer.charm .. " (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. "): " .. charmer.text, assets.small_font, x + 15, y + 125, w - 30, "left")
+		lg.printf(charmer.charm .. " (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. "): " .. charmer.text, assets.small_font, x + 20, y + 160, w - 40, "left")
 	end
 end
 
@@ -1547,7 +1638,7 @@ function render.level_select()
 		local name = charmers.of("Opponent", i).name
 		local x, y = level_node(i)
 		local fill = not play.level_open(i) and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple)
-		if i == 1 and not tutorial.done then -- the new-player hint: level 1 pulses until the first match has been played
+		if i == unlocked then -- the level you are up to pulses
 			fill = { 0.45 + 0.35 * math.sin(time * 5), 0.8, 0.3 }
 		end
 		lg.setColor(fill[1], fill[2], fill[3], fade)
