@@ -39,6 +39,7 @@ local BORDERS_SET = {}
 for _, border in ipairs(BORDERS) do
 	BORDERS_SET[border] = true
 end
+local deck_pick = {} -- deck_pick[name][border] = how many of the deck's copies carry that border (none listed: variants first)
 local deck_set -- names in the player's chosen deck; nil until they first edit it (then every owned snake is the deck)
 
 -- How far through the campaign you are: 0 with nothing beaten, 1 with every opponent beaten
@@ -114,12 +115,18 @@ function collection.load()
 
 	-- deck.txt: one snake name per line
 	local saved = love.filesystem.read("deck.txt")
-	deck_set = nil
+	deck_set, deck_pick = nil, {}
 	if saved then
 		deck_set = {}
 		for name in saved:gmatch("[^\n]+") do
-			local base, count = name:match("^(%S+) ?(%d*)$")
+			local base, count, picks = name:match("^(%S+) ?(%d*) ?(%S*)$")
 			deck_set[base] = data.stats_by_name[base] and (tonumber(count) or 1) or nil
+			if deck_set[base] and picks ~= "" then
+				deck_pick[base] = {}
+				for border, n in picks:gmatch("(%a+)=(%d+)") do
+					deck_pick[base][border] = tonumber(n)
+				end
+			end
 		end
 	end
 end
@@ -127,7 +134,11 @@ end
 local function save_deck()
 	local names = {}
 	for name, count in pairs(deck_set) do
-		table.insert(names, name .. " " .. count)
+		local picks = {}
+		for border, n in pairs(deck_pick[name] or {}) do
+			table.insert(picks, border .. "=" .. n)
+		end
+		table.insert(names, name .. " " .. count .. (deck_pick[name] and " " .. (#picks > 0 and table.concat(picks, ",") or "-") or ""))
 	end
 	love.filesystem.write("deck.txt", table.concat(names, "\n"))
 end
@@ -135,6 +146,7 @@ end
 -- Wipes progress back to a new game (settings are kept)
 function collection.reset()
 	unlocked, collection.unlock_all, last_pack, owned, variants, deck_set, collection.eyes = 1, false, "-", {}, {}, nil, 0
+	deck_pick = {}
 	chosen_avatar = require("Charmers").list[1].name
 	love.filesystem.remove("deck.txt")
 	love.filesystem.remove("finale.txt")
@@ -195,12 +207,24 @@ function collection.variant_list(name)
 end
 
 -- One border per copy for k copies of a snake in a deck or hand: variant copies first, then false for natural ones
-local function copy_borders(name, k)
-	local pool = {}
+-- (`picks` is the deck's own choice of how many of each border; the natural copies come after those, then any other variants)
+local function copy_borders(name, k, picks)
+	local pool, rest = {}, {}
 	for _, border in ipairs(BORDERS) do
-		for _ = 1, (variants[name] or {})[border] or 0 do
+		local have = (variants[name] or {})[border] or 0
+		local want = picks and math.min(picks[border] or 0, have) or have
+		for _ = 1, want do
 			table.insert(pool, border)
 		end
+		for _ = 1, have - want do
+			table.insert(rest, border)
+		end
+	end
+	for _ = 1, picks and collection.count(name) - variant_total(name) or 0 do
+		table.insert(pool, false)
+	end
+	for _, border in ipairs(rest) do
+		table.insert(pool, border)
 	end
 	local list = {}
 	for i = 1, k do
@@ -224,7 +248,7 @@ local function chosen()
 	local list, list_borders = {}, {}
 	for _, name in ipairs(data.deck) do
 		local k = math.min(deck_set[name] or 0, collection.count(name))
-		for i, border in ipairs(copy_borders(name, k)) do
+		for i, border in ipairs(copy_borders(name, k, deck_pick[name])) do
 			table.insert(list, name)
 			table.insert(list_borders, border)
 		end
@@ -247,7 +271,7 @@ function collection.auto_deck()
 	table.sort(names, function(a, b)
 		return stat(a, "rarity") > stat(b, "rarity") or (stat(a, "rarity") == stat(b, "rarity") and a < b)
 	end)
-	deck_set = {}
+	deck_set, deck_pick = {}, {}
 	local size, per_type = 0, {}
 	local function add(name)
 		deck_set[name] = (deck_set[name] or 0) + 1
@@ -293,7 +317,7 @@ function collection.start_deck_edit()
 	table.sort(names, function(a, b)
 		return stat(a, "rarity") > stat(b, "rarity") or (stat(a, "rarity") == stat(b, "rarity") and a < b)
 	end)
-	deck_set = {}
+	deck_set, deck_pick = {}, {}
 	local size = 0
 	for _, name in ipairs(names) do
 		for _ = 1, collection.count(name) do
@@ -306,20 +330,54 @@ function collection.start_deck_edit()
 	save_deck()
 end
 
--- A click adds a copy, or removes them all once every copy you own is in; returns a message when it isn't allowed
-function collection.toggle_deck(name)
-	local copies, size = collection.in_deck(name), collection.deck_count()
-	if copies < collection.count(name) then
+-- The borders a snake can go in the deck with, as { key (false for its own), border, avail, n (copies in the deck) }, its own first
+function collection.deck_kinds(name)
+	local counts = {}
+	for _, border in ipairs(copy_borders(name, collection.in_deck(name), deck_pick[name])) do
+		counts[border or ""] = (counts[border or ""] or 0) + 1
+	end
+	local kinds, natural = {}, collection.count(name) - variant_total(name)
+	if natural > 0 then
+		table.insert(kinds, { key = false, border = data.stats_by_name[name].border, avail = natural, n = counts[""] or 0 })
+	end
+	for _, border in ipairs(BORDERS) do
+		local have = (variants[name] or {})[border] or 0
+		if have > 0 then
+			table.insert(kinds, { key = border, border = border, avail = have, n = counts[border] or 0 })
+		end
+	end
+	return kinds
+end
+
+-- A click adds a copy with the given border (false: its own), or removes them all once every such copy you own is in;
+-- returns a message when it isn't allowed
+function collection.toggle_deck(name, key)
+	local kinds = collection.deck_kinds(name)
+	local kind = kinds[1]
+	for _, k in ipairs(kinds) do
+		kind = k.key == (key or false) and k or kind
+	end
+	local size = collection.deck_count()
+	if kind.n < kind.avail then
 		if size >= collection.MAX_DECK then
 			return "Your deck is full (" .. collection.MAX_DECK .. " snakes)"
 		end
-		deck_set[name] = copies + 1
+		kind.n = kind.n + 1
 	else
-		if size - copies < collection.MIN_DECK then
+		if size - kind.n < collection.MIN_DECK then
 			return "A deck needs at least " .. collection.MIN_DECK .. " snakes"
 		end
-		deck_set[name] = nil
+		kind.n = 0
 	end
+	local total, picks = 0, {}
+	for _, k in ipairs(kinds) do
+		total = total + k.n
+		if k.key then
+			picks[k.key] = k.n
+		end
+	end
+	deck_set[name] = total > 0 and total or nil
+	deck_pick[name] = total > 0 and picks or nil
 	save_deck()
 end
 

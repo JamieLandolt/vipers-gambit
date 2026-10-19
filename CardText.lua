@@ -127,11 +127,12 @@ function cardtext.lane(attack, defense, x, y)
 	stats_row(attack, defense, x + 10, x + 200, y + 240 - 10 - 16)
 end
 
-function cardtext.draw(name, x, y)
+function cardtext.draw(name, x, y, border) -- (a border can change the snake's attack or health)
 	local st = data.stats_by_name[name]
+	local shown = border and data.get_stats({ card_path = name .. ".png", border = border }) or st
 	top_row(st.cost, st.rarity, x + 14, x + 151, y + 14)
 	if st.kind == "snake" then
-		stats_row(st.attack, st.defense, x + 14, x + 151, y + 320 - 14 - 16)
+		stats_row(shown.attack, shown.defense, x + 14, x + 151, y + 320 - 14 - 16)
 	end
 	lg.setColor(0, 0, 0, 0.45)
 	lg.rectangle("fill", x + 11, y + 212, 143, 30, 4, 4)

@@ -341,7 +341,15 @@ function love.mousepressed(x, y, button)
 	if game.state["collection"] and not pressed and not collection.landing() then
 		local group, key = render.filter_icon_at(x, y)
 		local name = not group and render.collection_card_at(x, y)
-		if group then
+		if collection.picker then -- choosing which border to add: a card adds that one, a click outside finishes
+			local pick, on_card = render.deck_picker_at(x, y)
+			if on_card then
+				collection.message, collection.message_t = collection.toggle_deck(collection.picker, pick), time
+				play_sound(hover_sound)
+			elseif pick == "outside" then
+				collection.picker = nil
+			end
+		elseif group then
 			if group == "reset" then
 				collection.clear_filters()
 			else
@@ -349,8 +357,12 @@ function love.mousepressed(x, y, button)
 			end
 			play_sound(hover_sound)
 		elseif name and collection.deck_mode then
-			-- Editing the deck: a click adds or removes the snake (the message says why it didn't work)
-			collection.message, collection.message_t = collection.toggle_deck(name), time
+			-- Editing the deck: a click adds or removes the snake (the message says why it didn't work); with several borders you pick one
+			if #collection.deck_kinds(name) > 1 then
+				collection.picker = name
+			else
+				collection.message, collection.message_t = collection.toggle_deck(name), time
+			end
 			play_sound(hover_sound)
 		elseif name and collection.sacrifice_mode then
 			collection.message, collection.message_t = collection.pick_sacrifice(name), time

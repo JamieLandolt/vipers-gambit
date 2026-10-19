@@ -581,7 +581,76 @@ local function draw_sections()
 	end
 end
 
+-- Deck editing, a snake owned with several borders: a popup to pick which copy to add
+local PICK_SCALE, PICK_GAP = 0.8, 20
+local function picker_layout(count)
+	local cw, ch = img_widths * PICK_SCALE, img_heights * PICK_SCALE
+	local w, h = math.max(count * (cw + PICK_GAP) + 60, 900), ch + 200
+	return (reference_window_width - w) / 2, 150, w, h, cw, ch, (w - count * (cw + PICK_GAP) + PICK_GAP) / 2
+end
+
+-- Which border's card is under the window position: its key (false for the snake's own), "outside", or nil on the panel
+function render.deck_picker_at(window_x, window_y)
+	local kinds = collection.deck_kinds(collection.picker)
+	local px, py, pw, ph, cw, ch, left = picker_layout(#kinds)
+	local x, y = window_x * reference_window_width / lg.getWidth(), window_y * reference_window_height / lg.getHeight()
+	if x < px or x > px + pw or y < py or y > py + ph then
+		return "outside"
+	end
+	for i, kind in ipairs(kinds) do
+		local cx = px + left + (i - 1) * (cw + PICK_GAP)
+		if x >= cx and x <= cx + cw and y >= py + 70 and y <= py + 70 + ch then
+			return kind.key, true
+		end
+	end
+end
+
+local function draw_picker()
+	local name = collection.picker
+	local kinds = collection.deck_kinds(name)
+	local px, py, pw, ph, cw, ch, left = picker_layout(#kinds)
+	lg.setColor(0, 0, 0, 0.7)
+	lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+	lg.setColor(0.07, 0.04, 0.14, 0.97)
+	lg.rectangle("fill", px, py, pw, ph, 14, 14)
+	lg.setColor(0.35, 0.8, 0.4)
+	lg.setLineWidth(3)
+	lg.rectangle("line", px, py, pw, ph, 14, 14)
+	lg.setLineWidth(1)
+	lg.setColor(1, 1, 1)
+	lg.printf("Which " .. name:gsub("_", " ") .. " do you want in your deck?", assets.font, px, py + 14, pw, "center")
+	local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+	for i, kind in ipairs(kinds) do
+		local cx, cy = px + left + (i - 1) * (cw + PICK_GAP), py + 70
+		local hover = mx >= cx and mx <= cx + cw and my >= cy and my <= cy + ch
+		lg.push()
+		lg.translate(cx, cy)
+		lg.scale(PICK_SCALE)
+		lg.setColor(1, 1, 1)
+		lg.draw(assets.card_by_name[name])
+		borders.draw(kind.border, 0, 0, img_widths, img_heights, data.stats_by_name[name].rarity)
+		require("CardText").draw(name, 0, 0, kind.border)
+		if kind.n == 0 then
+			lg.setColor(0, 0, 0, hover and 0.2 or 0.45)
+			lg.rectangle("fill", 0, 0, img_widths, img_heights)
+		end
+		lg.pop()
+		if hover then
+			lg.setColor(0.95, 0.85, 0.25)
+			lg.setLineWidth(4)
+			lg.rectangle("line", cx, cy, cw, ch)
+			lg.setLineWidth(1)
+		end
+		lg.setColor(kind.n > 0 and { 0.5, 1, 0.55 } or { 0.85, 0.85, 0.95 })
+		lg.printf(kind.border .. "\nIn deck " .. kind.n .. " of " .. kind.avail, assets.small_font, cx - PICK_GAP / 2, cy + ch + 8, cw + PICK_GAP, "center")
+	end
+	lg.setColor(0.7, 0.75, 0.9)
+	lg.printf("Click a card to add it (again when all are in to take them out). Click outside to finish.", assets.debug_font, px, py + ph - 28, pw, "center")
+	lg.setColor(1, 1, 1)
+end
+
 function render.collection()
+	collection.picker = collection.deck_mode and collection.picker or nil
 	background()
 	if collection.landing() then
 		draw_sections()
@@ -742,6 +811,9 @@ function render.collection()
 		draw_eyes("", collection.eyes, reference_window_width - 400, 20, 238, "right")
 	end
 	buttons.collection["Back"]:draw()
+	if collection.picker then
+		draw_picker()
+	end
 end
 
 -- The altar of the Snake God: the recipes you can perform now on the left, the chosen one's details on the right
