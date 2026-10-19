@@ -128,6 +128,103 @@ local function stat_chip(label, value, x, y, w, colour)
 end
 
 
+-- The info popup used everywhere a card is looked at (pack results, snakes on the field, a clicked hand snake): the card on the
+-- left in a glow of its tier colour, its details on the right. `hp` and `status` are for a snake that is on the field.
+local POPUP_W, POPUP_SCALE = 600, 0.7
+local function card_popup(card, x, y, hp, status)
+	local st = data.get_stats(card)
+	local name = card.card_path:sub(1, -5)
+	local snake = st.kind == "snake"
+	local tier = RARITY_COLOUR[st.rarity]
+	local border = snake and data.border_of(card) or nil
+	local cw, ch = img_widths * POPUP_SCALE, img_heights * POPUP_SCALE
+	local tx, tw = x + cw + 36, POPUP_W - cw - 56
+	local font = assets.small_font
+	local function height(text)
+		local _, lines = font:getWrap(text, tw)
+		return #lines * font:getHeight()
+	end
+	local border_text = border and border ~= "Basic" and borders.describe(border)
+	local body_h = 34 + 34 + 52 + (border_text and height(border_text) + 20 or 0) + height(st.ability or "None") + 12
+		+ (st.lore and height(st.lore) + 12 or 0) + (status and #status > 0 and 30 or 0)
+	local h = math.max(ch + 40, body_h + 28)
+	x = math.max(10, math.min(x, reference_window_width - POPUP_W - 10))
+	y = math.max(10, math.min(y, reference_window_height - h - 10))
+	tx = x + cw + 36
+	local pulse = 0.5 + 0.5 * math.sin(time * 2.5)
+
+	lg.setColor(0.07, 0.04, 0.14, 0.96)
+	lg.rectangle("fill", x, y, POPUP_W, h, 14, 14)
+	lg.setColor(tier[1], tier[2], tier[3], 0.7 + 0.3 * pulse)
+	lg.setLineWidth(3)
+	lg.rectangle("line", x, y, POPUP_W, h, 14, 14)
+	lg.setLineWidth(1)
+
+	local cx, cy = x + 20, y + 20
+	lg.setBlendMode("add")
+	for i = 1, 3 do
+		lg.setColor(tier[1], tier[2], tier[3], (0.05 + 0.03 * pulse) * (4 - i))
+		lg.rectangle("fill", cx - i * 6, cy - i * 6, cw + i * 12, ch + i * 12, 10, 10)
+	end
+	lg.setBlendMode("alpha")
+	lg.push()
+	lg.translate(cx, cy)
+	lg.scale(POPUP_SCALE)
+	lg.setColor(1, 1, 1)
+	lg.draw(assets.card_by_name[name])
+	require("CardText").draw(name, 0, 0)
+	if snake then
+		borders.draw(border, 0, 0, img_widths, img_heights, st.rarity)
+	end
+	lg.pop()
+
+	local ty = y + 16
+	lg.setColor(1, 1, 1)
+	lg.print((name:gsub("_", " ")), font, tx, ty)
+	ty = ty + 34
+	lg.setColor(tier)
+	lg.print("Tier " .. st.rarity .. (st.tier and (" " .. st.tier) or "") .. "  |  " .. (snake and ("Snake, " .. data.get_type(card)) or (st.kind == "brew" and "Brew" or "Spell")), font, tx, ty)
+	ty = ty + 34
+	local chips = { { "Cost", st.cost, { 0.4, 0.85, 0.4 } } }
+	if snake then
+		chips[2] = { "Attack", st.attack, { 1, 0.4, 0.4 } }
+		chips[3] = { "Health", hp or st.defense, { 0.45, 0.6, 1 } }
+	end
+	local chip_w = (tw - 16) / 3
+	for i, c in ipairs(chips) do
+		local bx = tx + (i - 1) * (chip_w + 8)
+		lg.setColor(c[3][1] * 0.25, c[3][2] * 0.25, c[3][3] * 0.25, 0.9)
+		lg.rectangle("fill", bx, ty, chip_w, 40, 8, 8)
+		lg.setColor(c[3])
+		lg.rectangle("line", bx, ty, chip_w, 40, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.printf(c[1] .. " " .. c[2], font, bx, ty + 6, chip_w, "center")
+	end
+	ty = ty + 52
+	if border_text then
+		local colour = borders.colour(border) or { 0.7, 0.7, 0.7 }
+		local bh = height(border_text) + 12
+		lg.setColor(colour[1] * 0.2, colour[2] * 0.2, colour[3] * 0.2, 0.9)
+		lg.rectangle("fill", tx, ty, tw, bh, 6, 6)
+		lg.setColor(colour)
+		lg.rectangle("fill", tx, ty, 5, bh, 3, 3)
+		lg.printf(border_text, font, tx + 14, ty + 6, tw - 18)
+		ty = ty + bh + 8
+	end
+	lg.setColor(1, 0.85, 0.2)
+	lg.printf(st.ability or "None", font, tx, ty, tw)
+	ty = ty + height(st.ability or "None") + 12
+	if st.lore then
+		lg.setColor(0.7, 0.75, 0.95)
+		lg.printf(st.lore, font, tx, ty, tw)
+		ty = ty + height(st.lore) + 12
+	end
+	if status and #status > 0 then
+		lg.setColor(1, 0.6, 0.5)
+		lg.print(table.concat(status, ", "), font, tx, ty)
+	end
+end
+
 -- The collection screen: filter icons along the top, the card grid on the left (about 60% of the screen)
 -- and the hovered card's details in the pane on the right.
 local GRID_X, GRID_Y, GRID_W, GRID_BOTTOM = 40, 155, 840, 858
@@ -930,6 +1027,138 @@ function render.lanes()
 	end
 end
 
+local function rnd(n)
+	local v = math.sin(n * 12.9898) * 43758.5453
+	return v - math.floor(v)
+end
+
+-- A foil pack, 260 x 380 around (0, 0): a dark body of overlapping scales, crimped top and bottom, a coiled snake with a
+-- hood and eyes, and the name on a banner. The Elite pack is black and gold with a crown and sparkles. `part` draws just the
+-- "top" or "bottom" half either side of a jagged tear (for the opening); `t` animates the shimmer.
+local PACK_TEAR = -100
+local function pack_art(pack, t, part)
+	local c = pack.colour
+	local elite = pack.floor ~= nil
+	local gold = { 1, 0.82, 0.25 }
+	local light = elite and { 1, 0.9, 0.5 } or { math.min(1, c[1] * 1.3 + 0.2), math.min(1, c[2] * 1.3 + 0.2), math.min(1, c[3] * 1.3 + 0.2) }
+	local function tint(k, a) lg.setColor(c[1] * k, c[2] * k, c[3] * k, a or 1) end
+	if part then
+		local points = {}
+		for i = 0, 14 do
+			points[#points + 1], points[#points + 2] = 140 - i * 20, PACK_TEAR + (i % 2 == 0 and -9 or 9)
+		end
+		local edge = part == "top" and -210 or 210
+		local poly = { 140, edge, -140, edge }
+		for i = #points - 1, 1, -2 do -- the tear line, from the left edge back to the right
+			poly[#poly + 1], poly[#poly + 2] = points[i], points[i + 1]
+		end
+		lg.stencil(function() lg.polygon("fill", poly) end, "replace", 1)
+		lg.setStencilTest("greater", 0)
+	end
+	-- body and scales
+	tint(elite and 0.16 or 0.38)
+	lg.rectangle("fill", -130, -190, 260, 380, 16, 16)
+	for row = 0, 19 do
+		for col = 0, 6 do
+			tint(elite and (0.28 + 0.1 * ((row + col) % 2)) or (0.55 + 0.1 * ((row + col) % 2)), 0.85)
+			lg.arc("fill", -100 + col * 30 + (row % 2) * 15, -176 + row * 19, 17, 0, math.pi)
+		end
+	end
+	-- the snake: a hood, a body coiling down, its eyes
+	local path = {}
+	for k = 0, 40 do
+		local u = k / 40
+		path[k] = { 44 * math.sin(u * math.pi * 3.2) * (1 - 0.3 * u), -92 + u * 215, 15 * (1 - 0.5 * u) }
+	end
+	lg.setColor(0, 0, 0, 0.45)
+	lg.ellipse("fill", 0, -112, 50, 46)
+	for pass = 1, 2 do
+		for k = 40, 0, -1 do
+			local p = path[k]
+			if pass == 1 then
+				lg.setColor(0, 0, 0, 0.8)
+				lg.circle("fill", p[1], p[2], p[3] + 3)
+			else
+				if k % 6 < 3 then
+					lg.setColor(light[1], light[2], light[3])
+				else
+					lg.setColor(c[1] * 0.9, c[2] * 0.9, c[3] * 0.9)
+				end
+				lg.circle("fill", p[1], p[2], p[3])
+			end
+		end
+	end
+	lg.setColor(0, 0, 0, 0.85)
+	lg.ellipse("fill", 0, -118, 44, 40)
+	lg.setColor(light[1], light[2], light[3])
+	lg.ellipse("fill", 0, -118, 40, 36)
+	for side = -1, 1, 2 do
+		lg.setColor(1, 0.9, 0.2)
+		lg.ellipse("fill", side * 16, -124, 9, 7)
+		lg.setColor(0, 0, 0)
+		lg.rectangle("fill", side * 16 - 1.5, -131, 3, 14)
+	end
+	lg.setColor(0.9, 0.15, 0.2) -- forked tongue
+	lg.polygon("fill", -2, -98, 2, -98, 2, -80, -2, -80)
+	lg.polygon("fill", -2, -80, -8, -70, -5, -70, 0, -78, 5, -70, 8, -70, 2, -80)
+	if elite then -- a crown
+		lg.setColor(0, 0, 0, 0.9)
+		lg.polygon("fill", -36, -146, -38, -176, -20, -160, 0, -184, 20, -160, 38, -176, 36, -146)
+		lg.setColor(gold)
+		lg.polygon("fill", -32, -148, -33, -170, -19, -157, 0, -178, 19, -157, 33, -170, 32, -148)
+		lg.setColor(0.9, 0.2, 0.3)
+		lg.circle("fill", 0, -156, 4)
+	end
+	-- crimped top and bottom, and the frame
+	for _, edge in ipairs({ -190, 168 }) do
+		tint(elite and 0.5 or 0.75)
+		lg.rectangle("fill", -130, edge, 260, 22, 8, 8)
+		lg.setColor(0, 0, 0, 0.35)
+		for x = -124, 124, 8 do
+			lg.rectangle("fill", x, edge + 2, 2, 18)
+		end
+	end
+	local rim = elite and gold or light
+	lg.setColor(rim[1], rim[2], rim[3])
+	lg.setLineWidth(elite and 7 or 5)
+	lg.rectangle("line", -130, -190, 260, 380, 16, 16)
+	if elite then
+		lg.setLineWidth(2)
+		lg.rectangle("line", -118, -178, 236, 356, 10, 10)
+		for _, corner in ipairs({ { -130, -190 }, { 130, -190 }, { -130, 190 }, { 130, 190 } }) do
+			lg.circle("fill", corner[1] * 0.94, corner[2] * 0.94, 7)
+		end
+	end
+	lg.setLineWidth(1)
+	-- name banner
+	lg.setColor(0, 0, 0, 0.82)
+	lg.rectangle("fill", -112, 118, 224, 44, 6, 6)
+	lg.setColor(rim[1], rim[2], rim[3])
+	lg.rectangle("line", -112, 118, 224, 44, 6, 6)
+	lg.printf(pack.name, assets.small_font, -112, 124, 224, "center")
+	-- a glint sweeping across, then sparkles for the Elite pack
+	local sweep = ((t * 0.45) % 2.2) * 330 - 260
+	lg.setBlendMode("add")
+	lg.setColor(1, 1, 1, elite and 0.22 or 0.14)
+	local function cl(x) return math.max(-130, math.min(130, x)) end
+	lg.polygon("fill", cl(sweep), -190, cl(sweep + 46), -190, cl(sweep + 46 + 130), 190, cl(sweep + 130), 190)
+	if elite then
+		for i = 1, 7 do
+			local life = (t * 0.7 + i * 0.37) % 1
+			local sx, sy = (rnd(i * 3.3) - 0.5) * 220, (rnd(i * 7.1) - 0.5) * 340
+			lg.setColor(1, 0.9, 0.4, math.sin(life * math.pi))
+			local r = 3 + 7 * math.sin(life * math.pi)
+			lg.rectangle("fill", sx - 1, sy - r, 2, r * 2)
+			lg.rectangle("fill", sx - r, sy - 1, r * 2, 2)
+		end
+	end
+	lg.setBlendMode("alpha")
+	if part then
+		lg.setStencilTest()
+	end
+	lg.setLineWidth(1)
+end
+
 function render.shop()
 	background()
 	lg.setColor(1, 1, 1)
@@ -944,28 +1173,42 @@ function render.shop()
 		local x = 110 + (i - 1) * 420
 		local c, price = pack.colour, collection.price(i)
 		local weights, border_chance = collection.odds(pack)
-		lg.setColor(0, 0, 0, 0.6)
-		lg.rectangle("fill", x, 170, 380, 560, 12, 12)
+		local elite = pack.floor ~= nil
+		lg.setColor(0.05, 0.03, 0.1, 0.78)
+		lg.rectangle("fill", x, 170, 380, 560, 14, 14)
 		lg.setColor(c[1], c[2], c[3])
-		lg.setLineWidth(4)
-		lg.rectangle("line", x, 170, 380, 560, 12, 12)
+		lg.setLineWidth(elite and 6 or 4)
+		lg.rectangle("line", x, 170, 380, 560, 14, 14)
+		if elite then -- gold trim inside the frame
+			lg.setLineWidth(2)
+			lg.rectangle("line", x + 8, 178, 364, 544, 9, 9)
+		end
 		lg.setLineWidth(1)
-		lg.printf(pack.name, assets.font, x, 185, 380, "center")
+		lg.push()
+		lg.translate(x + 85, 272)
+		lg.scale(0.4)
+		pack_art(pack, time + i)
+		lg.pop()
+		lg.setColor(elite and { 1, 0.85, 0.3 } or { 1, 1, 1 })
+		lg.printf(pack.name, assets.font, x + 150, 196, 220, "left")
 		if price == 0 and not (pack.daily and collection.pack_ready()) then
-			lg.printf("Reward pack (x" .. collection.tokens(i) .. ")", assets.small_font, x, 245, 380, "center")
+			lg.setColor(0.8, 1, 0.7)
+			lg.printf("Reward pack (x" .. collection.tokens(i) .. ")", assets.small_font, x + 150, 262, 220, "left")
 		elseif price == 0 then
-			lg.printf("Free today (one a day)", assets.small_font, x, 245, 380, "center")
+			lg.setColor(0.8, 1, 0.7)
+			lg.printf("Free today (one a day)", assets.small_font, x + 150, 262, 220, "left")
 		else
-			draw_eyes("", price, x, 245, 380, "center")
+			lg.setColor(1, 0.85, 0.2)
+			draw_eyes("", price, x + 150, 262, 220, "left")
 		end
 		lg.setColor(0.8, 0.8, 0.8)
-		lg.printf(pack.kind == "snake" and (pack.floor and "3, 4 and 5 star snakes only" or "Snakes") or "Brews and spells", assets.small_font, x, 285, 380, "center")
+		lg.printf(pack.kind == "snake" and (pack.floor and "3, 4 and 5 star snakes only" or "Snakes") or "Brews and spells", assets.small_font, x + 150, 302, 220, "left")
 		lg.setColor(1, 1, 1)
-		lg.printf("Chance per card", assets.small_font, x, 330, 380, "center")
+		lg.printf("Chance per card", assets.small_font, x, 358, 380, "center")
 		local row = 0
 		for r, weight in ipairs(weights) do
 			if weight > 0 then
-				local y = 370 + row * 38
+				local y = 394 + row * 36
 				lg.push()
 				lg.translate(x + 35, y + 2)
 				lg.scale(1.2)
@@ -1003,11 +1246,6 @@ function render.shop()
 		{ rect = { 110, 170, 800, 560 }, text = "Pick one free pack: Serpent for snakes, or Support for brews and spells" },
 	})
 	buttons.shop["Back"]:draw()
-end
-
-local function rnd(n)
-	local v = math.sin(n * 12.9898) * 43758.5453
-	return v - math.floor(v)
 end
 
 -- Square sparks flying out from (x, y) that fall and fade; age in seconds
@@ -1062,32 +1300,60 @@ function render.pack()
 	lg.setColor(1, 1, 1, title_alpha)
 	lg.printf(heading, assets.font, 0, 60, reference_window_width, "center")
 
-	if t < 1.5 then -- the sealed pack: shakes harder and glows brighter until it bursts
-		local shake = (t / 1.5) ^ 2 * 14
-		local px, py = cx + math.sin(t * 60) * shake, cy + math.cos(t * 47) * shake * 0.6
+	local rise = math.min(1, t / 0.4)
+	rise = 1 - (1 - rise) ^ 3 -- the pack flies up into the middle
+	local lift = (1 - rise) * 500
+	local src = pack or { name = "Summon", colour = colour }
+	if t < 1.5 then -- the sealed pack: shakes harder and glows brighter, light leaking out of the seam, until it tears open
+		local k = math.max(0, (t - 0.4) / 1.1)
+		local shake = k ^ 2 * 14
+		local px, py = cx + math.sin(t * 60) * shake, cy + lift + math.cos(t * 47) * shake * 0.6
 		lg.setBlendMode("add")
 		for i = 1, 5 do
-			lg.setColor(colour[1], colour[2], colour[3], 0.05 + 0.1 * (t / 1.5))
+			lg.setColor(colour[1], colour[2], colour[3], (0.04 + 0.1 * k) * rise)
 			lg.circle("fill", px, py, 150 + i * 28 + t * 40)
 		end
 		lg.setBlendMode("alpha")
 		lg.push()
 		lg.translate(px, py)
 		lg.rotate(math.sin(t * 40) * shake * 0.004)
-		lg.setColor(colour[1] * 0.6, colour[2] * 0.6, colour[3] * 0.6)
-		lg.rectangle("fill", -130, -190, 260, 380, 14, 14)
-		lg.setColor(colour[1], colour[2], colour[3])
-		lg.setLineWidth(6)
-		lg.rectangle("line", -130, -190, 260, 380, 14, 14)
-		lg.setLineWidth(1)
-		lg.setColor(1, 1, 1, 0.25 + 0.2 * math.sin(t * 8))
-		lg.rectangle("fill", -100, -160 + (t * 400) % 320, 200, 24)
-		lg.setColor(1, 1, 1)
-		lg.printf(pack and pack.name or "Summon", assets.font, -130, -40, 260, "center")
+		lg.scale(0.7 + 0.3 * rise)
+		pack_art(src, t)
+		lg.setBlendMode("add") -- light along the seam
+		lg.setColor(1, 0.95, 0.7, k * k)
+		lg.rectangle("fill", -130, PACK_TEAR - 3 - 6 * k, 260, 6 + 12 * k)
+		lg.setBlendMode("alpha")
 		lg.pop()
 	else
-		local flash = 1 - (t - 1.5) / 0.5
-		burst(cx, cy, t - 1.5, 70, colour, 700)
+		local u = t - 1.5
+		local flash = 1 - u / 0.5
+		-- the top tears off and tumbles away, the bottom drops out of sight
+		local fade = math.max(0, 1 - u / 0.9)
+		if fade > 0 then
+			lg.push()
+			lg.translate(cx - u * 120, cy - 600 * u + 450 * u * u - 40)
+			lg.rotate(-u * 2.2)
+			lg.setColor(1, 1, 1, fade)
+			pack_art(src, t, "top")
+			lg.pop()
+			lg.push()
+			lg.translate(cx, cy + 700 * u * u)
+			lg.rotate(u * 0.3)
+			lg.setColor(1, 1, 1, fade)
+			pack_art(src, t, "bottom")
+			lg.pop()
+		end
+		lg.setBlendMode("add") -- rays of light from the pack
+		for ray = 1, 9 do
+			local angle = -math.pi / 2 + (ray - 5) * 0.16
+			lg.setColor(colour[1], colour[2], colour[3], 0.16 * math.max(0, 1 - u / 1.2))
+			lg.polygon("fill", cx, cy, cx + math.cos(angle - 0.05) * 900, cy + math.sin(angle - 0.05) * 900, cx + math.cos(angle + 0.05) * 900, cy + math.sin(angle + 0.05) * 900)
+		end
+		lg.setBlendMode("alpha")
+		burst(cx, cy, u, 70, colour, 700)
+		if pack and pack.floor then -- the Elite pack throws gold too
+			burst(cx, cy, u, 50, { 1, 0.85, 0.3 }, 900)
+		end
 		if flash > 0 then
 			lg.setColor(1, 1, 1, flash)
 			lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
@@ -1114,6 +1380,10 @@ function render.pack()
 				lg.polygon("fill", px, py, px + math.cos(angle - 0.06) * 700, py + math.sin(angle - 0.06) * 700, px + math.cos(angle + 0.06) * 700, py + math.sin(angle + 0.06) * 700)
 			end
 			lg.setBlendMode("alpha")
+			lg.setColor(c[1], c[2], c[3], math.max(0, 0.8 - age * 1.6)) -- a ring spreads out as it turns over
+			lg.setLineWidth(5)
+			lg.circle("line", px, py, 40 + age * 500)
+			lg.setLineWidth(1)
 			local flip = math.min(1, age / 0.5)
 			local pop = 1 + 0.15 * math.max(0, 1 - age * 3)
 			local face = flip >= 0.5
@@ -1130,11 +1400,22 @@ function render.pack()
 			else
 				lg.setColor(c[1] * 0.5, c[2] * 0.5, c[3] * 0.5)
 				lg.rectangle("fill", 0, 0, img_widths, img_heights, 8, 8)
+				for row = 0, 15 do -- scales, and a slit eye in the middle
+					for col = 0, 4 do
+						lg.setColor(c[1] * 0.7, c[2] * 0.7, c[3] * 0.7)
+						lg.arc("fill", 12 + col * 34 + (row % 2) * 17, 10 + row * 20, 17, 0, math.pi)
+					end
+				end
 				lg.setColor(c[1], c[2], c[3])
-				lg.setLineWidth(3)
+				lg.setLineWidth(4)
 				lg.rectangle("line", 8, 8, img_widths - 16, img_heights - 16, 6, 6)
 				lg.setLineWidth(1)
-				lg.printf("?", assets.font, 0, img_heights / 2 - 30, img_widths, "center")
+				lg.setColor(0, 0, 0, 0.8)
+				lg.ellipse("fill", img_widths / 2, img_heights / 2, 44, 28)
+				lg.setColor(1, 0.9, 0.2)
+				lg.ellipse("fill", img_widths / 2, img_heights / 2, 38, 22)
+				lg.setColor(0, 0, 0)
+				lg.rectangle("fill", img_widths / 2 - 3, img_heights / 2 - 22, 6, 44)
 			end
 			lg.pop()
 			if collection.pack_new[name] and face then
@@ -1150,27 +1431,13 @@ function render.pack()
 			burst(px, py, age - 0.4, 12 + st.rarity * 14, c, 250 + st.rarity * 120)
 			local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
 			if face and math.abs(mx - px) < img_widths * scale / 2 and math.abs(my - py) < img_heights * scale / 2 then
-				hovered_pull = { name, st }
+				hovered_pull = { name, st, collection.pack_borders and collection.pack_borders[i] }
 			end
 		end
 	end
-	if hovered_pull then -- what the hovered card does
-		local name, st = hovered_pull[1], hovered_pull[2]
-		local text = name:gsub("_", " ") .. "\n" .. (st.kind == "snake" and ("Snake, " .. data.get_type({ card_path = name .. ".png" }) .. "  Atk " .. st.attack .. "  Health " .. st.defense) or (st.kind == "brew" and "Brew" or "Spell")) .. "\n" .. st.ability
-		local border = st.kind == "snake" and st.border or nil
-		if border and border ~= "Basic" then
-			text = text .. "\n" .. borders.describe(border)
-		end
-		local _, lines = assets.small_font:getWrap(text, 420)
-		local th = #lines * assets.small_font:getHeight() + 16
+	if hovered_pull then -- the same info popup as a snake on the field
 		local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
-		local tx, ty = math.min(mx + 20, reference_window_width - 450), math.min(my + 20, reference_window_height - th - 10)
-		lg.setColor(0.07, 0.04, 0.14, 0.96)
-		lg.rectangle("fill", tx, ty, 440, th, 10, 10)
-		lg.setColor(1, 0.9, 0.2)
-		lg.rectangle("line", tx, ty, 440, th, 10, 10)
-		lg.setColor(1, 1, 1)
-		lg.printf(text, assets.small_font, tx + 10, ty + 8, 420, "left")
+		card_popup({ card_path = hovered_pull[1] .. ".png", border = hovered_pull[3] }, mx + 24, my + 24)
 	end
 	lg.setColor(1, 1, 1)
 	collection.pack_revealed = t > REVEAL_START + n * REVEAL_GAP
@@ -1419,7 +1686,7 @@ local level_start, last_level = 0, -1
 
 -- The swirling background dissolves into the snake and its levels over about a second and a half
 -- A row of small card thumbnails for a deck (list of names), wrapped at per_row; each thumbnail is remembered in thumb_hits
--- so hovering it can show the card (see card_popup)
+-- so hovering it can show the card (see thumb_popup)
 -- With `foe_level`, only the cards that opponent has played against you show; the rest are face down
 local thumb_hits = {}
 local function deck_thumbs(deck, x, y, per_row, foe_level, scale)
@@ -1449,7 +1716,7 @@ local function deck_thumbs(deck, x, y, per_row, foe_level, scale)
 end
 
 -- The card under the mouse in the thumbnails drawn this frame, shown large with its stats and ability
-local function card_popup()
+local function thumb_popup()
 	local hit
 	for _, t in ipairs(thumb_hits) do
 		hit = t[6] and t or hit
@@ -1591,7 +1858,7 @@ function render.briefing(level)
 	lg.setColor(1, 1, 1)
 	buttons.level_choice["Play"]:draw()
 	buttons.level_choice["Cancel"]:draw()
-	card_popup()
+	thumb_popup()
 end
 
 -- What the opponent on a level node fights with, shown while the node is hovered
@@ -2037,26 +2304,22 @@ function render.playing()
 		end
 	end
 
-	-- Hovering a snake on the field explains it
+	-- Hovering a snake on the field explains it; a clicked hand snake shows the same popup for a few seconds
 	if not held_card then
 		for sector, card in pairs(played_cards) do
 			if play.is_hitbox(mouse.x, mouse.y, play.field_hitboxes[sector]) then
-				local stats = data.get_stats(card)
 				local status = {}
 				for _, flag in ipairs({ "poison", "frozen", "shield" }) do
 					if card[flag] then
 						table.insert(status, flag == "shield" and ("shield " .. card.shield) or flag)
 					end
 				end
-				lg.setColor(0, 0, 0, 0.85)
-				lg.rectangle("fill", 1200, 325, 235, 170)
-				lg.setColor(1, 1, 1)
-				lg.printf(
-					card.card_path:sub(1, -5):gsub("_", " ") .. "\n" .. stats.ability .. "\n" .. borders.describe(data.border_of(card))
-						.. (#status > 0 and ("\n" .. table.concat(status, ", ")) or ""),
-					assets.debug_font, 1208, 330, 220
-				)
+				local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+				card_popup(card, mx + 24, my - 130, card.hp, status)
 			end
+		end
+		if popup_card and time - popup_t < 5 then
+			card_popup(popup_card, popup_x * reference_window_width / lg.getWidth() + 24, popup_y * reference_window_height / lg.getHeight() - 250)
 		end
 	end
 

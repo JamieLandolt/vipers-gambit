@@ -37,6 +37,7 @@ opponent_hand = {}
 held_card = nil
 held_index = nil -- where the held snake sat in the hand
 info_card = nil
+popup_card, popup_t, popup_x, popup_y = nil, 0, 0, 0 -- the info popup of a clicked hand snake (window position of the click)
 field_press = nil -- { slot, at }: a snake on the field being pressed; a short press uses its ability, holding opens its info
 HOLD_TIME = 0.4 -- seconds to hold a snake before its info opens
 info_return = "playing" -- screen the info page's Back button returns to
@@ -136,6 +137,7 @@ function update_game_state(state)
 		game.state[state_name] = false
 	end
 	animation = false
+	popup_card = nil
 	game.state[state] = true
 	if state == "menu" then
 		hub.return_to = nil
@@ -249,6 +251,7 @@ function love.mousepressed(x, y, button)
 	if button ~= 1 then
 		return
 	end
+	popup_card = nil
 
 	if coach.active() then -- a mini tutorial is showing: a click moves it on
 		coach.click()
