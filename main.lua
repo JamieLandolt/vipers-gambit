@@ -258,11 +258,6 @@ function love.mousepressed(x, y, button)
 		return
 	end
 
-	if game.state["playing"] and play.spotlit() then -- a click skips the close-up of a played snake
-		play.spotlight = nil
-		return
-	end
-
 	if game.state["settings"] then
 		if settings.confirm_reset then
 			for _, name in ipairs({ "Yes", "No" }) do

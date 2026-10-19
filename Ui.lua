@@ -231,11 +231,6 @@ return function()
 
 	-- Replaces Back during a match; asks for confirmation before conceding
 	buttons.playing["Forfeit"] = b("Forfeit", function() confirm_forfeit = true end, nil, 5, 5, button_width * 0.8, button_height)
-	buttons.playing["Zoom"] = b("Zoom: On", function()
-		settings.zoom_snakes = not settings.zoom_snakes -- the close-up of each snake the first time it is played; remembered between battles
-		settings.apply()
-		settings.save()
-	end, nil, 170, 5, button_width * 0.8, button_height)
 	buttons.playing["Yes"] = b("Yes", function()
 		confirm_forfeit = false
 		play.forfeited = true -- giving up earns nothing: no reward, no progress

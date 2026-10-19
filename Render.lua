@@ -140,12 +140,12 @@ local function card_popup(card, x, y, hp, status)
 	local cw, ch = img_widths * POPUP_SCALE, img_heights * POPUP_SCALE
 	local tx, tw = x + cw + 36, POPUP_W - cw - 56
 	local font = assets.small_font
-	local function height(text)
-		local _, lines = font:getWrap(text, tw)
+	local function height(text, width)
+		local _, lines = font:getWrap(text, width or tw)
 		return #lines * font:getHeight()
 	end
 	local border_text = border and border ~= "Basic" and borders.describe(border)
-	local body_h = 34 + 34 + 52 + (border_text and height(border_text) + 20 or 0) + height(st.ability or "None") + 12
+	local body_h = 34 + 34 + 52 + (border_text and height(border_text, tw - 18) + 20 or 0) + height(st.ability or "None") + 12
 		+ (st.lore and height(st.lore) + 12 or 0) + (status and #status > 0 and 30 or 0)
 	local h = math.max(ch + 40, body_h + 28)
 	x = math.max(10, math.min(x, reference_window_width - POPUP_W - 10))
@@ -203,7 +203,7 @@ local function card_popup(card, x, y, hp, status)
 	ty = ty + 52
 	if border_text then
 		local colour = borders.colour(border) or { 0.7, 0.7, 0.7 }
-		local bh = height(border_text) + 12
+		local bh = height(border_text, tw - 18) + 12
 		lg.setColor(colour[1] * 0.2, colour[2] * 0.2, colour[3] * 0.2, 0.9)
 		lg.rectangle("fill", tx, ty, tw, bh, 6, 6)
 		lg.setColor(colour)
@@ -2327,8 +2327,6 @@ function render.playing()
 
 	count = count + 1
 	buttons.playing["Forfeit"]:draw()
-	buttons.playing["Zoom"]:update_text(settings.zoom_snakes and "Zoom: On" or "Zoom: Off")
-	buttons.playing["Zoom"]:draw()
 	local tray = buttons.playing["Card Background"] -- the hand's tray: dark leather with a gold rim
 	lg.setColor(0.1, 0.07, 0.06, 0.92)
 	lg.rectangle("fill", tray.x, tray.y, tray.width, tray.height, 16, 16)
@@ -2534,7 +2532,6 @@ function render.playing()
 	end
 	tutorial.draw()
 	tutorial.draw_pointers()
-	render.spotlight()
 	if tutorial.needs_next() then
 		buttons.playing["Tutorial Next"]:draw()
 	end
@@ -2624,33 +2621,6 @@ function render.versus()
 end
 
 -- A snake that was just played is shown close up with its stats and ability (a click skips it)
-function render.spotlight()
-	local sp = play.spotlit()
-	if not sp then
-		return
-	end
-	local info = data.get_stats(sp.card)
-	local tier = RARITY_COLOUR[info.rarity]
-	local fade = math.min(1, (sp.ends - time) * 4, (time - (sp.ends - 2.5)) * 6)
-	lg.setColor(0, 0, 0, 0.75 * fade)
-	lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
-	local scale, cx, cy = 1.5, 330, 150
-	lg.setColor(tier[1], tier[2], tier[3], 0.5 * fade)
-	lg.rectangle("fill", cx - 12, cy - 12, img_widths * scale + 24, img_heights * scale + 24, 16, 16)
-	lg.setColor(1, 1, 1, fade)
-	sp.card:draw(cx, cy, 0, scale)
-	local x, w = cx + img_widths * scale + 50, 560
-	lg.setColor(1, 1, 1, fade)
-	lg.print((sp.card.card_path:sub(1, -5):gsub("_", " ")), assets.font, x, cy)
-	lg.setColor(tier[1], tier[2], tier[3], fade)
-	lg.print(data.get_type(sp.card) .. "  |  Tier " .. info.rarity, assets.small_font, x, cy + 58)
-	lg.setColor(1, 0.85, 0.2, fade)
-	lg.print("Cost " .. info.cost .. "   Attack " .. info.attack .. "   Health " .. info.defense, assets.small_font, x, cy + 104)
-	lg.setColor(1, 1, 1, fade)
-	lg.printf(info.ability or "No ability", assets.small_font, x, cy + 160, w)
-	lg.setColor(1, 1, 1)
-end
-
 -- The info page for a card: art on the left, then name and tier, stat boxes, border, ability, lore and (from the collection) your copies
 function render.info()
 	background()
