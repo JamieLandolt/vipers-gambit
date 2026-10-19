@@ -266,7 +266,7 @@ return function()
 		else
 			update_animation_screen("level_select")
 		end
-	end, nil, w / 2 - button_width / 2, h / 2 + 100, button_width, button_height)
+	end, nil, w / 2 - button_width / 2, h - button_height - 40, button_width, button_height)
 
 	buttons.versus["Back"] = b("Back", function()
 		versus.leave()

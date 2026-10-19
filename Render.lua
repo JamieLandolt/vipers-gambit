@@ -2624,6 +2624,8 @@ end
 
 function render.ended()
 	background()
+	lg.setColor(0, 0, 0, 0.55)
+	lg.rectangle("fill", 200, 55, reference_window_width - 400, 560, 16, 16)
 	lg.setColor(1, 1, 1)
 	local won = winner == "Player"
 	lg.printf(won and (play.versus and "Victory!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 70, reference_window_width / 3, "center", 0, 3, 3)
