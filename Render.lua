@@ -2322,6 +2322,9 @@ local function draw_venom_slot(x, y, w, h, seed)
 	lg.setLineWidth(1)
 end
 
+local HOVER_DELAY = 0.5 -- seconds the mouse rests on a snake before its popup shows
+local hover_target, hover_since = nil, 0
+
 function render.playing()
 	background()
 
@@ -2458,8 +2461,10 @@ function render.playing()
 		end
 	end
 
-	-- Hovering a snake on the field explains it; a clicked hand snake shows the same popup for a few seconds
+	-- Hovering a snake (on the field or in the hand) explains it once the mouse has rested on it for half a second;
+	-- a clicked hand snake shows the same popup for a few seconds
 	if not held_card then
+		local target, draw
 		for sector, card in pairs(played_cards) do
 			if play.is_hitbox(mouse.x, mouse.y, play.field_hitboxes[sector]) then
 				local status = {}
@@ -2469,14 +2474,21 @@ function render.playing()
 					end
 				end
 				local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
-				card_popup(card, mx + 24, my - 130, card.hp, status)
+				local px = mx > 720 and mx - POPUP_W - 24 or mx + 24 -- flips to the left over the right half of the field
+				target, draw = card, function() card_popup(card, px, my - 130, card.hp, status) end
 			end
 		end
 		for card, box in pairs(card_hitboxes) do -- snakes in the hand too
 			if play.is_hitbox(mouse.x, mouse.y, box) then
 				local mx = mouse.x * reference_window_width / lg.getWidth()
-				card_popup(card, mx - POPUP_W / 2, 250)
+				target, draw = card, function() card_popup(card, mx - POPUP_W / 2, 250) end
 			end
+		end
+		if target ~= hover_target then
+			hover_target, hover_since = target, time
+		end
+		if draw and time - hover_since >= HOVER_DELAY then
+			draw()
 		end
 		if popup_card and time - popup_t < 5 then
 			card_popup(popup_card, popup_x * reference_window_width / lg.getWidth() + 24, popup_y * reference_window_height / lg.getHeight() - 250)
