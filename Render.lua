@@ -2042,7 +2042,17 @@ function render.ended()
 	lg.setColor(1, 0.85, 0.2)
 	draw_eyes("+", collection.last_reward or 0, 0, 480, reference_window_width, "center", assets.font)
 	lg.setColor(1, 1, 1)
-	if won and play.challenge then
+	local drop = won and collection.last_snake
+	if drop then -- one of the opponent's snakes, with a random border
+		local scale = 0.5
+		lg.printf("New snake: " .. drop.name:gsub("_", " ") .. " (" .. drop.border .. ")", assets.small_font, 0, 540, reference_window_width, "center")
+		lg.push()
+		lg.translate(reference_window_width / 2 - img_widths * scale / 2, 580)
+		lg.scale(scale)
+		lg.draw(assets.card_by_name[drop.name])
+		borders.draw(drop.border, 0, 0, img_widths, img_heights, data.stats_by_name[drop.name].rarity)
+		lg.pop()
+	elseif won and play.challenge then
 		lg.printf((play.challenge.endless and "Endless: " or "Challenge: ") .. play.challenge.name .. " (x" .. play.challenge.mult .. " reward)", assets.small_font, 0, 560, reference_window_width, "center")
 	end
 	buttons.ended["Continue"]:draw()

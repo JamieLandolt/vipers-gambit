@@ -28,6 +28,7 @@ local UNOBTAINABLE = { "Cobra", "King_Cobra", "Albino_Cobra", "Blood_Cobra", "Fr
 -- Only T1 snakes, covering every lane type; the other T1s and everything else come from packs
 local STARTERS = { "Sand_Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
 
+collection.STARTERS = STARTERS
 collection.MIN_DECK, collection.MAX_DECK = 8, 20
 collection.deck_mode = false -- the collection screen is editing the deck
 
@@ -460,6 +461,7 @@ end
 -- A win over `level` (`challenge` is the fight's challenge table, if it was one)
 function collection.record_win(level, challenge)
 	local r = rival(level)
+	collection.drop_snake(level, r.wins == 0)
 	r.wins = r.wins + 1
 	if challenge and challenge.endless then
 		r.endless = r.endless + 1
@@ -563,13 +565,11 @@ function collection.price(index)
 end
 
 local function add_copy(name, border)
+	collection.start_deck_edit() -- fix the deck as it is, so new snakes only join it when the player puts them in
 	owned[name] = (owned[name] or 0) + 1
 	if border and border ~= data.stats_by_name[name].border then
 		variants[name] = variants[name] or {}
 		variants[name][border] = (variants[name][border] or 0) + 1
-	end
-	if deck_set and collection.deck_count() < collection.MAX_DECK then
-		deck_set[name] = (deck_set[name] or 0) + 1 -- new copies join the deck while it has room
 	end
 end
 
@@ -594,6 +594,27 @@ local function random_border(name)
 		end
 	end
 	return choices[math.random(#choices)]
+end
+
+-- A win can drop one of the opponent's snakes with a random border: always on the first win, sometimes after
+function collection.drop_snake(level, first)
+	collection.last_snake = nil
+	if not (first or math.random() < 0.25) then
+		return
+	end
+	local snakes = {}
+	for _, name in ipairs(require("Opponents")[level].deck) do
+		if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) then
+			snakes[#snakes + 1] = name
+		end
+	end
+	if #snakes > 0 then
+		local name = snakes[math.random(#snakes)]
+		local border = random_border(name)
+		add_copy(name, border)
+		collection.last_snake = { name = name, border = border }
+		collection.save()
+	end
 end
 
 local function random_of(pool, rarity, floor)
