@@ -5,7 +5,7 @@ local lg = love.graphics
 local borders = {
 	Basic = { text = "No special effect" },
 	Venom = { colour = { 0.45, 0.9, 0.2 }, text = "Poison: its hits poison the target for 2 turns (-1 health each turn)" },
-	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: damage beyond a kill hits the owner's health 1.5x (rounded up)" },
+	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: its hits deal 1.5x damage (rounded up)" },
 	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Shrouded: 1.5x health (rounded up)" },
 	Rainbow = { text = "Prismatic: gains +1 attack and +1 health every turn" },
 	Stone = { colour = { 0.65, 0.65, 0.7 }, text = "Fortified: takes 2 less damage from every hit" },

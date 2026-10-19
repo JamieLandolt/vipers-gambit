@@ -574,6 +574,9 @@ end
 -- Hits the card in `slot` (or that side's health if the lane is empty) for `attack`, with the
 -- attacker's border effects. `delay` times the visuals to the lunge that caused it.
 function play.hit(attacker, slot, attack, delay)
+	if data.border_of(attacker) == "Fire" then
+		attack = math.ceil(attack * 1.5)
+	end
 	local defender, owner = played_cards[slot], owner_of(slot)
 	local cx, cy = play.slot_centre(slot)
 	if not defender then
@@ -608,7 +611,7 @@ function play.hit(attacker, slot, attack, delay)
 	end
 	if defender.hp <= 0 then
 		if defender.hp < 0 then -- damage beyond the kill goes through to the owner's health (doubled by Fire)
-			play.hurt(owner, math.ceil(-defender.hp * ((border == "Fire" or attacker.brew == "fire") and 1.5 or 1)), delay)
+			play.hurt(owner, math.ceil(-defender.hp * (attacker.brew == "fire" and 1.5 or 1)), delay)
 		end
 		destroy(slot, delay)
 		for s, c in pairs(played_cards) do
