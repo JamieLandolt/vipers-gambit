@@ -107,6 +107,8 @@ for name, st in pairs(card_stats) do
 		end
 		if st.border == "Shadow" then
 			st.defense = math.ceil(st.defense * 1.5)
+		elseif st.border == "Fire" then
+			st.attack = math.ceil(st.attack * 1.5)
 		end
 	end
 	table.insert(deck, name)
@@ -123,16 +125,19 @@ for name, st in pairs(card_stats) do
 end
 table.sort(deck)
 
--- A Shadow-border copy of a snake with another border has 1.5x defense (rounded up); cached per snake
-local shadow_stats = {}
+-- A Shadow-border copy of a snake with another border has 1.5x defense, and a Fire-border copy 1.5x attack (both rounded up);
+-- cached per snake, so the stats shown are the stats it fights with
+local border_stats = { Shadow = {}, Fire = {} }
 local function get_stats(card)
 	local name = string.sub(card.card_path, 1, -5)
 	local st = card_stats[name]
-	if card.border == "Shadow" and st.border ~= "Shadow" and st.kind == "snake" then
-		if not shadow_stats[name] then
-			shadow_stats[name] = setmetatable({ defense = math.ceil(st.defense * 1.5) }, { __index = st })
+	local cache = card.border and border_stats[card.border]
+	if cache and st.border ~= card.border and st.kind == "snake" then
+		if not cache[name] then
+			local changed = card.border == "Shadow" and { defense = math.ceil(st.defense * 1.5) } or { attack = math.ceil(st.attack * 1.5) }
+			cache[name] = setmetatable(changed, { __index = st })
 		end
-		return shadow_stats[name]
+		return cache[name]
 	end
 	return st
 end

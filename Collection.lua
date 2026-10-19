@@ -8,11 +8,11 @@ local collection = { unlock_all = false, pack_size = 3, eyes = 0, pack_new = {},
 -- (all beaten); see collection.odds.
 collection.PACKS = {
 	{ name = "Serpent Pack", kind = "snake", cost = 40, daily = true, colour = { 0.3, 0.75, 0.35 },
-		early = { 70, 25, 5, 0, 0 }, late = { 30, 35, 25, 9, 1 }, border = { 0.06, 0.3 } },
+		early = { 70, 25, 5, 0, 0 }, late = { 30, 35, 25, 9, 1 }, border = { 0.6, 0.6 } },
 	{ name = "Support Pack", kind = "support", cost = 30, daily = true, colour = { 0.5, 0.6, 1 },
 		early = { 65, 30, 5, 0, 0 }, late = { 30, 40, 22, 8, 0 }, border = { 0, 0 } },
 	{ name = "Elite Pack", kind = "snake", cost = 250, floor = 3, colour = { 1, 0.8, 0.2 },
-		early = { 0, 0, 80, 19, 1 }, late = { 0, 0, 40, 45, 15 }, border = { 0.25, 0.6 } },
+		early = { 0, 0, 80, 19, 1 }, late = { 0, 0, 40, 45, 15 }, border = { 0.6, 0.6 } },
 }
 -- Reward packs from achievements: tokens[i] free openings of pack i (tokens.txt, "a b c")
 local tokens = {}
@@ -709,7 +709,7 @@ function collection.open_pack(index)
 		end
 		local name = random_of(pool, rarity, pack.floor)
 		collection.pack_new[name] = collection.pack_new[name] or not collection.has(name) or nil
-		local border = math.random() < border_chance and stat(name, "kind") == "snake" and random_border(name) or nil
+		local border = math.random() < border_chance and stat(name, "kind") == "snake" and BORDERS[math.random(#BORDERS)] or nil -- 12% each of the five; a snake's own border just stays as it is
 		add_copy(name, border)
 		table.insert(pulled, name)
 		table.insert(collection.pack_borders, border or data.stats_by_name[name].border)

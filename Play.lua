@@ -65,6 +65,9 @@ local function place_effect(placed, sector)
 	play.note((sector > 4 and "You play " or "Opponent plays ") .. play.name_of(placed))
 	play.reveal(sector <= 4, placed)
 	placed.fresh = true -- some abilities only work the turn a snake is played
+	if data.border_of(placed) == "Rainbow" and data.get_stats(placed).kind == "snake" then -- its +1/+1 starts the moment it is played
+		placed.bonus, placed.hp = (placed.bonus or 0) + 1, (placed.hp or data.get_stats(placed).defense) + 1
+	end
 	local cx, cy = play.slot_centre(sector)
 	effects.add("place", { card = placed, cx = cx, cy = cy })
 	powers.trigger("play", placed, sector)
@@ -562,9 +565,6 @@ end
 -- Hits the card in `slot` (or that side's health if the lane is empty) for `attack`, with the
 -- attacker's border effects. `delay` times the visuals to the lunge that caused it.
 function play.hit(attacker, slot, attack, delay)
-	if data.border_of(attacker) == "Fire" then
-		attack = math.ceil(attack * 1.5)
-	end
 	local defender, owner = played_cards[slot], owner_of(slot)
 	local cx, cy = play.slot_centre(slot)
 	if not defender then
