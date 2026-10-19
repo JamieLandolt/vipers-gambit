@@ -1476,6 +1476,10 @@ function render.briefing(level)
 	deck_thumbs(opponent.deck, 790, 262, 10, level)
 	lg.setColor(0.7, 0.7, 0.8)
 	lg.print("Cards show once they are played against you", assets.debug_font, 790, 355)
+	lg.setColor(1, 0.85, 0.2)
+	lg.print("Win a snake: one of these, a third each, with a random border", assets.small_font, 100, 452)
+	lg.setColor(1, 1, 1)
+	deck_thumbs(collection.level_rewards(level), 100, 480, 3)
 
 	-- What the next fight is: the plain match, one of the level's challenges, or an endless rematch
 	local fight = play.next_fight(level)

@@ -490,7 +490,7 @@ end
 -- A win over `level` (`challenge` is the fight's challenge table, if it was one)
 function collection.record_win(level, challenge)
 	local r = rival(level)
-	collection.drop_snake(level, r.wins == 0)
+	collection.drop_snake(level)
 	r.wins = r.wins + 1
 	if challenge and challenge.endless then
 		r.endless = r.endless + 1
@@ -632,22 +632,29 @@ end
 
 local MILESTONE_TIER = { [3] = 3, [10] = 4 }
 
--- A win can drop one of the opponent's snakes with a random border: always on the first win, sometimes after
-function collection.drop_snake(level, first)
-	collection.last_snake = nil
-	if not (first or math.random() < 0.25) then
-		return
-	end
+-- The three snakes a win over `level` can give: the opponent's best snakes (or three of the set tier on levels 3 and 10)
+function collection.level_rewards(level)
 	local snakes = {}
-	if first and MILESTONE_TIER[level] then -- beating level 3 or 10 for the first time gives a snake of a set tier instead
-		snakes = obtainable("snake")[MILESTONE_TIER[level]]
+	if MILESTONE_TIER[level] then
+		snakes = { unpack(obtainable("snake")[MILESTONE_TIER[level]]) }
 	else
 		for _, name in ipairs(require("Opponents")[level].deck) do
-			if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) then
+			if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) and not contains(snakes, name) then
 				snakes[#snakes + 1] = name
 			end
 		end
 	end
+	table.sort(snakes, function(a, b)
+		local ta, tb = stat(a, "attack") + stat(a, "defense"), stat(b, "attack") + stat(b, "defense")
+		return ta > tb or (ta == tb and a < b)
+	end)
+	return { unpack(snakes, 1, 3) }
+end
+
+-- Every win drops one of the level's three reward snakes (a third each) with a random border
+function collection.drop_snake(level)
+	local snakes = collection.level_rewards(level)
+	collection.last_snake = nil
 	if #snakes > 0 then
 		local name = snakes[math.random(#snakes)]
 		local border = random_border(name)
