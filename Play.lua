@@ -527,18 +527,19 @@ end
 -- until its time, and shown_health / shown_hp add it back meanwhile
 local lag = {}
 
-local function lose_later(who, amount, delay)
-	if delay and delay > 0 and amount > 0 then
-		lag[#lag + 1] = { who = who, amount = amount, at = time + delay }
+local function lose_later(who, amount, delay, stat) -- stat: "hp" (default) or "atk"; a negative amount is a gain
+	if delay and delay > 0 and amount ~= 0 then
+		lag[#lag + 1] = { who = who, amount = amount, at = time + delay, stat = stat or "hp" }
 	end
 end
+play.defer = lose_later
 
-local function pending(who)
+local function pending(who, stat)
 	local total = 0
 	for i = #lag, 1, -1 do
 		if lag[i].at <= time then
 			table.remove(lag, i)
-		elseif lag[i].who == who then
+		elseif lag[i].who == who and lag[i].stat == (stat or "hp") then
 			total = total + lag[i].amount
 		end
 	end
@@ -551,6 +552,11 @@ end
 
 function play.shown_hp(card)
 	return (card.hp or data.get_stats(card).defense) + pending(card)
+end
+
+-- A snake's attack as shown: a gain from a blow that has not landed yet is not counted
+function play.shown_attack(card, sector)
+	return abilities.attack(card, sector) - pending(card, "atk")
 end
 
 function play.hurt(side, amount, delay)
@@ -608,6 +614,12 @@ end
 -- Hits the card in `slot` (or that side's health if the lane is empty) for `attack`, with the
 -- attacker's border effects. `delay` times the visuals to the lunge that caused it.
 function play.hit(attacker, slot, attack, delay)
+	play.fx_delay = delay -- pop-ups and stat changes caused by this blow wait for it to land (see Powers.lua)
+	play.hit_now(attacker, slot, attack, delay)
+	play.fx_delay = nil
+end
+
+function play.hit_now(attacker, slot, attack, delay)
 	local defender, owner = played_cards[slot], owner_of(slot)
 	local cx, cy = play.slot_centre(slot)
 	if not defender then
@@ -629,9 +641,9 @@ function play.hit(attacker, slot, attack, delay)
 	local border = data.border_of(attacker)
 	if damage > 0 then
 		if border == "Venom" or attacker.brew == "venom" then
-			defender.poison = 2
+			defender.poison, defender.fx_at = 2, time + (delay or 0)
 		elseif attacker.brew == "frost" then
-			defender.frozen = true
+			defender.frozen, defender.fx_at = true, time + (delay or 0)
 		end
 	end
 	if attacker.brew == "leech" and damage > 0 then

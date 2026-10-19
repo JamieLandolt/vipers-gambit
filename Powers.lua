@@ -38,12 +38,15 @@ end
 
 local function float(slot, text, good)
 	local cx, cy = require("Play").slot_centre(slot)
-	effects.add("float", { x = cx, y = cy, text = text, colour = good and { 0.45, 1, 0.45 } or nil })
+	effects.add("float", { x = cx, y = cy, text = text, colour = good and { 0.45, 1, 0.45 } or nil, delay = require("Play").fx_delay })
 end
 
 -- Permanent stat change; attack shows as 0 at least, defense can go past its printed value
 local function buff(card, attack, defense)
 	local slot = slot_of(card)
+	local play = require("Play")
+	play.defer(card, attack, play.fx_delay, "atk") -- the numbers on the card change when the blow that caused this lands
+	play.defer(card, -defense, play.fx_delay)
 	card.bonus = (card.bonus or 0) + attack
 	card.hp = (card.hp or defense_of(card)) + defense
 	if slot then

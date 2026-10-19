@@ -2162,7 +2162,7 @@ local LANE_X, LANE_Y = { 20, 250, 490, 720 }, { 20, 280 } -- where each lane's c
 -- Attack (sword) and defense (heart) sit in the bottom corners of the card's lane cell
 local function draw_stats(sector)
 	local card, lane = played_cards[sector], (sector - 1) % 4 + 1
-	require("CardText").lane(abilities.attack(card, sector), play.shown_hp(card), 245 + LANE_X[lane], 15 + LANE_Y[sector > 4 and 2 or 1])
+	require("CardText").lane(play.shown_attack(card, sector), play.shown_hp(card), 245 + LANE_X[lane], 15 + LANE_Y[sector > 4 and 2 or 1])
 end
 
 -- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
@@ -2307,7 +2307,7 @@ local function draw_slot(card, sector)
 	snake_shader:send("bg_count", #style.bgs)
 	snake_shader:send("frame", { style.frame[1] / 255, style.frame[2] / 255, style.frame[3] / 255 })
 	snake_shader:send("rim", rim and { rim[1], rim[2], rim[3], 0.55 + 0.4 * pulse } or { 0, 0, 0, 0 })
-	snake_shader:send("tint", card.frozen and { 0.6, 0.85, 1.2 } or (card.poison and { 0.7, 1.15, 0.6 } or { 1, 1, 1 }))
+	snake_shader:send("tint", (card.fx_at or 0) > time and { 1, 1, 1 } or card.frozen and { 0.6, 0.85, 1.2 } or (card.poison and { 0.7, 1.15, 0.6 } or { 1, 1, 1 }))
 	lg.push()
 	lg.translate(cx + dx, cy + dy)
 	lg.scale(SNAKE_SCALE * sx, SNAKE_SCALE * sy)
