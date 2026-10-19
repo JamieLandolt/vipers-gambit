@@ -489,11 +489,11 @@ local function draw_info_pane()
 	lg.printf("Tier " .. st.rarity .. " " .. (st.tier or "") .. "\n" .. (snake and ("Snake, " .. data.card_types[name]) or (st.kind == "brew" and "Brew" or "Spell")), assets.small_font, x, y, w)
 	y = y + 70
 	if snake then
-		stat_chip("Cost", st.cost, x, y, 82, { 0.4, 0.85, 0.4 })
+		stat_chip("Cost", owned and st.cost or "?", x, y, 82, { 0.4, 0.85, 0.4 })
 		stat_chip("Attack", owned and st.attack or "?", x + 94, y, 82, { 1, 0.4, 0.4 })
 		stat_chip("Health", owned and st.defense or "?", x + 188, y, 82, { 0.45, 0.6, 1 })
 	else
-		stat_chip("Cost", st.cost, x, y, 82, { 0.4, 0.85, 0.4 })
+		stat_chip("Cost", owned and st.cost or "?", x, y, 82, { 0.4, 0.85, 0.4 })
 		stat_chip("Use", st.kind == "brew" and "Drink" or "Cast", x + 94, y, 176, { 0.7, 0.5, 1 })
 	end
 	y = y + 100
@@ -598,6 +598,14 @@ function render.collection()
 	local under = card_under(mouse.x, mouse.y) -- the pane shows any hovered card, owned or not
 	pane_name = under or pane_name
 	local sc = lg.getWidth() / reference_window_width
+	if collection.deck_mode then -- the deck page: a green felt table under your own cards
+		lg.setColor(0.04, 0.22, 0.1, 0.7)
+		lg.rectangle("fill", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
+		lg.setColor(0.35, 0.8, 0.4, 0.8)
+		lg.setLineWidth(3)
+		lg.rectangle("line", GRID_X - 15, GRID_Y - 8, GRID_W + 30, GRID_BOTTOM - GRID_Y + 16, 12, 12)
+		lg.setLineWidth(1)
+	end
 	lg.setScissor(0, GRID_Y * sc, (GRID_X + GRID_W + CELL_GAP) * sc, (GRID_BOTTOM - GRID_Y) * sc)
 	each_collection_card(function(i, gx, gy)
 		lg.push()
@@ -655,7 +663,7 @@ function render.collection()
 	draw_filter_bar()
 	draw_info_pane()
 
-	buttons.collection["Collection Header"]:update_text(collection.deck_mode and ("Deck " .. collection.deck_count() .. "/" .. collection.MAX_DECK)
+	buttons.collection["Collection Header"]:update_text(collection.deck_mode and ("Your Deck " .. collection.deck_count() .. "/" .. collection.MAX_DECK)
 		or collection.sacrifice_mode and ("Pick " .. #collection.sacrificing .. "/" .. collection.SACRIFICE)
 		or ("Collection " .. collection.owned_count() .. "/" .. #data.deck))
 	buttons.collection["Collection Header"]:draw()
@@ -2016,27 +2024,46 @@ end
 function render.level_tooltip(level)
 	local opponent, charmer = opponents[level], charmers.of("Opponent", level)
 	local nx, ny = level_node(level)
-	local w = 680
-	local lines = 0
-	if play.charms_open(level) then
-		lines = select(2, assets.small_font:getWrap(charmer.charm .. " (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. "): " .. charmer.text, w - 40)) 
-		lines = #lines
+	local font = assets.small_font
+	local w, pad, portrait_w = 480, 16, 96
+	local text_x, text_w = pad + portrait_w + 16, w - portrait_w - 2 * pad - 16
+	local charm = play.charms_open(level) and (charmer.charm .. " (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. "): " .. charmer.text)
+	local _, charm_lines = font:getWrap(charm or "", w - 2 * pad)
+	local h = pad * 2 + 120 + (charm and (#charm_lines * font:getHeight() + 28) or 0)
+	-- beside the node, on whichever side has room, so the map around it stays visible
+	local x = nx + NODE_RADIUS + 24
+	if x + w > reference_window_width - 10 then
+		x = nx - NODE_RADIUS - 24 - w
 	end
-	local h = 170 + lines * assets.small_font:getHeight() + (lines > 0 and 20 or 0)
-	local x = nx < reference_window_width / 2 and reference_window_width - w - 40 or 40
+	x = math.max(10, x)
 	local y = math.max(10, math.min(ny - h / 2, reference_window_height - h - 10))
-	lg.setColor(0.07, 0.04, 0.14, 0.95)
+	lg.setColor(0.07, 0.04, 0.14, 0.96)
 	lg.rectangle("fill", x, y, w, h, 12, 12)
 	lg.setColor(1, 0.85, 0.2)
+	lg.setLineWidth(3)
 	lg.rectangle("line", x, y, w, h, 12, 12)
+	lg.setLineWidth(1)
 	lg.setColor(1, 1, 1)
-	portrait(charmer.name, x + 20, y + 20, 100, 120)
-	lg.printf(charmer.name, assets.font, x + 140, y + 20, w - 160, "left")
-	lg.setColor(0.8, 0.9, 1)
-	lg.printf(opponent.health .. " HP, " .. #opponent.deck .. " card deck", assets.small_font, x + 140, y + 80, w - 160, "left")
-	if play.charms_open(level) then
-		lg.setColor(0.7, 0.9, 1)
-		lg.printf(charmer.charm .. " (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. "): " .. charmer.text, assets.small_font, x + 20, y + 160, w - 40, "left")
+	portrait(charmer.name, x + pad, y + pad, portrait_w, 120)
+	lg.setColor(1, 1, 1)
+	lg.printf(charmer.name, assets.font, x + text_x, y + pad - 2, text_w, "left")
+	local chips = { { opponent.health .. " HP", { 1, 0.4, 0.4 } }, { #opponent.deck .. " cards", { 0.45, 0.6, 1 } } }
+	local cx = x + text_x
+	for _, chip in ipairs(chips) do
+		local cw = font:getWidth(chip[1]) + 24
+		lg.setColor(chip[2][1] * 0.25, chip[2][2] * 0.25, chip[2][3] * 0.25, 0.9)
+		lg.rectangle("fill", cx, y + pad + 58, cw, 36, 8, 8)
+		lg.setColor(chip[2])
+		lg.rectangle("line", cx, y + pad + 58, cw, 36, 8, 8)
+		lg.setColor(1, 1, 1)
+		lg.print(chip[1], font, cx + 12, y + pad + 62)
+		cx = cx + cw + 10
+	end
+	if charm then
+		lg.setColor(0.5, 0.35, 0.8, 0.5)
+		lg.rectangle("fill", x + pad, y + pad + 134, w - 2 * pad, #charm_lines * font:getHeight() + 14, 8, 8)
+		lg.setColor(0.8, 0.92, 1)
+		lg.printf(charm, font, x + pad + 8, y + pad + 140, w - 2 * pad - 16, "left")
 	end
 end
 
@@ -2388,7 +2415,7 @@ function render.playing()
 		lg.rectangle("line", spot[1] - 7, spot[2] - 7, 229, 86, 10, 10)
 		lg.setLineWidth(1)
 		lg.setColor(1, 1, 1)
-		portrait(side == "Opponent" and not play.versus and opponents[play.level].portrait or c.name, spot[1], spot[2], 60, 72)
+		portrait(c.name, spot[1], spot[2], 60, 72)
 		local pulse = play.charm_pulse
 		if pulse and pulse.side == side and time - pulse.t < 1.2 then -- using the charm sends rings out from the charmer, in its colour
 			local age = time - pulse.t
