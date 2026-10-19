@@ -85,6 +85,7 @@ end
 local ABILITY_OVERRIDES = {
 	Chromatic_Wyrm = "refresh:1:3", -- the tier 4 Wyrm lets your other snakes use their abilities again
 	Kaleido_Viper = "refresh:1:4",
+	Jelly_Snake = "bolster:2:2", -- pay 2 venom: neighbours get +2 attack this turn
 	Dirt_Snake = "heal:2:1", -- pay 1 venom to restore 2 health
 }
 
