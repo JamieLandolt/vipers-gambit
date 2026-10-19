@@ -2724,11 +2724,12 @@ end
 
 function render.ended()
 	background()
-	lg.setColor(0, 0, 0, 0.55)
-	lg.rectangle("fill", 200, 55, reference_window_width - 400, 690, 16, 16)
-	lg.setColor(1, 1, 1)
 	local won = winner == "Player"
-	lg.printf(won and (play.versus and "Victory!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 70, reference_window_width / 3, "center", 0, 3, 3)
+	local top = won and 55 or 230 -- a defeat has no reward snakes, so its panel is short and centred
+	lg.setColor(0, 0, 0, 0.55)
+	lg.rectangle("fill", 200, top, reference_window_width - 400, won and 690 or 400, 16, 16)
+	lg.setColor(1, 1, 1)
+	lg.printf(won and (play.versus and "Victory!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, top + 15, reference_window_width / 3, "center", 0, 3, 3)
 	if won then
 		local message = play.versus and (require("Versus").status == "The other player left" and "The other player left" or "") or level_unlocked and ("Level " .. level_unlocked .. " unlocked!") or (play.level == #opponents and "You beat every opponent!" or "")
 		lg.printf(message, assets.font, 0, 230, reference_window_width, "center")
@@ -2738,7 +2739,7 @@ function render.ended()
 		end
 	end
 	lg.setColor(1, 0.85, 0.2)
-	draw_eyes("+", collection.last_reward or 0, 0, 330, reference_window_width, "center", assets.font)
+	draw_eyes("+", collection.last_reward or 0, 0, won and 330 or top + 150, reference_window_width, "center", assets.font)
 	lg.setColor(1, 1, 1)
 	local drops = won and { collection.last_snake, collection.last_bonus } or {}
 	if #drops > 0 then -- one of the level's reward snakes, and on a first win of level 3 or 10 a bonus snake, each with a random border
@@ -2757,7 +2758,10 @@ function render.ended()
 	elseif won and play.challenge then
 		lg.printf((play.challenge.endless and "Endless: " or "Challenge: ") .. play.challenge.name .. " (x" .. play.challenge.mult .. " reward)", assets.small_font, 0, 420, reference_window_width, "center")
 	end
-	buttons.ended["Continue"]:draw()
+	local continue = buttons.ended["Continue"]
+	continue.home_y = continue.home_y or continue.y
+	continue.y = won and continue.home_y or top + 300
+	continue:draw()
 end
 
 -- Host or join a two-player match
