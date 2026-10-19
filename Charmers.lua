@@ -35,7 +35,7 @@ local function defense(card)
 end
 
 charmers.list = {
-	{ name = "Yuki Frostveil", portrait = "yuki.png", charm = "Frost Flute", cooldown = 1, cost = 3, text = "Freeze the strongest enemy snake.",
+	{ name = "Yuki Frostveil", colour = { 0.5, 0.85, 1 }, portrait = "yuki.png", charm = "Frost Flute", cooldown = 1, cost = 3, text = "Freeze the strongest enemy snake.",
 		apply = function(play, side)
 			local best, best_slot, best_attack = nil, nil, -1
 			each(foe(side), function(slot, card)
@@ -50,7 +50,7 @@ charmers.list = {
 			end
 			return best ~= nil
 		end },
-	{ name = "Dr. Fang", portrait = "fang.png", charm = "Venom Surge", cooldown = 2, cost = 1, text = "Pay 1 venom, gain 4.",
+	{ name = "Dr. Fang", colour = { 0.55, 1, 0.3 }, portrait = "fang.png", charm = "Venom Surge", cooldown = 2, cost = 1, text = "Pay 1 venom, gain 4.",
 		apply = function(play, side)
 			if venom[side] >= play.MAX_VENOM then
 				return false
@@ -59,18 +59,18 @@ charmers.list = {
 			play.float_bar(side, "+4 venom")
 			return true
 		end },
-	{ name = "Tide Priestess", portrait = "tide.png", charm = "Tidal Wave", cooldown = 2, cost = 3, text = "2 damage to every enemy snake.",
+	{ name = "Tide Priestess", colour = { 0.2, 0.85, 0.9 }, portrait = "tide.png", charm = "Tidal Wave", cooldown = 2, cost = 3, text = "2 damage to every enemy snake.",
 		apply = function(play, side)
 			return each(foe(side), function(slot) play.wound(slot, 2) end)
 		end },
-	{ name = "Ember Queen", portrait = "ember.png", charm = "Cinder Blessing", cooldown = 3, cost = 4, text = "All your snakes gain 1 attack for good.",
+	{ name = "Ember Queen", colour = { 1, 0.5, 0.1 }, portrait = "ember.png", charm = "Cinder Blessing", cooldown = 3, cost = 4, text = "All your snakes gain 1 attack for good.",
 		apply = function(play, side)
 			return each(side, function(slot, card)
 				card.bonus = (card.bonus or 0) + 1
 				play.float(slot, "+1 atk")
 			end)
 		end },
-	{ name = "Warden Basalt", portrait = "basalt.png", charm = "Granite Heart", cooldown = 3, cost = 3, text = "Heal your charmer for 8.",
+	{ name = "Warden Basalt", colour = { 0.55, 1, 0.6 }, portrait = "basalt.png", charm = "Granite Heart", cooldown = 3, cost = 3, text = "Heal your charmer for 8.",
 		apply = function(play, side)
 			if health[side] >= max_health[side] then
 				return false

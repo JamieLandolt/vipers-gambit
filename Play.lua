@@ -732,6 +732,7 @@ function play.use_charm(side)
 	venom[side] = venom[side] - charmer.cost
 	play.charm_used[side] = true
 	play.charm_cd[side] = charmer.cooldown + 1 -- counts down at the start of each of its owner's turns
+	play.charm_pulse = { side = side, t = time, colour = charmer.colour or { 1, 1, 1 } } -- drawn round the charmer (see render.playing)
 	play.note((side == "Player" and "You use " or "Opponent uses ") .. charmer.charm)
 	play.float_bar(side, charmer.charm)
 	play_sound(hover_sound)

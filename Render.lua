@@ -2380,8 +2380,32 @@ function render.playing()
 		if play.charms_open() and mx >= spot[1] and mx <= spot[1] + 215 and my >= spot[2] and my <= spot[2] + 72 then
 			charm_tip = { side, c, spot }
 		end
+		local rim = c.colour or { 1, 0.85, 0.2 }
+		lg.setColor(0.07, 0.04, 0.14, 0.88) -- a panel behind the charmer, their name and charm
+		lg.rectangle("fill", spot[1] - 7, spot[2] - 7, 229, 86, 10, 10)
+		lg.setColor(rim[1], rim[2], rim[3], 0.8)
+		lg.setLineWidth(2)
+		lg.rectangle("line", spot[1] - 7, spot[2] - 7, 229, 86, 10, 10)
+		lg.setLineWidth(1)
 		lg.setColor(1, 1, 1)
 		portrait(side == "Opponent" and not play.versus and opponents[play.level].portrait or c.name, spot[1], spot[2], 60, 72)
+		local pulse = play.charm_pulse
+		if pulse and pulse.side == side and time - pulse.t < 1.2 then -- using the charm sends rings out from the charmer, in its colour
+			local age = time - pulse.t
+			lg.setBlendMode("add")
+			for ring = 0, 2 do
+				local a = age - ring * 0.18
+				if a > 0 then
+					lg.setColor(pulse.colour[1], pulse.colour[2], pulse.colour[3], math.max(0, 0.9 - a / 0.9))
+					lg.setLineWidth(6)
+					lg.circle("line", spot[1] + 30, spot[2] + 36, 20 + a * 260)
+				end
+			end
+			lg.setColor(pulse.colour[1], pulse.colour[2], pulse.colour[3], math.max(0, 0.6 - age))
+			lg.rectangle("fill", spot[1] - 7, spot[2] - 7, 229, 86, 10, 10)
+			lg.setLineWidth(1)
+			lg.setBlendMode("alpha")
+		end
 		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
 		if play.charms_open() then
 			lg.setColor(0.6, 0.9, 0.4)
@@ -2390,7 +2414,7 @@ function render.playing()
 	end
 	local charm = buttons.playing["Charm"]
 	if play.charms_open() then
-		charm:update_text(play.charm_used.Player and "Charm used" or play.charm_cd.Player > 0 and ("Charm (" .. play.charm_cd.Player .. ")") or "Charm")
+		charm:update_text(play.charm_cd.Player > 0 and ("Charm (" .. play.charm_cd.Player .. ")") or "Charm")
 		charm:draw()
 		if not play.charm_ready("Player") then
 			lg.setColor(0, 0, 0, 0.55)
@@ -2527,10 +2551,6 @@ function render.playing()
 		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
 	end
 	lg.setColor(1, 1, 1)
-	if turn == "Player" then
-		lg.printf("Your Turn", assets.font, 1200, 190, 230, "center")
-	end
-	lg.setColor(1, 1, 1)
 
 	if held_card then
 		local hx = mouse.x * reference_window_width / lg.getWidth() - img_widths / 2
@@ -2596,7 +2616,7 @@ function render.playing()
 		lg.setColor(0.9, 0.9, 1)
 		lg.printf(c.text, assets.small_font, x + 20, y + 88, w - 40)
 		lg.setColor(0.7, 0.85, 1)
-		local state = play.charm_used[side] and "Used this turn" or (play.charm_cd[side] > 0 and ("Recharging: " .. play.charm_cd[side] .. " more turn" .. (play.charm_cd[side] > 1 and "s" or "")) or "Ready to use")
+		local state = play.charm_cd[side] > 0 and ("Recharging: " .. play.charm_cd[side] .. " more turn" .. (play.charm_cd[side] > 1 and "s" or "")) or "Ready to use"
 		lg.print(state, assets.debug_font, x + 20, y + h - 28)
 		lg.setColor(1, 1, 1)
 	end
