@@ -218,7 +218,14 @@ return function()
 	buttons.character_select["Charmers Header"] = b("Charmers", nil, nil, w / 2 - button_width / 2, 5, button_width, button_height)
 
 	-- Replaces Back during a match; asks for confirmation before conceding
-	buttons.playing["Forfeit"] = b("Forfeit", function() confirm_forfeit = true end, nil, 5, 5, button_width * 0.8, button_height)
+	buttons.playing["Forfeit"] = b("Forfeit", function()
+		if play.free_exit() then
+			play.next_turn = nil
+			update_animation_screen("level_select")
+		else
+			confirm_forfeit = true
+		end
+	end, nil, 5, 5, button_width * 0.8, button_height)
 	buttons.playing["Yes"] = b("Yes", function()
 		confirm_forfeit = false
 		play.forfeited = true -- giving up earns nothing: no reward, no progress

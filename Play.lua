@@ -330,6 +330,11 @@ function play.check_end()
 	return false
 end
 
+-- Leaving a campaign match in its first 30 seconds costs nothing
+function play.free_exit()
+	return not play.versus and not tutorial.active and play.started and time - play.started < 30
+end
+
 -- Start of a side's turn: venom and hand refill, then each of its snakes' border effects
 function play.start_turn()
 	play.charm_used[turn] = false
@@ -430,7 +435,7 @@ function play.new_game(level, challenge)
 	venom = { Player = 0, Opponent = 0 }
 	played_cards, player_hand, opponent_hand = {}, {}, {}
 	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited = nil, nil, false, nil, nil, false
-	play.log, play.lost_snake = {}, false
+	play.log, play.lost_snake, play.started = {}, false, time
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
 	effects.clear()
 	for i, name in ipairs(c.opp_start or {}) do -- challenge: the opponent begins with snakes already in play
