@@ -1185,12 +1185,12 @@ function render.shop()
 		end
 		lg.setLineWidth(1)
 		lg.push()
-		lg.translate(x + 85, 272)
-		lg.scale(0.4)
+		lg.translate(x + 82, 312)
+		lg.scale(0.37)
 		pack_art(pack, time + i)
 		lg.pop()
 		lg.setColor(elite and { 1, 0.85, 0.3 } or { 1, 1, 1 })
-		lg.printf(pack.name, assets.font, x + 150, 196, 220, "left")
+		lg.printf(pack.name, assets.font, x, 184, 380, "center")
 		if price == 0 and not (pack.daily and collection.pack_ready()) then
 			lg.setColor(0.8, 1, 0.7)
 			lg.printf("Reward pack (x" .. collection.tokens(i) .. ")", assets.small_font, x + 150, 262, 220, "left")
@@ -1202,13 +1202,13 @@ function render.shop()
 			draw_eyes("", price, x + 150, 262, 220, "left")
 		end
 		lg.setColor(0.8, 0.8, 0.8)
-		lg.printf(pack.kind == "snake" and (pack.floor and "3, 4 and 5 star snakes only" or "Snakes") or "Brews and spells", assets.small_font, x + 150, 302, 220, "left")
+		lg.printf(pack.kind == "snake" and (pack.floor and "3, 4 and 5 star snakes only" or "Snakes") or "Brews and spells", assets.small_font, x + 150, 330, 220, "left")
 		lg.setColor(1, 1, 1)
-		lg.printf("Chance per card", assets.small_font, x, 358, 380, "center")
+		lg.printf("Chance per card", assets.small_font, x, 386, 380, "center")
 		local row = 0
 		for r, weight in ipairs(weights) do
 			if weight > 0 then
-				local y = 394 + row * 36
+				local y = 418 + row * 34
 				lg.push()
 				lg.translate(x + 35, y + 2)
 				lg.scale(1.2)
@@ -1224,7 +1224,7 @@ function render.shop()
 		end
 		if border_chance > 0 then
 			lg.setColor(1, 0.85, 0.2)
-			lg.printf(math.floor(border_chance * 100 + 0.5) .. "% chance of a border", assets.small_font, x, 590, 380, "center")
+			lg.printf(math.floor(border_chance * 100 + 0.5) .. "% chance of a border", assets.small_font, x, 612, 380, "center")
 		end
 		local button = buttons.shop["Pack " .. i]
 		button:update_text("Open")
