@@ -92,7 +92,7 @@ local function hand_border() return hand_rect(has_border) end
 local tips = {
 	[2] = { { text = "Borders: the coloured frame on a card gives a snake a passive effect.", next = true,
 			point = function() local r = hand_border() or hand_rect(function() return true end); return r and { r } or {} end },
-		{ text = "Hold B at any time to see what every border does.", next = true, point = function() return { { 8, 544, 190, 30 } } end } },
+		{ text = "Snakes can come out of packs with a border. Give a snake a quick click to read what its border does.", next = true, point = function() local r = hand_border() or hand_rect(function() return true end); return r and { r } or {} end } },
 	[3] = { { text = "Abilities: some snakes have one. Passive ones always work. Hover a snake on the field to read its ability here.", next = true,
 			point = function() return { { 1200, 325, 235, 170 } } end },
 		{ text = "A ! over your snake means you can pay venom to use its ability. Click the snake. Once per turn.", next = true,

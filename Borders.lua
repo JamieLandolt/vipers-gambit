@@ -219,24 +219,49 @@ local THEMES = {
 		lg.setLineWidth(2)
 		lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, 4, 4)
 	end,
-	Venom = function(x, y, w, h, t) -- toxic green frame: slime dripping from the top, bubbles rising from the bottom
-		lg.setColor(0.15, 0.45, 0.1)
-		lg.setLineWidth(5)
-		lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, CORNER, CORNER)
-		lg.setColor(0.45, 0.9, 0.15)
-		for i = 1, 6 do
-			local px = x + 22 + (i - 1) * (w - 44) / 5
-			local len = 10 + 16 * (0.5 + 0.5 * math.sin(t * 1.2 + i * 2.3))
-			lg.setLineWidth(4)
-			lg.line(px, y + 4, px, y + 4 + len)
-			lg.circle("fill", px, y + 4 + len, 5)
+	Venom = function(x, y, w, h, t) -- a scaled toxic frame with a snake's fangs at the top, venom dripping from them, and bubbles
+		local pulse = 0.5 + 0.5 * math.sin(t * 2.5)
+		lg.setColor(0.07, 0.26, 0.07)
+		lg.setLineWidth(8)
+		lg.rectangle("line", x + 4, y + 4, w - 8, h - 8, CORNER, CORNER)
+		lg.setColor(0.4, 0.85, 0.15)
+		lg.setLineWidth(2)
+		lg.rectangle("line", x + 8, y + 8, w - 16, h - 16, CORNER - 4, CORNER - 4)
+		for i = 0, math.floor((w - 44) / 12) do -- scales along the top and bottom edges, and down the sides
+			local px = x + 22 + i * 12
+			lg.setColor(i % 2 == 0 and 0.55 or 0.2, i % 2 == 0 and 0.95 or 0.6, i % 2 == 0 and 0.2 or 0.12)
+			lg.polygon("fill", px, y + 4, px + 6, y + 11, px + 12, y + 4)
+			lg.polygon("fill", px, y + h - 4, px + 6, y + h - 11, px + 12, y + h - 4)
+		end
+		for i = 0, math.floor((h - 44) / 12) do
+			local py = y + 22 + i * 12
+			lg.setColor(i % 2 == 0 and 0.2 or 0.55, i % 2 == 0 and 0.6 or 0.95, i % 2 == 0 and 0.12 or 0.2)
+			lg.polygon("fill", x + 4, py, x + 11, py + 6, x + 4, py + 12)
+			lg.polygon("fill", x + w - 4, py, x + w - 11, py + 6, x + w - 4, py + 12)
+		end
+		lg.setBlendMode("add") -- a toxic glow that breathes
+		lg.setColor(0.3, 1, 0.1, 0.1 + 0.12 * pulse)
+		lg.setLineWidth(12)
+		lg.rectangle("line", x + 6, y + 6, w - 12, h - 12, CORNER, CORNER)
+		lg.setBlendMode("alpha")
+		local cx = x + w / 2
+		for _, side in ipairs({ -1, 1 }) do -- two fangs, each with a drop of venom that grows, falls and fades
+			local fx = cx + side * 17
+			local tip = fx - side * 3
+			lg.setColor(0.1, 0.1, 0.08)
+			lg.polygon("fill", fx - 8, y + 3, fx + 8, y + 3, tip, y + 34)
+			lg.setColor(0.97, 0.96, 0.85)
+			lg.polygon("fill", fx - 6, y + 4, fx + 6, y + 4, tip, y + 31)
+			local life = (t * 0.7 + (side > 0 and 0.5 or 0)) % 1
+			lg.setColor(0.5, 1, 0.2, 1 - life * life)
+			lg.circle("fill", tip, y + 34 + life * life * 70, 4.5 * (1 - 0.4 * life))
 		end
 		lg.setLineWidth(1.5)
 		lg.setColor(0.7, 1, 0.4)
-		for i = 1, 7 do
+		for i = 1, 6 do
 			local rise = (t * 0.35 + rnd(i)) % 1
-			local bx = x + 16 + rnd(i * 3.7) * (w - 32) + 3 * math.sin(t * 3 + i)
-			lg.circle("line", bx, y + h - 8 - rise * 40, 2 + 3 * rnd(i * 1.3))
+			local bx = x + 22 + rnd(i * 3.7) * (w - 44) + 3 * math.sin(t * 3 + i)
+			lg.circle("line", bx, y + h - 14 - rise * 40, 2 + 3 * rnd(i * 1.3))
 		end
 	end,
 	Fire = function(x, y, w, h, t) -- flames licking up the card

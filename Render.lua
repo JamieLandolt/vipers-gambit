@@ -1055,59 +1055,210 @@ local function pack_art(pack, t, part)
 		lg.stencil(function() lg.polygon("fill", poly) end, "replace", 1)
 		lg.setStencilTest("greater", 0)
 	end
-	-- body and scales
-	tint(elite and 0.16 or 0.38)
-	lg.rectangle("fill", -130, -190, 260, 380, 16, 16)
-	for row = 0, 19 do
-		for col = 0, 6 do
-			tint(elite and (0.28 + 0.1 * ((row + col) % 2)) or (0.55 + 0.1 * ((row + col) % 2)), 0.85)
-			lg.arc("fill", -100 + col * 30 + (row % 2) * 15, -176 + row * 19, 17, 0, math.pi)
-		end
-	end
-	-- the snake: a hood, a body coiling down, its eyes
-	local path = {}
-	for k = 0, 40 do
-		local u = k / 40
-		path[k] = { 44 * math.sin(u * math.pi * 3.2) * (1 - 0.3 * u), -92 + u * 215, 15 * (1 - 0.5 * u) }
-	end
-	lg.setColor(0, 0, 0, 0.45)
-	lg.ellipse("fill", 0, -112, 50, 46)
-	for pass = 1, 2 do
-		for k = 40, 0, -1 do
-			local p = path[k]
-			if pass == 1 then
-				lg.setColor(0, 0, 0, 0.8)
-				lg.circle("fill", p[1], p[2], p[3] + 3)
-			else
-				if k % 6 < 3 then
-					lg.setColor(light[1], light[2], light[3])
-				else
-					lg.setColor(c[1] * 0.9, c[2] * 0.9, c[3] * 0.9)
-				end
-				lg.circle("fill", p[1], p[2], p[3])
+	if elite then
+		-- body and scales
+		tint(elite and 0.16 or 0.38)
+		lg.rectangle("fill", -130, -190, 260, 380, 16, 16)
+		for row = 0, 19 do
+			for col = 0, 6 do
+				tint(elite and (0.28 + 0.1 * ((row + col) % 2)) or (0.55 + 0.1 * ((row + col) % 2)), 0.85)
+				lg.arc("fill", -100 + col * 30 + (row % 2) * 15, -176 + row * 19, 17, 0, math.pi)
 			end
 		end
-	end
-	lg.setColor(0, 0, 0, 0.85)
-	lg.ellipse("fill", 0, -118, 44, 40)
-	lg.setColor(light[1], light[2], light[3])
-	lg.ellipse("fill", 0, -118, 40, 36)
-	for side = -1, 1, 2 do
-		lg.setColor(1, 0.9, 0.2)
-		lg.ellipse("fill", side * 16, -124, 9, 7)
-		lg.setColor(0, 0, 0)
-		lg.rectangle("fill", side * 16 - 1.5, -131, 3, 14)
-	end
-	lg.setColor(0.9, 0.15, 0.2) -- forked tongue
-	lg.polygon("fill", -2, -98, 2, -98, 2, -80, -2, -80)
-	lg.polygon("fill", -2, -80, -8, -70, -5, -70, 0, -78, 5, -70, 8, -70, 2, -80)
-	if elite then -- a crown
+		-- the snake: a flared cobra hood with banded belly scales, a fanged head, and a body coiling down to a tapering tail
+		local deep, mid = { 0.55, 0.38, 0.06 }, { 0.86, 0.64, 0.14 }
+		local path = {}
+		for k = 0, 44 do
+			local u = k / 44
+			path[k] = { 46 * math.sin(u * math.pi * 3.2) * (1 - 0.3 * u), -80 + u * 205, 17 * (1 - 0.72 * u) }
+		end
+		for pass = 1, 2 do
+			for k = 44, 0, -1 do
+				local p = path[k]
+				if pass == 1 then
+					lg.setColor(0, 0, 0, 0.85)
+					lg.circle("fill", p[1], p[2], p[3] + 3)
+				else
+					local band = k % 8 < 4
+					lg.setColor(band and gold[1] or mid[1], band and gold[2] or mid[2], band and gold[3] or mid[3])
+					lg.circle("fill", p[1], p[2], p[3])
+					lg.setColor(1, 0.97, 0.75, 0.45)
+					lg.circle("fill", p[1] - p[3] * 0.3, p[2] - p[3] * 0.3, p[3] * 0.35)
+				end
+			end
+		end
+		-- the hood: wide at the shoulders, narrowing up to the head
+		local hood = { -52, -74, -44, -106, -22, -132, 22, -132, 44, -106, 52, -74, 20, -62, -20, -62 }
 		lg.setColor(0, 0, 0, 0.9)
-		lg.polygon("fill", -36, -146, -38, -176, -20, -160, 0, -184, 20, -160, 38, -176, 36, -146)
-		lg.setColor(gold)
-		lg.polygon("fill", -32, -148, -33, -170, -19, -157, 0, -178, 19, -157, 33, -170, 32, -148)
-		lg.setColor(0.9, 0.2, 0.3)
-		lg.circle("fill", 0, -156, 4)
+		lg.setLineWidth(8)
+		lg.polygon("line", hood)
+		lg.setLineWidth(1)
+		lg.setColor(mid[1], mid[2], mid[3])
+		lg.polygon("fill", hood)
+		for i = 0, 4 do -- belly scales: curved bands across the hood
+			lg.setColor(i % 2 == 0 and gold[1] or deep[1], i % 2 == 0 and gold[2] or deep[2], i % 2 == 0 and gold[3] or deep[3])
+			lg.arc("fill", "open", 0, -134 + i * 15, 38 + i * 3, math.pi * 0.12, math.pi * 0.88)
+			lg.setColor(0, 0, 0, 0.5)
+			lg.arc("line", "open", 0, -134 + i * 15, 38 + i * 3, math.pi * 0.12, math.pi * 0.88)
+		end
+		lg.setColor(0, 0, 0, 0.9) -- the head: a rounded wedge with a brow ridge
+		lg.polygon("fill", -30, -128, -22, -150, 22, -150, 30, -128, 18, -98, -18, -98)
+		lg.setColor(gold[1], gold[2], gold[3])
+		lg.polygon("fill", -27, -128, -20, -146, 20, -146, 27, -128, 16, -102, -16, -102)
+		lg.setColor(1, 0.97, 0.75, 0.5)
+		lg.ellipse("fill", -8, -138, 9, 5)
+		for side = -1, 1, 2 do
+			lg.setColor(0, 0, 0)
+			lg.polygon("fill", side * 7, -136, side * 24, -142, side * 24, -126, side * 10, -126)
+			lg.setColor(0.95, 0.15, 0.15)
+			lg.polygon("fill", side * 9, -134, side * 22, -139, side * 22, -128, side * 11, -128)
+			lg.setColor(0, 0, 0)
+			lg.rectangle("fill", side * 16 - 1, -140, 2, 12)
+			lg.setColor(0.97, 0.96, 0.85) -- fangs
+			lg.polygon("fill", side * 8 - 3, -104, side * 8 + 3, -104, side * 8, -90)
+		end
+		lg.setColor(0, 0, 0, 0.6)
+		lg.circle("fill", -4, -118, 1.5)
+		lg.circle("fill", 4, -118, 1.5)
+		lg.setColor(0.9, 0.12, 0.2) -- forked tongue
+		lg.polygon("fill", -1.5, -96, 1.5, -96, 1.5, -80, -1.5, -80)
+		lg.polygon("fill", -1.5, -80, -8, -70, -5, -70, 0, -77, 5, -70, 8, -70, 1.5, -80)
+		if elite then -- a crown
+			lg.setColor(0, 0, 0, 0.9)
+			lg.polygon("fill", -36, -146, -38, -176, -20, -160, 0, -184, 20, -160, 38, -176, 36, -146)
+			lg.setColor(gold)
+			lg.polygon("fill", -32, -148, -33, -170, -19, -157, 0, -178, 19, -157, 33, -170, 32, -148)
+			lg.setColor(0.9, 0.2, 0.3)
+			lg.circle("fill", 0, -156, 4)
+		end
+	elseif pack.kind == "snake" then
+		-- Serpent pack: diamondback skin and an ouroboros (a snake eating its tail) round a slit eye
+		tint(0.34)
+		lg.rectangle("fill", -130, -190, 260, 380, 16, 16)
+		for row = 0, 11 do
+			for col = 0, 4 do
+				local dx, dy = -90 + col * 45 + (row % 2) * 22, -165 + row * 32
+				tint(0.5 + 0.12 * ((row + col) % 2), 0.9)
+				lg.polygon("fill", dx, dy - 16, dx + 20, dy, dx, dy + 16, dx - 20, dy)
+				tint(0.28, 0.9)
+				lg.polygon("line", dx, dy - 16, dx + 20, dy, dx, dy + 16, dx - 20, dy)
+			end
+		end
+		local ring = 0.34 * math.pi
+		for pass = 1, 2 do
+			for k = 0, 56 do
+				local u = k / 56
+				local ang = -math.pi / 2 + ring + u * (2 * math.pi - ring * 1.2)
+				local px, py = 64 * math.cos(ang), -30 + 64 * math.sin(ang)
+				local r = 8 + 7 * math.sin(u * math.pi)
+				if pass == 1 then
+					lg.setColor(0, 0, 0, 0.85)
+					lg.circle("fill", px, py, r + 3)
+				else
+					if k % 6 < 3 then
+						lg.setColor(light[1], light[2], light[3])
+					else
+						lg.setColor(c[1] * 0.85, c[2] * 0.85, c[3] * 0.85)
+					end
+					lg.circle("fill", px, py, r)
+				end
+			end
+		end
+		lg.setColor(0, 0, 0, 0.85) -- the head, biting the tail
+		lg.ellipse("fill", 14, -94, 22, 17)
+		lg.setColor(light[1], light[2], light[3])
+		lg.ellipse("fill", 14, -94, 19, 14)
+		lg.setColor(1, 0.9, 0.2)
+		lg.circle("fill", 8, -98, 4)
+		lg.setColor(0, 0, 0)
+		lg.rectangle("fill", 7, -102, 2, 8)
+		lg.setColor(0, 0, 0, 0.85) -- the slit eye in the middle
+		lg.ellipse("fill", 0, -30, 40, 26)
+		lg.setColor(0.95, 0.85, 0.2)
+		lg.ellipse("fill", 0, -30, 35, 21)
+		lg.setColor(c[1] * 0.3, c[2] * 0.3, c[3] * 0.3)
+		lg.ellipse("fill", 0, -30, 14, 19)
+		lg.setColor(0, 0, 0)
+		lg.rectangle("fill", -3, -49, 6, 38)
+		lg.setBlendMode("add")
+		lg.setColor(1, 1, 1, 0.35)
+		lg.circle("fill", -14, -40, 4)
+		lg.setBlendMode("alpha")
+	else
+		-- Support pack: a night sky and a bubbling flask with a snake coiled round its neck
+		tint(0.22)
+		lg.rectangle("fill", -130, -190, 260, 380, 16, 16)
+		for i = 1, 42 do
+			local sx, sy = (rnd(i * 2.9) - 0.5) * 230, (rnd(i * 5.3) - 0.5) * 350
+			local twinkle = 0.5 + 0.5 * math.sin(t * 2 + i)
+			lg.setColor(1, 1, 0.85, 0.35 + 0.5 * twinkle * (i % 3 == 0 and 1 or 0.4))
+			lg.rectangle("fill", sx, sy, i % 5 == 0 and 4 or 2, i % 5 == 0 and 4 or 2)
+		end
+		tint(0.6, 0.35)
+		for r = 1, 3 do
+			lg.setLineWidth(3)
+			lg.arc("line", "open", 0, 40, 60 + r * 28, math.pi * 1.05, math.pi * 1.95)
+		end
+		lg.setLineWidth(1)
+		-- the flask
+		lg.setColor(0.04, 0.03, 0.1, 0.9)
+		lg.circle("fill", 0, 10, 62)
+		lg.rectangle("fill", -22, -76, 44, 40)
+		lg.setColor(0.15, 0.18, 0.35)
+		lg.circle("fill", 0, 10, 57)
+		lg.rectangle("fill", -17, -72, 34, 40)
+		local surface = 4 + 3 * math.sin(t * 3)
+		local phi0 = math.acos(math.max(-1, math.min(1, (surface - 10) / 57)))
+		local liquid = {}
+		for k = 0, 16 do -- the part of the flask's round below the liquid's surface
+			local phi = -phi0 + k / 16 * 2 * phi0
+			liquid[#liquid + 1], liquid[#liquid + 2] = 57 * math.sin(phi), 10 + 57 * math.cos(phi)
+		end
+		lg.setColor(c[1] * 0.9, c[2] * 0.9, c[3] * 0.9)
+		lg.polygon("fill", liquid)
+		lg.setColor(light[1], light[2], light[3], 0.8)
+		for i = 0, 6 do
+			lg.circle("fill", -42 + i * 14, surface + 1.5 * math.sin(t * 4 + i), 7)
+		end
+		for i = 1, 5 do
+			local rise = (t * 0.4 + rnd(i)) % 1
+			lg.setColor(1, 1, 1, 0.7 * (1 - rise))
+			lg.circle("line", (rnd(i * 4.1) - 0.5) * 44, 52 - rise * 44, 3 + 3 * rnd(i * 1.7))
+		end
+		lg.setColor(1, 1, 1, 0.3)
+		lg.rectangle("fill", -42, -10, 8, 40, 4, 4)
+		lg.setColor(0.65, 0.45, 0.25) -- cork
+		lg.rectangle("fill", -14, -94, 28, 20, 4, 4)
+		-- a snake coiled twice round the neck, head resting on the shoulder
+		for pass = 1, 2 do
+			for k = 0, 36 do
+				local u = k / 36
+				local ang = u * math.pi * 4
+				local px, py = 24 * math.cos(ang), -62 + u * 26 + 6 * math.sin(ang)
+				local r = 6.5 * (1 - 0.35 * u)
+				if pass == 1 then
+					lg.setColor(0, 0, 0, 0.85)
+					lg.circle("fill", px, py, r + 2.5)
+				else
+					if k % 6 < 3 then
+						lg.setColor(0.5, 0.92, 0.4)
+					else
+						lg.setColor(0.2, 0.62, 0.3)
+					end
+					lg.circle("fill", px, py, r)
+				end
+			end
+		end
+		lg.setColor(0, 0, 0, 0.85)
+		lg.ellipse("fill", 38, -34, 19, 14)
+		lg.setColor(0.5, 0.92, 0.4)
+		lg.ellipse("fill", 38, -34, 16, 11)
+		lg.setColor(1, 0.9, 0.2)
+		lg.circle("fill", 43, -37, 3.5)
+		lg.setColor(0, 0, 0)
+		lg.rectangle("fill", 42, -41, 2, 8)
+		lg.setColor(0.9, 0.15, 0.2)
+		lg.polygon("fill", 52, -33, 66, -36, 66, -30)
 	end
 	-- crimped top and bottom, and the frame
 	for _, edge in ipairs({ -190, 168 }) do
