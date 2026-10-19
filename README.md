@@ -22,7 +22,7 @@ sudo apt install love
 ## Run
 
 ```bash
-git clone <repo url>
+git clone https://github.com/JamieLandolt/vipers-gambit
 cd SnakeGame
 love .
 ```
