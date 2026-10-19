@@ -14,7 +14,7 @@ def shift(path, kind, rows):
     px = img.load()
     frame, bgs, fn = rc.STYLES[kind]
     cells = {}
-    for gy in range(2, 38):
+    for gy in range(2, 42):
         for gx in range(2, 31):
             colour = px[gx * S + 2, gy * S + 2][:3]
             if colour != bgs[fn(gx, gy)] and colour != frame:
