@@ -6,16 +6,18 @@
 --   EXTRA=<n>      level mode: the starter deck plus n random other snakes (opened packs)
 --   PROGRESS=<n>   level mode: at level L the player owns the starters plus n*L random snakes and plays the best 20 of them
 --   LEVELS=a,b,c   level mode: only these levels (e.g. LEVELS=9,12)
---   MODE=chal      each level's challenge vs the plain level (with PROGRESS): win rates and a suggested reward multiplier
+--   MODE=chal      each level's challenge (TIER=1-3, default 1) vs the plain level (with PROGRESS): win rates and a suggested reward multiplier
 --   FRAC=<0-1>     matrix mode: share of a deck's snakes that carry the ability (default 0.5)
 package.path = "./?.lua;" .. package.path
 package.preload["love"] = function() return { graphics = {}, mouse = {}, filesystem = { write = function() end, getInfo = function() end } } end
-package.preload["Effects"] = function() return { add = function() end, clear = function() end } end
+package.preload["Effects"] = function() return { add = function() end, clear = function() end, shake = function() end } end
+package.preload["Achievements"] = function() return { add = function() end, set = function() end } end
 package.preload["Card"] = function() return function(p) return { card_path = p } end end
 local data = require("CardData")
 local abilities = require("Abilities")
-for i = #data.deck, 1, -1 do -- the bots only play snakes
-	if data.stats_by_name[data.deck[i]].kind ~= "snake" then table.remove(data.deck, i) end
+local SUPPORTS = {}
+for i = #data.deck, 1, -1 do -- the deck pool is snakes only; brews and spells are added to the bot's deck by SUPPORT=<n> (default 0)
+	if data.stats_by_name[data.deck[i]].kind ~= "snake" then table.insert(SUPPORTS, table.remove(data.deck, i)) end
 end
 local STARTERS = { "Sand_Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake", "Pale_Snake", "Coral_Snake" }
 local player_deck = os.getenv("ALL") and data.deck or STARTERS
@@ -29,7 +31,7 @@ if os.getenv("EXTRA") then -- starters plus N random other snakes: a player who 
 	end
 	for _ = 1, tonumber(os.getenv("EXTRA")) do player_deck[#player_deck + 1] = table.remove(pool, math.random(#pool)) end
 end
-package.preload["Collection"] = function() return { deck = function() return player_deck end, save = function() end, reward = function() return 0 end, mark_challenge = function() end, challenge_done = function() return false end } end
+package.preload["Collection"] = function() return { deck = function() return player_deck end, save = function() end, mark_hint = function() end, reward = function() return 0 end, record_win = function() end, beaten_base = function() return true end, challenges_done = function() return 0 end, endless = function() return 0 end, wins = function() return 0 end } end
 function contains(t, v) for _, x in ipairs(t) do if x == v then return true end end return false end
 function update_game_state(s) state = s end
 function play_sound() end
@@ -44,6 +46,7 @@ local W = { attack = 1, defense = 1, cost = 0.5, block = 2, open = 1 }
 local function bot_turn(side)
 	local base, ahead = side == "Player" and 4 or 0, side == "Player" and -4 or 4
 	local hand = side == "Player" and player_hand or opponent_hand
+	while play.use_support(side) do end
 	while true do
 		local best, bi, bslot = -1e9
 		for i, c in ipairs(hand) do
@@ -119,6 +122,10 @@ local function progress_deck(level, per_level)
 	table.sort(owned, function(a, b) return value(a) > value(b) end)
 	local deck = {}
 	for i = 1, math.min(20, #owned) do deck[i] = owned[i] end
+	for i = 1, tonumber(os.getenv("SUPPORT")) or 0 do -- a couple of brews or spells (random, up to tier 3) in place of the weakest snakes
+		local pick = SUPPORTS[math.random(#SUPPORTS)]
+		if data.stats_by_name[pick].rarity <= 3 and not contains(deck, pick) and #deck > 2 then deck[#deck + 1 - i] = pick end
+	end
 	return deck
 end
 
@@ -135,11 +142,11 @@ if os.getenv("MODE") == "chal" then
 		for _ = 1, N do
 			player_deck = progress_deck(level, per_level)
 			base = base + (match(level, "ai") == "Player" and 1 or 0)
-			hard = hard + (match(level, "ai", challenges[level]) == "Player" and 1 or 0)
+			hard = hard + (match(level, "ai", challenges[level][tonumber(os.getenv("TIER")) or 1]) == "Player" and 1 or 0)
 		end
 		base, hard = 100 * base / N, 100 * hard / N
 		local suggest = hard <= 0 and 5 or math.max(1.25, math.min(5, math.floor(base / hard * 4 + 0.5) / 4))
-		print(("%d\t%s\tbase %d%%\tchallenge %d%%\tmult %s (now %s)"):format(level, challenges[level].name, base, hard, suggest, challenges[level].mult))
+		print(("%d\t%s\tbase %d%%\tchallenge %d%%\tmult %s (now %s)"):format(level, challenges[level][tonumber(os.getenv("TIER")) or 1].name, base, hard, suggest, challenges[level][tonumber(os.getenv("TIER")) or 1].mult))
 	end
 	end
 	return
@@ -194,6 +201,108 @@ if os.getenv("MODE") == "search" then
 	return
 end
 
+if os.getenv("MODE") == "theme" then
+	-- Builds each level's deck from a themed pool (a lane type, a border or name words, plus the opponent's own brews and spells)
+	-- and picks the deck and starting venom whose win rate (with PROGRESS) is closest to the WIN_FIRST..WIN_LAST line.
+	-- Prints Opponents.lua-style lines. Run:  MODE=theme PROGRESS=3.5 LEVELS=8,9 luajit tools/sim.lua
+	N = N or 60
+	math.randomseed(11)
+	local first, last = tonumber(os.getenv("WIN_FIRST")) or 88, tonumber(os.getenv("WIN_LAST")) or 40
+	local per_level = tonumber(os.getenv("PROGRESS")) or 3.5
+	local THEMES = { -- level = { type, border, name words, supports }
+		[4] = { type = "Land", sup = { "Stoneskin_Tonic" } }, [5] = { border = "Venom", sup = { "Rage_Draught" } },
+		[6] = { type = "Spirit", sup = { "Ghost_Tonic" } }, [7] = { type = "Tree", sup = { "Regrowth_Brew" } },
+		[8] = { type = "Rainbow", sup = { "Rage_Draught", "Arcane_Insight" } }, [9] = { border = "Venom", sup = { "Venom_Elixir", "Stoneskin_Tonic" } },
+		[10] = { type = "Water", sup = { "Healing_Rain", "Regrowth_Brew" } }, [11] = { type = "Water", border = "Frost", sup = { "Frostbrew", "Frost_Nova" } },
+		[12] = { words = "Boa Python Constrictor Basalt Stone", sup = { "Guardian_Ward", "Stoneskin_Tonic" } },
+		[13] = { type = "Spirit", sup = { "Smoke_Draught", "Ghost_Tonic" } }, [14] = { border = "Fire", sup = { "Rage_Draught", "Lightning_Storm" } },
+		[15] = { border = "Fire", sup = { "Lightning_Storm", "Rage_Draught" } }, [16] = { words = "Cobra Adder", sup = { "Smoke_Draught", "Arcane_Insight" } },
+		[17] = { border = "Shadow", sup = { "Frost_Nova", "Ghost_Tonic" } }, [18] = { border = "Gold", sup = { "Guardian_Ward", "Stoneskin_Tonic" } },
+		[19] = { type = "Tree", sup = { "Venom_Elixir", "Regrowth_Brew" } }, [20] = { words = "Viper Wyrm Serpent Nagaraja", sup = { "Meteor_Strike", "Frost_Nova" } },
+	}
+	local fillers = {}
+	for _, name in ipairs(data.deck) do
+		if data.stats_by_name[name].rarity == 1 then fillers[#fillers + 1] = name end
+	end
+	local only = {}
+	for l in (os.getenv("LEVELS") or ""):gmatch("%d+") do only[tonumber(l)] = true end
+	local function rate(level, n)
+		local wins = 0
+		for _ = 1, n do
+			player_deck = progress_deck(level, per_level)
+			wins = wins + (match(level, "ai") == "Player" and 1 or 0)
+		end
+		return 100 * wins / n
+	end
+	for level = 4, #opponents do
+	local th = THEMES[level]
+	if th and (not next(only) or only[level]) then
+		local pool = {}
+		for _, name in ipairs(data.deck) do
+			local st, r = data.stats_by_name[name], data.stats_by_name[name].rarity
+			local hit = (th.type and data.card_types[name] == th.type) or (th.border and st.border == th.border)
+			for word in (th.words or ""):gmatch("%S+") do hit = hit or name:find(word) end
+			if hit and r <= math.ceil(level / 4) + 1 and st.cost <= 6 then pool[#pool + 1] = name end
+		end
+		local target, best, best_gap = first + (last - first) * (level - 1) / (#opponents - 1)
+		local o = opponents[level]
+		for _ = 1, 150 do
+			local deck, used = {}, {}
+			for _ = 1, math.random(2, 4) do
+				local pick = pool[math.random(#pool)]
+				if not used[pick] then used[pick] = true; deck[#deck + 1] = pick end
+			end
+			for _ = 1, math.random(2, 3) do -- cheap filler so late decks can be weak enough (the opponent's health does the climbing)
+				local pick = fillers[math.random(#fillers)]
+				if not used[pick] then used[pick] = true; deck[#deck + 1] = pick end
+			end
+			for i = 1, math.random(1, #th.sup) do deck[#deck + 1] = th.sup[i] end
+			if #deck >= 6 then
+				o.deck, o.venom = deck, math.random(0, 4)
+				local w = rate(level, N)
+				if math.abs(w - target) < (best_gap or 1e9) then best, best_gap = { deck = deck, venom = o.venom, w = w }, math.abs(w - target) end
+			end
+		end
+		o.deck, o.venom = best.deck, best.venom
+		local w = rate(level, 200)
+		print(("%d\t%s\tvenom %d\twin %d%% (target %d)\t{ \"%s\" }"):format(level, o.name, best.venom, w, target, table.concat(best.deck, "\", \"")))
+	end
+	end
+	return
+end
+
+if os.getenv("MODE") == "venom" then
+	-- Keeps every deck as written and picks each level's starting venom (0-8) whose win rate (with PROGRESS) is closest to the
+	-- WIN_FIRST..WIN_LAST line; prints "level venom win%". Run:  MODE=venom PROGRESS=3.5 luajit tools/sim.lua
+	N = N or 150
+	math.randomseed(3)
+	local first, last = tonumber(os.getenv("WIN_FIRST")) or 88, tonumber(os.getenv("WIN_LAST")) or 40
+	local per_level = tonumber(os.getenv("PROGRESS")) or 2.5
+	local only = {}
+	for l in (os.getenv("LEVELS") or ""):gmatch("%d+") do only[tonumber(l)] = true end
+	for level = 1, #opponents do
+	if not next(only) or only[level] then
+		if os.getenv("DECK") then -- DECK=a,b,c with a single LEVELS value: try that deck
+			opponents[level].deck = {}
+			for name in os.getenv("DECK"):gmatch("[^,]+") do table.insert(opponents[level].deck, name) end
+		end
+		local target, best, best_gap, best_w = first + (last - first) * (level - 1) / (#opponents - 1)
+		for v = 0, 8 do
+			opponents[level].venom = v
+			local wins = 0
+			for _ = 1, N do
+				player_deck = progress_deck(level, per_level)
+				wins = wins + (match(level, "ai") == "Player" and 1 or 0)
+			end
+			local w = 100 * wins / N
+			if not best_gap or math.abs(w - target) < best_gap then best, best_gap, best_w = v, math.abs(w - target), w end
+		end
+		print(("%d\t%d\t%d%% (target %d)"):format(level, best, best_w, target))
+	end
+	end
+	return
+end
+
 if os.getenv("MODE") == "tune" then
 	-- Adjusts each level's opponent deck and starting venom until the bot's win rate (with PROGRESS) follows a line from
 	-- WIN_FIRST% at level 1 to WIN_LAST% at the last level; prints Opponents.lua-style lines. Run:  MODE=tune PROGRESS=2.5 luajit tools/sim.lua
@@ -230,7 +339,7 @@ if os.getenv("MODE") == "tune" then
 		for i, name in ipairs(deck) do order[i] = i end
 		table.sort(order, function(a, b) return power(deck[a]) < power(deck[b]) end)
 		for _, i in ipairs(dir == 1 and order or { unpack(order, 1) }) do
-			local list = by_type[data.card_types[deck[i]]]
+			local list = by_type[data.card_types[deck[i]]] or {}
 			for k, name in ipairs(list) do
 				if name == deck[i] then
 					local step = list[k + dir]
@@ -296,6 +405,7 @@ if os.getenv("KINDS") then -- e.g. KINDS=strike,heal
 	KINDS = {}
 	for k in os.getenv("KINDS"):gmatch("[^,]+") do table.insert(KINDS, k) end
 end
+local tiers = { 1, 2, 3, 4, 5 }
 local by_tier = {}
 for _, name in ipairs(data.deck) do
 	local r = data.stats_by_name[name].rarity

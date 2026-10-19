@@ -15,12 +15,6 @@ local assets = {
 	card_name_font = lg.newFont("assets/Jersey15-Regular.ttf", 24),
 	card_text_font = lg.newFont("assets/Jersey15-Regular.ttf", 17),
 	debug_font = lg.newFont("assets/Jersey15-Regular.ttf", 20),
-	backgrounds = {
-		lg.newImage("assets/Sprites/DefenseBackground.png"),
-		lg.newImage("assets/Sprites/AttackBackground.png"),
-	},
-	defenses = numbered("", "Defense", 0, 9),
-	attacks = numbered("", "Attack", 0, 9),
 	venom = numbered("Venom_", "", 0, 10),
 	background = lg.newImage("assets/backgrounds/SnakeBackground.png"),
 	level_snake = lg.newImage("assets/backgrounds/LevelSnake.png"),
@@ -37,12 +31,11 @@ local assets = {
 }
 
 for _, c in ipairs(require("Charmers").list) do
-	assets.avatars[c.name] = lg.newImage("assets/characters/" .. c.portrait)
+	assets.avatars[c.name] = lg.newImage(require("Charmers").file(c))
 end
 
--- Each campaign opponent (and the tutorial's) has its own portrait
-local campaign = { require("Tutorial").profile, unpack(require("Opponents")) }
-for _, o in ipairs(campaign) do
+-- Each campaign opponent has its own portrait
+for _, o in ipairs(require("Opponents")) do
 	assets.avatars[o.name] = assets.avatars[o.name] or lg.newImage("assets/" .. o.portrait)
 end
 

@@ -25,6 +25,11 @@ local function make(notes)
 end
 
 local builders = {
+	hit = function() return make({ { 220, 70, 0.12, 0.5, 0.5 } }) end,
+	kill = function() return make({ { 300, 60, 0.3, 0.55, 0.6 } }) end,
+	spell = function() return make({ { 400, 1200, 0.35, 0.35, 0.05 } }) end,
+	brew = function() return make({ { 300, 500, 0.08, 0.3 }, { 450, 700, 0.08, 0.3 }, { 350, 600, 0.1, 0.3 } }) end,
+	achievement = function() return make({ { 523, 523, 0.1, 0.4 }, { 659, 659, 0.1, 0.4 }, { 784, 784, 0.1, 0.4 }, { 1047, 1047, 0.3, 0.4 } }) end,
 	rumble = function() return make({ { 50, 110, 1.4, 0.5, 0.35 } }) end,
 	burst = function() return make({ { 500, 80, 0.5, 0.6, 0.7 } }) end,
 	summon = function() return make({ { 200, 900, 0.9, 0.45, 0.05 } }) end,

@@ -108,13 +108,16 @@ end
 
 -- Damage that gets through armor, guards, shields and the Shadow border's free dodge
 function abilities.mitigate(defender, slot, damage)
-	if (require("CardData").border_of(defender) == "Shadow" or defender.brew == "phase") and not defender.phased then
+	if defender.brew == "phase" and not defender.phased then
 		defender.phased = true
 		return 0
 	end
 	damage = require("Powers").reduce(defender, slot, damage)
-	if defender.brew == "stone" then
+	if defender.brew == "stone" or require("CardData").border_of(defender) == "Stone" then
 		damage = math.max(damage - 2, 1)
+	end
+	if defender.brew == "adamant" then
+		damage = math.max(damage - 4, 1)
 	end
 	for _, ab in ipairs(abilities.of(defender)) do
 		if ab.kind == "armor" then
@@ -134,7 +137,7 @@ function abilities.mitigate(defender, slot, damage)
 end
 
 function abilities.thorns(card)
-	local total = 0
+	local total = card.brew == "thorn" and 2 or 0
 	for _, ab in ipairs(abilities.of(card)) do
 		if ab.kind == "thorns" then
 			total = total + ab.args[1]
@@ -180,19 +183,19 @@ local POOLS = {
 
 -- Strength and venom cost per tier (1-5), tuned with tools/sim.lua so every kind is worth about the same.
 -- Activated abilities are { strength, cost } pairs; passives are just the strength.
-local STRIKE = { { 1, 1 }, { 2, 1 }, { 4, 1 }, { 7, 2 }, { 9, 2 } }
-local DRAIN = { { 1, 2 }, { 2, 2 }, { 4, 2 }, { 7, 2 }, { 10, 3 } }
-local HEAL = { { 3, 1 }, { 5, 1 }, { 8, 1 }, { 12, 1 }, { 16, 2 } }
-local SHIELD = { { 2, 1 }, { 3, 1 }, { 6, 1 }, { 9, 2 }, { 13, 2 } }
-local EMPOWER = { { 1, 3 }, { 1, 2 }, { 2, 2 }, { 3, 2 }, { 4, 3 } }
-local BOLSTER = { { 1, 2 }, { 1, 1 }, { 3, 1 }, { 4, 2 }, { 6, 2 } }
+local STRIKE = { { 1, 2 }, { 2, 1 }, { 6, 1 }, { 10, 2 }, { 9, 2 } }
+local DRAIN = { { 1, 4 }, { 2, 2 }, { 6, 2 }, { 8, 2 }, { 10, 3 } }
+local HEAL = { { 2, 1 }, { 5, 1 }, { 11, 1 }, { 14, 1 }, { 24, 2 } }
+local SHIELD = { { 1, 1 }, { 3, 1 }, { 9, 1 }, { 13, 1 }, { 15, 2 } }
+local EMPOWER = { { 1, 5 }, { 2, 2 }, { 3, 2 }, { 7, 2 }, { 5, 3 } }
+local BOLSTER = { { 1, 4 }, { 2, 1 }, { 3, 1 }, { 8, 2 }, { 8, 2 } }
 local PACK = { 1, 1, 1, 2, 2 }
-local FIRST = { 2, 3, 3, 3, 4 }
-local LONE = { 2, 3, 3, 3, 4 }
-local LANE = { 1, 1, 2, 2, 3 }
-local ADJ = { 1, 2, 3, 3, 4 }
-local ARMOR = { 1, 1, 1, 2, 2 }
-local GUARD = { 1, 1, 2, 2, 3 }
+local FIRST = { 1, 3, 3, 4, 4 }
+local LONE = { 3, 3, 4, 4, 6 }
+local LANE = { 1, 1, 2, 3, 3 }
+local ADJ = { 1, 2, 5, 6, 6 }
+local ARMOR = { 1, 1, 2, 3, 4 }
+local GUARD = { 1, 1, 3, 4, 5 }
 local THORNS = { 1, 1, 2, 3, 4 }
 
 local function build(kind, t)
@@ -206,7 +209,7 @@ local function build(kind, t)
 	local codes = {
 		strike = act("strike", STRIKE), drain = act("drain", DRAIN), heal = act("heal", HEAL),
 		shield = act("shield", SHIELD), empower = act("empower", EMPOWER), bolster = act("bolster", BOLSTER),
-		pack = "pack:" .. PACK[t], first = "first:" .. FIRST[t], lone = "lone:" .. LONE[t],
+		pack = t == 1 and "lone:3" or "pack:" .. PACK[t], first = "first:" .. FIRST[t], lone = "lone:" .. LONE[t],
 		armor = "armor:" .. ARMOR[t], guard = "guard:" .. GUARD[t], thorns = "thorns:" .. THORNS[t],
 	}
 	return codes[kind]

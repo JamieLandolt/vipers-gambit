@@ -42,9 +42,39 @@ def type_of_cards():
         types[n.lower()] = kind.capitalize()
     return types
 
+NOT_SNAKE = {BG, FRAME, (95, 205, 228), (199, 169, 9)}  # background, frame, the cyan corner curves and the rarity bars
+
+
+def centre_snake(img):
+    """Moves the snake (everything in the art area that is not card furniture) so its bounding box is centred in the
+    art area (columns 2-30, rows 2-36 of the 33x48 art grid), a little low. The corner with the cost is left alone."""
+    px = img.load()
+    cells = {}
+    for y in range(2, 37):
+        for x in range(2, 31):
+            if (x < 10 and y < 10) or px[x * S + 2, y * S + 2][:3] in NOT_SNAKE:
+                continue
+            cells[(x, y)] = [px[x * S + dx, y * S + dy] for dy in range(S) for dx in range(S)]
+    if not cells:
+        return
+    xs, ys = [c[0] for c in cells], [c[1] for c in cells]
+    move_x, move_y = int(16.5 - (min(xs) + max(xs) + 1) / 2), int(21.5 - (min(ys) + max(ys) + 1) / 2)
+    move_y = min(move_y, 37 - max(ys))  # (sits a little low: the cost icon takes the top corner, the text panel the bottom)
+    if move_x == 0 and move_y == 0:
+        return
+    for (x, y) in cells:
+        for dy in range(S):
+            for dx in range(S):
+                px[x * S + dx, y * S + dy] = BG + (255,)
+    for (x, y), colours in cells.items():
+        for i, colour in enumerate(colours):
+            px[(x + move_x) * S + i % S, (y + move_y) * S + i // S] = colour
+
+
 def recolour(img, kind):
     frame, bgs, fn = STYLES[kind]
     img = img.convert("RGBA")
+    centre_snake(img)
     # taller card: a text panel of EXTRA art rows goes in above the corner icons, with the frame carried down the sides
     cut = PANEL_AT * S
     tall = Image.new("RGBA", (img.width, img.height + EXTRA * S))
@@ -70,7 +100,22 @@ def recolour(img, kind):
             for dy in range(S):
                 for dx in range(S):
                     px[cx * S + dx, cy * S + dy] = (0, 0, 0, 0)
+    round_corners(img)
     return img
+
+
+CORNER = 20  # corner radius in pixels, matched by the border frames in Borders.lua
+
+
+def round_corners(img):
+    """Cut a smooth quarter circle out of each corner (safe to repeat)."""
+    px = img.load()
+    for y in range(CORNER):
+        for x in range(CORNER):
+            d = ((CORNER - x - 0.5) ** 2 + (CORNER - y - 0.5) ** 2) ** 0.5
+            if d > CORNER:
+                for ux, uy in [(x, y), (img.width - 1 - x, y), (x, img.height - 1 - y), (img.width - 1 - x, img.height - 1 - y)]:
+                    px[ux, uy] = (0, 0, 0, 0)
 
 if __name__ == "__main__":
     src = sys.argv[1]

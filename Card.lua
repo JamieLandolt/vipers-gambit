@@ -3,10 +3,13 @@ local lg = love.graphics
 local borders = require("Borders")
 local data = require("CardData")
 
+local images = {} -- one loaded image per card file, shared by every copy
+
 function Card(card_path, card_width, card_height, border)
+    images[card_path] = images[card_path] or lg.newImage("assets/Snake_Cards/" .. card_path)
     return {
         border = border or nil, -- a variant copy's border (nil: the snake's own)
-        card_object = lg.newImage("assets/Snake_Cards/" .. card_path),
+        card_object = images[card_path],
         card_height = card_height,
         card_width = card_width,
         card_path = card_path,

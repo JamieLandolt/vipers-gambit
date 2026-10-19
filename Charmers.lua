@@ -1,6 +1,6 @@
 local love = require("love")
 
--- Charmers: each has one charm, used once per turn for `cost` venom (Play.use_charm).
+-- Charmers: each has one charm, used for `cost` venom at most once a turn and then not again for `cooldown` of its owner's turns (Play.use_charm).
 -- apply(play, side) does the effect and returns false if it would do nothing (then it costs nothing).
 -- The chosen charmer is the global chosen_avatar; each campaign level's opponent has its own, below.
 -- (CardData and Abilities are required lazily: Assets loads this file for the portraits)
@@ -35,14 +35,14 @@ local function defense(card)
 end
 
 charmers.list = {
-	{ name = "Raja Kaal", portrait = "raja.png", charm = "Poison Piper", cost = 3, text = "Poison every enemy snake for 3 turns.",
+	{ name = "Raja Kaal", portrait = "raja.png", charm = "Poison Piper", cooldown = 2, cost = 3, text = "Poison every enemy snake for 3 turns.",
 		apply = function(play, side)
 			return each(foe(side), function(slot, card)
 				card.poison = 3
 				play.float(slot, "poison")
 			end)
 		end },
-	{ name = "Yuki Frostveil", portrait = "yuki.png", charm = "Frost Flute", cost = 3, text = "Freeze the strongest enemy snake.",
+	{ name = "Yuki Frostveil", portrait = "yuki.png", charm = "Frost Flute", cooldown = 1, cost = 3, text = "Freeze the strongest enemy snake.",
 		apply = function(play, side)
 			local best, best_slot, best_attack = nil, nil, -1
 			each(foe(side), function(slot, card)
@@ -57,7 +57,7 @@ charmers.list = {
 			end
 			return best ~= nil
 		end },
-	{ name = "Brother Moss", portrait = "moss.png", charm = "Heal Hymn", cost = 3, text = "Heal all your snakes for 3.",
+	{ name = "Brother Moss", portrait = "moss.png", charm = "Heal Hymn", cooldown = 1, cost = 3, text = "Heal all your snakes for 3.",
 		apply = function(play, side)
 			local healed = false
 			each(side, function(slot, card)
@@ -69,7 +69,7 @@ charmers.list = {
 			end)
 			return healed
 		end },
-	{ name = "Dr. Fang", portrait = "fang.png", charm = "Venom Surge", cost = 1, text = "Pay 1 venom, gain 4.",
+	{ name = "Dr. Fang", portrait = "fang.png", charm = "Venom Surge", cooldown = 2, cost = 1, text = "Pay 1 venom, gain 4.",
 		apply = function(play, side)
 			if venom[side] >= play.MAX_VENOM then
 				return false
@@ -78,7 +78,7 @@ charmers.list = {
 			play.float_bar(side, "+4 venom")
 			return true
 		end },
-	{ name = "Madame Zora", portrait = "zora.png", charm = "Mesmerise", cost = 1, text = "Enemy snakes shuffle one lane over and take 2 damage.",
+	{ name = "Madame Zora", portrait = "zora.png", charm = "Mesmerise", cooldown = 3, cost = 1, text = "Enemy snakes shuffle one lane over and take 2 damage.",
 		apply = function(play, side)
 			local base = side == "Player" and 1 or 5
 			local moved = {}
@@ -101,24 +101,31 @@ charmers.list = {
 			end
 			return true
 		end },
-	{ name = "Baba Jaro", portrait = "baba.png", charm = "Snake Cloak", cost = 4, text = "Give all your snakes a 2 point shield.",
+	{ name = "Tide Priestess", portrait = "tide.png", charm = "Tidal Wave", cooldown = 2, cost = 3, text = "2 damage to every enemy snake.",
+		apply = function(play, side)
+			return each(foe(side), function(slot) play.wound(slot, 2) end)
+		end },
+	{ name = "Ember Queen", portrait = "ember.png", charm = "Cinder Blessing", cooldown = 3, cost = 4, text = "All your snakes gain 1 attack for good.",
+		apply = function(play, side)
+			return each(side, function(slot, card)
+				card.bonus = (card.bonus or 0) + 1
+				play.float(slot, "+1 atk")
+			end)
+		end },
+	{ name = "Warden Basalt", portrait = "basalt.png", charm = "Granite Heart", cooldown = 3, cost = 3, text = "Heal your charmer for 8.",
+		apply = function(play, side)
+			if health[side] >= max_health[side] then
+				return false
+			end
+			health[side] = math.min(health[side] + 8, max_health[side])
+			play.float_bar(side, "+8 health")
+			return true
+		end },
+	{ name = "Baba Jaro", portrait = "baba.png", charm = "Snake Cloak", cooldown = 2, cost = 4, text = "Give all your snakes a 2 point shield.",
 		apply = function(play, side)
 			return each(side, function(slot, card)
 				card.shield = (card.shield or 0) + 2
 				play.float(slot, "+2 shield")
-			end)
-		end },
-	{ name = "Josh", portrait = "josh.jpg", charm = "Fury", cost = 3, text = "All your snakes get +3 attack this turn.",
-		apply = function(play, side)
-			return each(side, function(slot, card)
-				card.temp = (card.temp or 0) + 3
-				play.float(slot, "+3 atk")
-			end)
-		end },
-	{ name = "Michael", portrait = "michael.jpg", charm = "Bile Spray", cost = 4, text = "Hit every enemy snake for 2.",
-		apply = function(play, side)
-			return each(foe(side), function(slot)
-				play.wound(slot, 2)
 			end)
 		end },
 }
@@ -132,22 +139,61 @@ end
 function charmers.of(side, level)
 	local name = chosen_avatar
 	if side ~= "Player" then
-		local opponent = level == 0 and require("Tutorial").profile or require("Opponents")[level]
-		name = opponent and opponent.charmer
+		local opponent = require("Opponents")[level]
+		name = versus_charmer or (opponent and opponent.charmer)
 	end
 	return charmers.by_name[name] or charmers.list[1]
 end
 
--- The player's pick is remembered in its own file so save.txt keeps its format
-function charmers.save()
-	love.filesystem.write("charmer.txt", chosen_avatar)
+-- Looks: a charmer with files <base>_1.png .. <base>_4.png (and stand_<base>_N.png) lets the player pick which one to use
+charmers.skin = {} -- name -> chosen look (1 when not picked)
+
+function charmers.skin_count(c)
+	local base, n = c.portrait:gsub("%..+$", ""), 0
+	while love.filesystem.getInfo("assets/characters/" .. base .. "_" .. (n + 1) .. ".png") do
+		n = n + 1
+	end
+	return n
 end
 
--- Only the first PICKABLE charmers can be chosen; the rest only appear as campaign opponents
-charmers.PICKABLE = 6
+-- The portrait (or standing cut-out) file for a charmer's chosen look
+function charmers.file(c, stand)
+	local base, n = c.portrait:gsub("%..+$", ""), charmers.skin[c.name]
+	local file = "assets/characters/" .. (stand and "stand_" or "") .. base .. (n and n > 1 and "_" .. n or "") .. ".png" -- (look 1 is the default file)
+	if stand and not love.filesystem.getInfo(file) then
+		return "assets/characters/" .. base .. ".png" -- no standing cut-out: use the portrait
+	end
+	return file
+end
+
+function charmers.set_skin(name, n)
+	charmers.skin[name] = n
+	require("Assets").avatars[name] = love.graphics.newImage(charmers.file(charmers.by_name[name]))
+	charmers.save()
+end
+
+-- The player's pick is remembered in its own file so save.txt keeps its format: the charmer, then "name=look" lines
+function charmers.save()
+	local lines = { chosen_avatar }
+	for name, n in pairs(charmers.skin) do
+		lines[#lines + 1] = name .. "=" .. n
+	end
+	love.filesystem.write("charmer.txt", table.concat(lines, "\n"))
+end
+
+-- Every charmer can be chosen
+charmers.PICKABLE = #charmers.list
 
 function charmers.load()
-	local saved = love.filesystem.read("charmer.txt")
+	local text = love.filesystem.read("charmer.txt") or ""
+	local saved = text:match("^[^\n]+")
+	for name, n in text:gmatch("\n([^=\n]+)=(%d)") do
+		local c = charmers.by_name[name]
+		if c and tonumber(n) <= charmers.skin_count(c) then
+			charmers.skin[name] = tonumber(n)
+			require("Assets").avatars[name] = love.graphics.newImage(charmers.file(c))
+		end
+	end
 	chosen_avatar = charmers.list[1].name
 	for i = 1, charmers.PICKABLE do
 		if charmers.list[i].name == saved then

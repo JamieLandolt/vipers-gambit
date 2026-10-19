@@ -5,21 +5,25 @@ local lg = love.graphics
 local borders = {
 	Basic = { text = "No special effect" },
 	Venom = { colour = { 0.45, 0.9, 0.2 }, text = "Poison: its hits poison the target for 2 turns (-1 defense each turn)" },
-	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: damage beyond a kill hits the owner's health twice over" },
-	Frost = { colour = { 0.5, 0.85, 1 }, text = "Chill: snakes it hits can't attack on their next turn" },
-	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Phantom: ignores the first hit it takes" },
-	Gold = { colour = { 1, 0.85, 0.2 }, text = "Wealth: +1 venom each turn while on the field" },
+	Fire = { colour = { 1, 0.5, 0.1 }, text = "Scorch: damage beyond a kill hits the owner's health 1.5x (rounded up)" },
+	Shadow = { colour = { 0.65, 0.35, 0.95 }, text = "Shrouded: 1.5x defense (rounded up)" },
 	Rainbow = { text = "Prismatic: gains +1 attack and +1 defense every turn" },
+	Stone = { colour = { 0.65, 0.65, 0.7 }, text = "Fortified: takes 2 less damage from every hit" },
 	-- Support cards (brews and spells) have their own frames: a double line with flask-shaped or star-shaped corners
 	Brew = { colour = { 0.3, 0.95, 0.7 }, text = "Support: a brew, drunk by one of your snakes" },
 	Spell = { colour = { 0.5, 0.65, 1 }, text = "Support: a spell, cast over the field" },
 }
 
+-- The clock the border animations run on (frozen by the Reduce motion setting)
+local function now()
+	return reduce_motion and 1.3 or time
+end
+
 function borders.text(name)
 	return borders[name].text
 end
 
--- "Shadow border (Phantom): ignores the first hit it takes"
+-- "Shadow border (Shrouded): 1.5x defense (rounded up)"
 function borders.describe(name)
 	local effect, rest = borders[name].text:match("^(.-): (.*)$")
 	return effect and (name .. " border (" .. effect .. "): " .. rest) or (name .. " border: " .. borders[name].text)
@@ -27,7 +31,7 @@ end
 
 local function colour(name)
 	if name == "Rainbow" then
-		local t = time * 1.5
+		local t = now() * 1.5
 		return { 0.6 + 0.4 * math.sin(t), 0.6 + 0.4 * math.sin(t + 2.1), 0.6 + 0.4 * math.sin(t + 4.2) }
 	end
 	return borders[name].colour
@@ -63,7 +67,7 @@ local function legendary(x, y, w, h)
 	local oldR, oldG, oldB, oldA = lg.getColor()
 	local oldBlend, oldAlpha = lg.getBlendMode()
 	local oldLine, oldShader = lg.getLineWidth(), lg.getShader()
-	local t = time
+	local t = now()
 
 	-- holographic sweep (additive), inside the card
 	lg.setBlendMode("add")
@@ -168,7 +172,7 @@ end
 -- tier (rarity, optional): 5 adds the legendary treatment on top.
 -- The support frame: a double line, with a round flask corner for brews and a four-point star for spells
 local function support(name, x, y, w, h)
-	local c, pulse = colour(name), 0.5 + 0.5 * math.sin(time * 3)
+	local c, pulse = colour(name), 0.5 + 0.5 * math.sin(now() * 3)
 	lg.setColor(c[1], c[2], c[3], 0.8 + 0.2 * pulse)
 	lg.setLineWidth(3)
 	lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, 10, 10)
@@ -187,20 +191,149 @@ local function support(name, x, y, w, h)
 	lg.setColor(1, 1, 1)
 end
 
+-- Each border is drawn as the thing it stands for, using a few shapes along the card's edges
+local function along(x, y, w, h, step, fn)
+	local i = 0
+	for px = x + 16, x + w - 16, step do
+		i = i + 1
+		fn(px, y + 3, 0, 1, i)
+		fn(px, y + h - 3, 0, -1, i + 50)
+	end
+	for py = y + 16, y + h - 16, step do
+		i = i + 1
+		fn(x + 3, py, 1, 0, i + 100)
+		fn(x + w - 3, py, -1, 0, i + 150)
+	end
+end
+
+local function spike(px, py, dx, dy, base, len)
+	local tx, ty = math.abs(dy), math.abs(dx)
+	lg.polygon("fill", px - tx * base, py - ty * base, px + tx * base, py + ty * base, px + dx * len, py + dy * len)
+end
+
+local CORNER = 18 -- matches the corner radius cut into the card art (tools/recolour_cards.py uses 20)
+
+local THEMES = {
+	Basic = function(x, y, w, h, t)
+		lg.setColor(0.55, 0.5, 0.42)
+		lg.setLineWidth(2)
+		lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, 4, 4)
+	end,
+	Venom = function(x, y, w, h, t) -- toxic green frame: slime dripping from the top, bubbles rising from the bottom
+		lg.setColor(0.15, 0.45, 0.1)
+		lg.setLineWidth(5)
+		lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, CORNER, CORNER)
+		lg.setColor(0.45, 0.9, 0.15)
+		for i = 1, 6 do
+			local px = x + 22 + (i - 1) * (w - 44) / 5
+			local len = 10 + 16 * (0.5 + 0.5 * math.sin(t * 1.2 + i * 2.3))
+			lg.setLineWidth(4)
+			lg.line(px, y + 4, px, y + 4 + len)
+			lg.circle("fill", px, y + 4 + len, 5)
+		end
+		lg.setLineWidth(1.5)
+		lg.setColor(0.7, 1, 0.4)
+		for i = 1, 7 do
+			local rise = (t * 0.35 + rnd(i)) % 1
+			local bx = x + 16 + rnd(i * 3.7) * (w - 32) + 3 * math.sin(t * 3 + i)
+			lg.circle("line", bx, y + h - 8 - rise * 40, 2 + 3 * rnd(i * 1.3))
+		end
+	end,
+	Fire = function(x, y, w, h, t) -- flames licking up the card
+		lg.setColor(0.7, 0.15, 0.05)
+		lg.setLineWidth(4)
+		lg.rectangle("line", x + 3, y + 3, w - 6, h - 6, CORNER, CORNER)
+		along(x, y, w, h, 14, function(px, py, dx, dy, i)
+			local len = 11 + 8 * math.sin(t * 7 + i * 1.9)
+			lg.setColor(1, 0.4, 0.05)
+			spike(px, py, dx, dy, 7, len)
+			lg.setColor(1, 0.85, 0.2)
+			spike(px, py, dx, dy, 3.5, len * 0.6)
+		end)
+	end,
+	Shadow = function(x, y, w, h, t) -- a black frame with writhing tendrils and watching eyes
+		lg.setColor(0.04, 0.02, 0.08)
+		lg.setLineWidth(9)
+		lg.rectangle("line", x + 4, y + 4, w - 8, h - 8, CORNER, CORNER)
+		lg.setColor(0.4, 0.15, 0.65, 0.9)
+		lg.setLineWidth(3)
+		for i = 1, 14 do
+			local pts = {}
+			local side = i % 4
+			local base = 20 + rnd(i * 2.1) * ((side < 2 and w or h) - 40)
+			for k = 0, 12 do
+				local d = k * 5
+				local sway = 8 * math.sin(t * 2 + i + k * 0.7)
+				if side == 0 then
+					pts[#pts + 1], pts[#pts + 2] = x + base + sway, y + 4 + d
+				elseif side == 1 then
+					pts[#pts + 1], pts[#pts + 2] = x + base + sway, y + h - 4 - d
+				elseif side == 2 then
+					pts[#pts + 1], pts[#pts + 2] = x + 4 + d, y + base + sway
+				else
+					pts[#pts + 1], pts[#pts + 2] = x + w - 4 - d, y + base + sway
+				end
+			end
+			lg.line(pts)
+		end
+		local blink = (math.sin(t * 1.3) > 0.9) and 0.2 or 1
+		for _, ex in ipairs({ w / 2 - 22, w / 2 + 22 }) do
+			lg.setColor(0.8, 0.3, 1)
+			lg.ellipse("fill", x + ex, y + 26, 9, 5 * blink)
+			lg.setColor(0, 0, 0)
+			lg.ellipse("fill", x + ex, y + 26, 2.5, 5 * blink)
+		end
+	end,
+	Rainbow = function(x, y, w, h, t) -- a band of shifting colours
+		local seg = 8
+		for i = 0, math.floor((w - 8) / seg) - 1 do
+			lg.setColor(hue(i * 0.07 - t * 0.4))
+			lg.rectangle("fill", x + 4 + i * seg, y + 3, seg, 6)
+			lg.rectangle("fill", x + 4 + i * seg, y + h - 9, seg, 6)
+		end
+		for i = 0, math.floor((h - 8) / seg) - 1 do
+			lg.setColor(hue(i * 0.07 + 0.5 - t * 0.4))
+			lg.rectangle("fill", x + 3, y + 4 + i * seg, 6, seg)
+			lg.rectangle("fill", x + w - 9, y + 4 + i * seg, 6, seg)
+		end
+	end,
+	Stone = function(x, y, w, h, t) -- a wall of grey bricks
+		local bw, bt = 22, 9
+		local function brick(bx, by, bw2, bh, i)
+			local g = 0.45 + 0.2 * rnd(i)
+			lg.setColor(g, g, g + 0.04)
+			lg.rectangle("fill", bx, by, bw2, bh)
+			lg.setColor(0.18, 0.18, 0.2)
+			lg.setLineWidth(1)
+			lg.rectangle("line", bx + 0.5, by + 0.5, bw2 - 1, bh - 1)
+		end
+		local i = 0
+		for px = x, x + w - 1, bw do
+			i = i + 1
+			local bw2 = math.min(bw, x + w - px)
+			brick(px, y, bw2, bt, i)
+			brick(px, y + h - bt, bw2, bt, i + 40)
+		end
+		for py = y + bt, y + h - bt - 1, bw do
+			i = i + 1
+			local bh = math.min(bw, y + h - bt - py)
+			brick(x, py, bt, bh, i)
+			brick(x + w - bt, py, bt, bh, i + 40)
+		end
+	end,
+}
+
 function borders.draw(name, x, y, w, h, tier)
 	if name == "Brew" or name == "Spell" then
 		support(name, x, y, w, h)
 		return
 	end
-	if borders[name] and name ~= "Basic" then
-		local c, pulse = colour(name), 0.5 + 0.5 * math.sin(time * 4)
-		lg.setColor(c[1], c[2], c[3], 0.75 + 0.25 * pulse)
-		lg.setLineWidth(5)
-		lg.rectangle("line", x + 3, y + 3, w - 6, h - 6)
-		lg.setColor(c[1], c[2], c[3], 0.4 + 0.5 * pulse)
-		for _, corner in ipairs({ { 3, 3 }, { w - 3, 3 }, { 3, h - 3 }, { w - 3, h - 3 } }) do
-			lg.circle("fill", x + corner[1], y + corner[2], 7)
-		end
+	if THEMES[name] then
+		-- everything is clipped to the card's rounded outline
+		lg.stencil(function() lg.rectangle("fill", x, y, w, h, CORNER + 2, CORNER + 2) end, "replace", 1, true)
+		lg.setStencilTest("greater", 0)
+		THEMES[name](x, y, w, h, now())
+		lg.setStencilTest()
 		lg.setLineWidth(1)
 		lg.setColor(1, 1, 1)
 	end

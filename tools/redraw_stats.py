@@ -20,9 +20,6 @@ for f in sorted(os.listdir(src)):
             draw_cards.fill(grid, 3, 2, 5, 6)
             draw_cards.fill(grid, 3, 41, 7, 45)
             draw_cards.fill(grid, 26, 41, 30, 45)
-            draw_cards.draw_text(grid, str(cost), 3, 2, draw_cards.GREEN)
-            draw_cards.draw_text(grid, str(attack), 3, 41, draw_cards.RED)
-            draw_cards.draw_text(grid, str(defense), 26 if defense > 9 else 27, 41, draw_cards.BLUE)
         else:
             draw_cards.draw_stats(grid, cost, attack, defense, rarity)
         draw_cards.save(grid, os.path.join(out, f))

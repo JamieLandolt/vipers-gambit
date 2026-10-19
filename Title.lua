@@ -58,20 +58,6 @@ title.styles = {
 		tongues = { V = { 2, 7, 0, 1 }, T = { 2, 7, 0, 1 }, S = { 5, 0, 1, 0 }, I = { 2, 7, 0, 1 } },
 	},
 	{
-		name = "Neon",
-		gap = 3,
-		fill = function(_, _, u)
-			return 0.75 - 0.5 * u, 0.3 + 0.6 * u, 0.95
-		end,
-		snake = { 0.6, 1, 0.3 },
-		shadow = { 1, 0.2, 0.8, 0.22 },
-		offsets = SIDES,
-		eye = { 0.6, 1, 0.3 },
-		tongue = { 1, 0.3, 0.75 },
-		eyes = { P = { 2, 1 }, G = { 2, 2 }, S = { 3, 0 } },
-		tongues = { V = { 2, 7, 0, 1 }, T = { 2, 7, 0, 1 }, S = { 5, 0, 1, 0 } },
-	},
-	{
 		name = "Gold",
 		fill = function(_, r)
 			local k = (r - 1) / 6

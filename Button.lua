@@ -39,7 +39,7 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 	end
 
 	return {
-		edge_buttons = { "Play", "Back", "Switch Background", "Hand" },
+		edge_buttons = { "Back", "Switch Background", "Hand" },
 		icon = icon,
 		icon_scale = icon_scale,
 		font = font,
@@ -99,7 +99,16 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 				lg.draw(self.icon, math.floor(icon_x), math.floor(icon_y), 0, scale)
 			end
 
-			if self.text ~= "" then
+			if self.text == "Back" then -- every back button is a left arrow
+				local cx, cy = self.x + self.width / 2, self.y + self.height / 2
+				local arrow = { cx - 20, cy, cx - 4, cy - 15, cx - 4, cy - 6, cx + 20, cy - 6, cx + 20, cy + 6, cx - 4, cy + 6, cx - 4, cy + 15 }
+				lg.setColor(0, 0, 0, 0.5)
+				lg.translate(2, 3)
+				lg.polygon("fill", arrow)
+				lg.translate(-2, -3)
+				lg.setColor(hovered and { 1, 1, 1 } or CREAM)
+				lg.polygon("fill", arrow)
+			elseif self.text ~= "" then
 				local text_x = self.x + (self.width - self.font:getWidth(self.text)) / 2
 				local text_y = self.top_text and self.y + 10 or self.y + (self.height - self.font:getHeight()) / 2
 				lg.setColor(0, 0, 0, 0.5)

@@ -2,6 +2,7 @@
 -- New snakes bring their own lore in NewCards.lua; a snake listed here overrides it.
 local lore = {
 	tiers = { "Hatchling", "Fanged", "Ancient", "Royal", "Mythic" },
+	support_tiers = { "Common", "Uncommon", "Rare", "Epic", "Legendary" }, -- brews and spells
 
 	-- Land: the Dustwild
 	Cannibal_Snake = "Eats other snakes; the Court bans it from banquets.",

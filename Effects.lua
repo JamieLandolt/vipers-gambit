@@ -8,12 +8,28 @@ local assets = require("Assets")
 local effects = {}
 local list = {}
 
-local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9 }
+local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9, sound = 0.3, shake = 0.35 }
 local FALL = 0.25 -- how long a placed card takes to land
 
 function effects.add(kind, fields)
 	fields.kind, fields.t0 = kind, time + (fields.delay or 0)
 	table.insert(list, fields)
+end
+
+-- Screen shake: `amount` pixels at its start, fading over 0.35 seconds (skipped by the Reduce motion setting)
+function effects.shake(amount, delay)
+	if not reduce_motion then
+		effects.add("shake", { amount = amount, delay = delay })
+	end
+end
+
+-- When the effects playing now will all have finished (so the end screen can wait for the last attack)
+function effects.settled()
+	local last = time
+	for _, e in ipairs(list) do
+		last = math.max(last, e.t0 + (LIFE[e.kind] or 0.5))
+	end
+	return last
 end
 
 function effects.clear()
@@ -61,6 +77,19 @@ function effects.ghosts()
 	return ghosts
 end
 
+-- Where the whole screen is nudged to right now
+function effects.screen_offset()
+	local dx, dy = 0, 0
+	for _, e in ipairs(list) do
+		local age = time - e.t0
+		if e.kind == "shake" and age >= 0 then
+			local u = 1 - age / LIFE.shake
+			dx, dy = dx + math.sin(age * 90) * e.amount * u, dy + math.cos(age * 110) * e.amount * u
+		end
+	end
+	return dx, dy
+end
+
 -- Horizontal shake and white flash for a side's health bar
 function effects.bar(side)
 	local dx, flash = 0, 0
@@ -102,7 +131,12 @@ function effects.draw()
 				lg.setLineWidth(1)
 				sparks(e.cx, e.cy, u, 12, { 1, 1, 0.7 }, 190)
 			elseif e.kind == "hit" then
-				sparks(e.cx, e.cy, math.min(age / 0.4, 1), 8, { 1, 0.45, 0.2 }, 110)
+				-- sparks take the attacker's border colour (orange when it has none)
+				local colour = e.border and require("Borders").colour(e.border) or { 1, 0.45, 0.2 }
+				sparks(e.cx, e.cy, math.min(age / 0.4, 1), 8, colour, 110)
+			elseif e.kind == "sound" and not e.done then
+				e.done = true
+				require("Sounds").play(e.name)
 			elseif e.kind == "dead" then
 				sparks(e.cx, e.cy, math.min(age / 0.5, 1), 14, { 0.9, 0.2, 0.2 }, 200)
 			elseif e.kind == "float" then

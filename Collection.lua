@@ -14,6 +14,12 @@ collection.PACKS = {
 	{ name = "Elite Pack", kind = "snake", cost = 250, floor = 3, colour = { 1, 0.8, 0.2 },
 		early = { 0, 0, 80, 19, 1 }, late = { 0, 0, 40, 45, 15 }, border = { 0.25, 0.6 } },
 }
+-- Reward packs from achievements: tokens[i] free openings of pack i (tokens.txt, "a b c")
+local tokens = {}
+for i in ipairs(collection.PACKS) do
+	tokens[i] = 0
+end
+local rivals -- per-opponent record, loaded on first use (see load_rivals)
 collection.SACRIFICE = 3 -- same-tier snakes given up for one snake of the next tier
 collection.pack_kind = 0 -- the pack just opened (an index in PACKS), or 0 for a summon
 
@@ -26,10 +32,9 @@ collection.MIN_DECK, collection.MAX_DECK = 8, 20
 collection.deck_mode = false -- the collection screen is editing the deck
 
 local owned, last_pack = {}, "-"
-local recipe_open = {} -- targets of the sacrifice recipes discovered so far
 -- variants[name][border] = how many of your copies of a snake carry a border other than its own (they are counted in owned[name] too)
 local variants = {}
-local BORDERS = { "Venom", "Fire", "Frost", "Shadow", "Gold", "Rainbow" }
+local BORDERS = { "Venom", "Fire", "Shadow", "Rainbow", "Stone" }
 local BORDERS_SET = {}
 for _, border in ipairs(BORDERS) do
 	BORDERS_SET[border] = true
@@ -69,11 +74,12 @@ function collection.save()
 end
 
 function collection.load()
+	collection.load_tokens()
 	local lines = {}
 	for line in (love.filesystem.read("save.txt") or ""):gmatch("[^\n]+") do
 		table.insert(lines, line)
 	end
-	unlocked = tonumber(lines[1]) or 1
+	unlocked = math.min(tonumber(lines[1]) or 1, #require("Opponents"))
 	collection.unlock_all = lines[2] == "1"
 	last_pack = lines[3] or "-"
 	owned, variants = {}, {}
@@ -105,12 +111,6 @@ function collection.load()
 		end
 	end
 
-	-- recipes.txt: the sacrifice recipes you have discovered, one snake name per line
-	recipe_open = {}
-	for name in (love.filesystem.read("recipes.txt") or ""):gmatch("[^\n]+") do
-		recipe_open[name] = true
-	end
-	collection.update_recipes()
 
 	-- deck.txt: one snake name per line
 	local saved = love.filesystem.read("deck.txt")
@@ -139,9 +139,18 @@ function collection.reset()
 	love.filesystem.remove("finale.txt")
 	love.filesystem.remove("hints.txt")
 	love.filesystem.remove("recipes.txt")
-	recipe_open = {}
 	love.filesystem.remove("challenges.txt")
-	collection.seen, collection.beaten = nil, nil
+	love.filesystem.remove("vials.txt")
+	love.filesystem.remove("tutorial1.txt")
+	require("Tutorial").done = false
+	vials, vials_since = collection.VIALS_MAX, os.time()
+	require("Achievements").reset()
+	for i in ipairs(tokens) do
+		tokens[i] = 0
+	end
+	love.filesystem.remove("tokens.txt")
+	collection.seen, rivals = nil, nil
+	love.filesystem.remove("rivals.txt")
 	for _, name in ipairs(STARTERS) do
 		owned[name] = 1
 	end
@@ -383,30 +392,119 @@ function collection.owned_count()
 	return n
 end
 
--- Challenges you have beaten (challenges.txt: one level number per line); each reveals the next
-function collection.challenge_done(level)
-	if not collection.beaten then
-		collection.beaten = {}
-		for line in (love.filesystem.read("challenges.txt") or ""):gmatch("%d+") do
-			collection.beaten[tonumber(line)] = true
+-- How many copies of snakes you own carry the border (the ones with their own natural border included)
+function collection.border_count(border)
+	local n = 0
+	for name, count in pairs(owned) do
+		local st = data.stats_by_name[name]
+		local variant = variant_total(name)
+		if st.border == border then
+			n = n + count - variant
+		end
+		n = n + ((variants[name] or {})[border] or 0)
+	end
+	return n
+end
+
+-- Your snakes wearing a border, as { name, count } in card order
+function collection.border_holders(border)
+	local list = {}
+	for _, name in ipairs(data.deck) do
+		local n = ((variants[name] or {})[border] or 0)
+		if data.stats_by_name[name].border == border then
+			n = n + collection.count(name) - variant_total(name)
+		end
+		if n > 0 then
+			table.insert(list, { name, n })
 		end
 	end
-	return collection.beaten[level] == true
+	return list
 end
 
-function collection.mark_challenge(level)
-	collection.challenge_done(level)
-	collection.beaten[level] = true
-	local lines = {}
-	for l in pairs(collection.beaten) do
-		table.insert(lines, l)
+-- Record against each opponent (rivals.txt, one "level wins challenges endless" line per level): matches won, how many of the
+-- level's three challenges are cleared, and endless rematches won. Saves from before challenges had tiers (challenges.txt) count as one.
+local function load_rivals()
+	if rivals then
+		return rivals
 	end
-	love.filesystem.write("challenges.txt", table.concat(lines, "\n"))
+	rivals = {}
+	local text = love.filesystem.read("rivals.txt")
+	if text then
+		for level, wins, chal, endless in text:gmatch("(%d+) (%d+) (%d+) (%d+)") do
+			rivals[tonumber(level)] = { wins = tonumber(wins), chal = tonumber(chal), endless = tonumber(endless) }
+		end
+	else
+		for level in (love.filesystem.read("challenges.txt") or ""):gmatch("%d+") do
+			rivals[tonumber(level)] = { wins = 1, chal = 1, endless = 0 }
+		end
+	end
+	return rivals
 end
 
--- Sacrifice opens up once you have beaten the second opponent
+local function rival(level)
+	local all = load_rivals()
+	all[level] = all[level] or { wins = 0, chal = 0, endless = 0 }
+	return all[level]
+end
+
+function collection.wins(level) return rival(level).wins end
+function collection.challenges_done(level) return rival(level).chal end
+function collection.endless(level) return rival(level).endless end
+
+-- Has the plain level been beaten? (older saves only have the unlocked level to go by)
+function collection.beaten_base(level)
+	return level > 0 and (rival(level).wins > 0 or level < unlocked or (level == #require("Opponents") and love.filesystem.getInfo("finale.txt") ~= nil))
+end
+
+-- A win over `level` (`challenge` is the fight's challenge table, if it was one)
+function collection.record_win(level, challenge)
+	local r = rival(level)
+	r.wins = r.wins + 1
+	if challenge and challenge.endless then
+		r.endless = r.endless + 1
+	elseif challenge and challenge.tier == r.chal + 1 then
+		r.chal = r.chal + 1
+	end
+	local lines, best, chals, endless = {}, 0, 0, 0
+	for l, v in pairs(rivals) do
+		lines[#lines + 1] = l .. " " .. v.wins .. " " .. v.chal .. " " .. v.endless
+		best, chals, endless = math.max(best, v.wins), chals + v.chal, endless + v.endless
+	end
+	love.filesystem.write("rivals.txt", table.concat(lines, "\n"))
+	local ach = require("Achievements")
+	ach.set("rival_wins", best)
+	ach.set("challenges", chals)
+	ach.set("endless", endless)
+end
+
+-- Imbuing opens up once you have beaten the 10th opponent, and so does the Snake God's altar (sacrifice)
+-- Deck building opens with the Collection, after the 5th opponent
+function collection.deck_unlocked()
+	return collection.unlock_all or unlocked >= 6
+end
+
+-- The collection opens on a page of sections (snakes, brews, spells, borders); `section` is the kind being browsed
+collection.section, collection.return_to = nil, nil
+function collection.landing()
+	return not collection.deck_mode and not collection.sacrifice_mode and not collection.section
+end
+
+function collection.open_section(kind)
+	collection.clear_filters()
+	for _, other in ipairs({ "snake", "brew", "spell" }) do
+		if other ~= kind then
+			collection.toggle_filter("kind", other)
+		end
+	end
+	collection.section = kind
+end
+
+function collection.imbue_unlocked()
+	return collection.unlock_all or unlocked >= 11
+end
+
 function collection.sacrifice_unlocked()
-	return collection.unlock_all or unlocked >= 3
+	return collection.unlock_all or unlocked >= 11
 end
 
 -- One-time tips: hints.txt lists the ones already shown
@@ -434,15 +532,37 @@ function collection.pack_ready()
 	return last_pack ~= today()
 end
 
--- Snake eyes the pack costs right now: the first Serpent or Support pack each day is free
+local function save_tokens()
+	love.filesystem.write("tokens.txt", table.concat(tokens, " "))
+end
+function collection.load_tokens()
+	local i = 0
+	for n in (love.filesystem.read("tokens.txt") or ""):gmatch("%d+") do
+		i = i + 1
+		tokens[i] = tokens[i] and tonumber(n) or nil
+	end
+end
+function collection.give_pack(index)
+	tokens[index] = tokens[index] + 1
+	save_tokens()
+end
+function collection.tokens(index)
+	return tokens[index]
+end
+
+-- Does opening this pack right now use up a reward pack (rather than the free daily one)?
+local function uses_token(index)
+	return tokens[index] > 0 and not (collection.PACKS[index].daily and collection.pack_ready())
+end
+
+-- Snake eyes the pack costs right now: the first Serpent or Support pack each day is free, and so are reward packs
 function collection.price(index)
 	local pack = collection.PACKS[index]
-	return pack.daily and collection.pack_ready() and 0 or pack.cost
+	return (pack.daily and collection.pack_ready() or tokens[index] > 0) and 0 or pack.cost
 end
 
 local function add_copy(name, border)
 	owned[name] = (owned[name] or 0) + 1
-	collection.update_recipes()
 	if border and border ~= data.stats_by_name[name].border then
 		variants[name] = variants[name] or {}
 		variants[name][border] = (variants[name][border] or 0) + 1
@@ -489,6 +609,7 @@ function collection.open_pack(index)
 	if collection.eyes < price then
 		return nil, "Not enough snake eyes"
 	end
+	local token = uses_token(index)
 	local weights, border_chance = collection.odds(pack)
 	local pool, pulled = obtainable(pack.kind), {}
 	collection.pack_new, collection.pack_borders = {}, {}
@@ -509,15 +630,70 @@ function collection.open_pack(index)
 		table.insert(collection.pack_borders, border or data.stats_by_name[name].border)
 	end
 	collection.eyes = collection.eyes - price
-	if pack.daily and price == 0 then
+	if token then
+		tokens[index] = tokens[index] - 1
+		save_tokens()
+	elseif pack.daily and price == 0 then
 		last_pack = today()
 	end
 	collection.pack_kind = index
+	require("Achievements").add("packs")
+	require("Achievements").set("owned", collection.owned_count())
 	if deck_set then
 		save_deck()
 	end
 	collection.save()
 	return pulled
+end
+
+-- Venom vials: every campaign match costs 1, and it comes back over time (even while the game is closed).
+-- vials.txt holds "<points> <time the next point started refilling>". The first, guided match is free.
+collection.VIALS_MAX, collection.VIALS_REGEN = 5, 300 -- most you can hold, and seconds per point
+local vials, vials_since = collection.VIALS_MAX, os.time()
+
+local function refill()
+	local now = os.time()
+	if vials >= collection.VIALS_MAX then
+		vials_since = now
+		return
+	end
+	local gained = math.floor((now - vials_since) / collection.VIALS_REGEN)
+	if gained > 0 then
+		vials = math.min(vials + gained, collection.VIALS_MAX)
+		vials_since = vials >= collection.VIALS_MAX and now or vials_since + gained * collection.VIALS_REGEN
+	end
+end
+
+function collection.load_vials()
+	local points, since = (love.filesystem.read("vials.txt") or ""):match("^(%d+) (%d+)$")
+	if points then
+		vials, vials_since = math.min(tonumber(points), collection.VIALS_MAX), tonumber(since)
+	end
+	refill()
+end
+
+function collection.vials()
+	refill()
+	return vials
+end
+
+-- Seconds until the next venom vial (nil when full)
+function collection.vials_wait()
+	refill()
+	return vials < collection.VIALS_MAX and math.max(0, collection.VIALS_REGEN - (os.time() - vials_since)) or nil
+end
+
+function collection.spend_vials(amount)
+	refill()
+	if vials < amount then
+		return false
+	end
+	if vials >= collection.VIALS_MAX then
+		vials_since = os.time()
+	end
+	vials = vials - amount
+	love.filesystem.write("vials.txt", vials .. " " .. vials_since)
+	return true
 end
 
 -- Snake eyes for finishing a match
@@ -610,6 +786,7 @@ function collection.summon()
 	collection.pack_borders = { border }
 	add_copy(result, border)
 	collection.sacrificing, collection.pack_kind = {}, 0
+	require("Achievements").add("imbues")
 	if deck_set then
 		save_deck()
 	end
@@ -617,7 +794,7 @@ function collection.summon()
 	return { result }
 end
 
--- The Snake God's recipes: specific snakes in, one specific snake out. A recipe is discovered once you own everything it asks for.
+-- The Snake God's recipes: specific snakes in, one specific snake out. A recipe is only shown while you own everything it asks for.
 local recipes, recipe_for
 function collection.recipes()
 	if not recipes then
@@ -642,24 +819,9 @@ function collection.can_sacrifice(recipe)
 	return true
 end
 
+-- A recipe only shows while you own every snake it asks for (one copy of each is enough)
 function collection.recipe_known(recipe)
-	return collection.unlock_all or recipe_open[recipe.get] == true
-end
-
-function collection.update_recipes()
-	local changed = false
-	for _, recipe in ipairs(collection.recipes()) do
-		if not recipe_open[recipe.get] and collection.can_sacrifice(recipe) then
-			recipe_open[recipe.get], changed = true, true
-		end
-	end
-	if changed then
-		local lines = {}
-		for name in pairs(recipe_open) do
-			table.insert(lines, name)
-		end
-		love.filesystem.write("recipes.txt", table.concat(lines, "\n"))
-	end
+	return collection.unlock_all or collection.can_sacrifice(recipe)
 end
 
 -- Performs a recipe: gives up its snakes for its reward; returns { reward } or nil if you no longer own what it asks for

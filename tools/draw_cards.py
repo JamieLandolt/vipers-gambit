@@ -67,13 +67,11 @@ def draw_text(grid, text, x, y, color):
 
 
 def draw_stats(grid, cost, attack, defense, rarity):
+    """Clears the number boxes (the game prints cost, attack and defense itself, see CardText.lua) and marks the rarity."""
     fill(grid, 3, 2, 5, 6)
     fill(grid, 3, 41, 7, 45)
     fill(grid, 26, 41, 30, 45)
     fill(grid, 13, 41, 19, 45)
-    draw_text(grid, str(cost), 3, 2, GREEN)
-    draw_text(grid, str(attack), 3, 41, RED)
-    draw_text(grid, str(defense), 26 if defense > 9 else 27, 41, BLUE)
     for x in {1: [16], 2: [15, 17], 3: [14, 16, 18], 4: [13, 15, 17, 19]}[rarity]:
         for y in range(41, 45):
             grid[y][x] = GOLD

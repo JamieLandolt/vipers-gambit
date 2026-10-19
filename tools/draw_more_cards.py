@@ -90,7 +90,7 @@ add("Iron_Snake", "Land", 2, 3, "tank", "Basic", "Forged by a thousand rainy sea
 add("Sandstorm_Asp", "Land", 3, 4, "atk", "Gold", "Wears the desert wind like a golden hood.", "e6b84a", "fff0b0", "grad", "coilB", hood=2.2, hoodcol=hx("f4d878"), pp=dict(stops=cols("c8842a", "e6b84a", "f4d878", "fff0b0")), deco="sand")
 add("Tiger_Snake", "Land", 3, 5, "atk", "Fire", "Stripes like a tiger and a temper to match.", "e08a28", "2a2018", "bands", "S7", flip=True, head="spade", rb=3.5, pp=dict(period=4))
 add("Bushmaster", "Land", 3, 6, "bal", "Basic", "The largest viper in the dry forest, and the most patient.", "a8643a", "3e2418", "diamonds", "S8", rb=3.4, head="spade", acc=["spikes"], accol=hx("3e2418"), pp=dict(period=7))
-add("Basalt_Serpent", "Land", 3, 5, "tank", "Fire", "Cracks glow orange where the lava still sleeps beneath its scales.", "2a2228", "ff6a1e", "cracks", "Zs", rb=3.2, head="flat", eye=hx("ff9a3a"), deco="embers")
+add("Basalt_Serpent", "Land", 3, 5, "tank", "Fire", "Cracks glow orange where the lava still sleeps beneath its scales.", "2a2228", "ff6a1e", "cracks", "S9", rb=3.0, head="flat", eye=hx("ff9a3a"), deco="embers")
 add("Obsidian_Wyrm", "Land", 4, 6, "glass", "Fire", "Black glass scales, red veins, and a hunger that never cools.", "1a1a24", "c8283c", "chevron", "coilC", rb=3.3, head="viper", acc=["horns", "spikes"], accol=hx("c8283c"), acccols=dict(horns=hx("e8e0f0")), eye=hx("ff5a3a"), pp=dict(period=6))
 add("Colossus_Python", "Land", 4, 6, "tank", "Basic", "It has swallowed three explorers and still looks for more.", "9a7648", "3e2c1a", "net", "spiral", rb=3.6, head="flat")
 

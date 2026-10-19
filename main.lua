@@ -12,6 +12,10 @@ local charmers = require("Charmers")
 local tutorial = require("Tutorial")
 local lane_editor = require("LaneEditor")
 local settings = require("Settings")
+local coach = require("Coach")
+local effects = require("Effects")
+local achievements = require("Achievements")
+local versus = require("Versus")
 
 reference_window_width = 1440
 reference_window_height = 872
@@ -23,9 +27,9 @@ chosen_avatar = "Raja Kaal"
 chosen_opponent = "Ice King"
 scroll_offset_y = 0
 count = 0
-mouse_over_info = false
+held_since, held_at = 0, { 0, 0 } -- when and where the held snake was picked up (a quick click opens its info)
 mouse_over_info_background = false
-characters = { "Josh", "Michael" }
+characters = {} -- (Avatar.lua checks it)
 played_cards = {}
 card_hitboxes = {} -- x, y, width, height
 player_hand = {}
@@ -56,20 +60,28 @@ buttons = {
 	pack = {},
 	shop = {},
 	altar = {},
+	borders = {},
+	achievements = {},
 	ended = {},
 	info = {},
 	universal = {},
 	reset_confirm = {},
 	hub_popup = {},
+	gameplay = {},
+	play_menu = {},
 	level_choice = {},
 	sac_tutorial = {},
+	versus = {},
 }
 sac_tutorial = nil -- step (1-3) of the Sacrifice tutorial while it is showing
+achievements_return = "settings" -- where the achievements page's Back goes: the settings, or the menu when opened from there
 shop_return = "menu" -- where Back goes from the pack shop: the menu, or the collection when opened from there
 level_choice = nil -- the beaten level whose Play/Challenge dialog is open
 game = {
 	state = {
 		menu = true,
+		gameplay = false,
+		play_menu = false,
 		settings = false,
 		level_select = false,
 		character_select = false,
@@ -80,8 +92,11 @@ game = {
 		pack = false,
 		shop = false,
 		altar = false,
+		borders = false,
+		achievements = false,
 		ended = false,
 		info = false,
+		versus = false,
 	},
 }
 
@@ -119,6 +134,9 @@ function update_game_state(state)
 	end
 	animation = false
 	game.state[state] = true
+	if state == "menu" then
+		hub.return_to = nil
+	end
 end
 
 function contains(table, val)
@@ -157,10 +175,6 @@ local function handle_animations(dt)
 	if game.state["info"] then
 		mouse_over_info_background = buttons.info["Info Background"]:hover()
 	end
-
-	if game.state["playing"] then
-		mouse_over_info = buttons.playing["Info"]:hover()
-	end
 end
 
 function love.load()
@@ -173,6 +187,8 @@ function love.load()
 
 	love.window.setMode(reference_window_width, reference_window_height, { resizable = true, vsync = 0 })
 	collection.load()
+	collection.load_vials()
+	require("Achievements").load()
 	play.load_lanes()
 	charmers.load()
 	build_ui()
@@ -193,15 +209,26 @@ function love.update(dt)
 	h = lg.getHeight()
 
 	handle_animations(dt)
+	if map_press and love.mouse.isDown(1) and game.state["level_select"] and not level_choice then -- dragging the level map
+		local mx, my = love.mouse.getPosition()
+		local dx, dy = (mx - map_press.x) * reference_window_width / w, (my - map_press.y) * reference_window_height / h
+		map_press.x, map_press.y, map_press.moved = mx, my, map_press.moved + math.abs(dx) + math.abs(dy)
+		render.pan_map(dx, dy)
+	end
 	settings.update()
+	versus.update()
 	if game.state["playing"] then
 		tutorial.update()
-		if confirm_forfeit then
+		play.update_ending()
+		if settings.infinite_venom and venom and not play.versus then -- testing: the player's venom vials never run out
+			venom.Player = play.MAX_VENOM
+		end
+		if confirm_forfeit or play.ending then
 			return
 		elseif turn == "Player" then
 			-- Checks where to place a card if one has been let go since last update
 			play.place_card()
-		else
+		elseif not play.versus then
 			play.opponent_turn(dt)
 		end
 	end
@@ -209,6 +236,11 @@ end
 
 function love.mousepressed(x, y, button)
 	if button ~= 1 then
+		return
+	end
+
+	if coach.active() then -- a mini tutorial is showing: a click moves it on
+		coach.click()
 		return
 	end
 
@@ -233,7 +265,7 @@ function love.mousepressed(x, y, button)
 	end
 
 	if game.state["level_select"] and level_choice then -- only the choice dialog responds while it is open
-		for _, name in ipairs({ "Play", "Challenge", "Cancel" }) do
+		for _, name in ipairs({ "Play", "Cancel" }) do
 			buttons.level_choice[name]:checkPressed(x, y)
 		end
 		return
@@ -245,9 +277,13 @@ function love.mousepressed(x, y, button)
 	end
 
 	if game.state["menu"] then
-		if hub.popup then -- only the Deck & Lanes popup responds while it is open
-			for _, name in ipairs({ "Deck", "Lanes", "Cancel" }) do
-				buttons.hub_popup[name]:checkPressed(x, y)
+		local spot = hub.spotlight()
+		if #spot > 0 then -- something new is highlighted: clicking it opens it, clicking elsewhere just dismisses the note
+			local hit = hub.at(x, y)
+			if hit and contains(spot, hit) then
+				hub.click(hit)
+			else
+				hub.dismiss(spot)
 			end
 			return
 		end
@@ -260,8 +296,9 @@ function love.mousepressed(x, y, button)
 
 	-- Check if button on screen is clicked
 	local pressed = false
+	local hidden = game.state["playing"] and { [buttons.playing["Yes"]] = true, [buttons.playing["No"]] = true } or {} -- the forfeit buttons only exist while it is asked
 	for _, b in pairs(buttons[get_game_state()]) do
-		if b:checkPressed(x, y) then
+		if not hidden[b] and b:checkPressed(x, y) then
 			pressed = true
 		end
 	end
@@ -273,7 +310,29 @@ function love.mousepressed(x, y, button)
 		end
 	end
 
-	if game.state["collection"] and not pressed then
+	for _, screen in ipairs({ "gameplay", "play_menu" }) do
+		if game.state[screen] and not pressed then
+			local item = hub.screen_at(screen, x, y)
+			if item then
+				hub.screen_click(screen, item)
+			end
+		end
+	end
+
+	if game.state["collection"] and not pressed and collection.landing() then
+		local key = render.collection_tile_at(x, y)
+		if key == "borders" then
+			animation, animation_time = true, 0
+			update_animation_screen("borders")
+		elseif key then
+			collection.open_section(key)
+		end
+		if key then
+			play_sound(hover_sound)
+		end
+	end
+
+	if game.state["collection"] and not pressed and not collection.landing() then
 		local group, key = render.filter_icon_at(x, y)
 		local name = not group and render.collection_card_at(x, y)
 		if group then
@@ -298,6 +357,13 @@ function love.mousepressed(x, y, button)
 		end
 	end
 
+	if game.state["borders"] and not pressed and not border_view then
+		border_view = render.border_at(x, y)
+		if border_view then
+			play_sound(hover_sound)
+		end
+	end
+
 	if game.state["altar"] and not pressed then
 		local target = render.altar_row_at(x, y)
 		if target then
@@ -307,10 +373,15 @@ function love.mousepressed(x, y, button)
 	end
 
 	if game.state["character_select"] then
-		local name = render.charmer_at(x, y)
+		local skin_name, look = render.skin_at(x, y)
+		local name = skin_name or render.charmer_at(x, y)
 		if name then
 			chosen_avatar = name
-			charmers.save()
+			if skin_name then -- a small picture of one of the charmer's looks: pick the charmer and that look
+				charmers.set_skin(skin_name, look)
+			else
+				charmers.save()
+			end
 			play_sound(hover_sound)
 		end
 	end
@@ -320,18 +391,11 @@ function love.mousepressed(x, y, button)
 	end
 
 	if game.state["level_select"] and not pressed then
-		local level = render.level_at(x, y)
-		if level and level <= unlocked then
-			if level == 0 then
-				play.begin(level)
-			else
-				level_choice = level -- the briefing: reward, challenge, charmers and decks
-			end
-		end
+		map_press = { x = x, y = y, moved = 0 } -- a click opens the level, a drag pans the map (see love.mousereleased)
 	end
 
 	-- Check if card is clicked with no card in hand
-	if game.state["playing"] and turn == "Player" then
+	if game.state["playing"] and turn == "Player" and not play.ending then
 		-- Clicking one of your snakes on the field uses its activated ability
 		for slot = 5, 8 do
 			if played_cards[slot] and tutorial.allows("ability") and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
@@ -340,26 +404,57 @@ function love.mousepressed(x, y, button)
 		end
 		for card, hitbox in pairs(card_hitboxes) do
 			if play.is_hitbox(x, y, hitbox) then
+				local found
 				for i, c in pairs(player_hand) do
 					if c == card then
 						table.remove(player_hand, i)
-						held_index = i -- so it goes back to the same place if it isn't played
+						held_index, found = i, true -- so it goes back to the same place if it isn't played
+						break
 					end
 				end
-				card_hitboxes[card] = nil
-				held_card = card
+				if found then
+					card_hitboxes[card] = nil
+					held_card = card
+					held_since, held_at = time, { mouse.x, mouse.y }
+				end
 			end
 		end
 	end
 end
 
+function love.textinput(text)
+	if game.state["versus"] then
+		versus.textinput(text)
+	end
+end
+
+function love.keypressed(key)
+	if game.state["versus"] and key == "backspace" then
+		versus.backspace()
+	end
+end
+
 function love.mousereleased(x, y, button)
+	if button == 1 and map_press then
+		local press = map_press
+		map_press = nil
+		if press.moved < 10 and game.state["level_select"] and not level_choice then
+			local level = render.level_at(x, y)
+			if level and play.level_open(level) then
+				level_choice = level -- the briefing: reward, challenge, charmers and decks
+			end
+		end
+	end
 	if button == 1 and game.state["lanes"] then
 		lane_editor.release(x, y)
 	end
 end
 
-function love.wheelmoved(_, y)
+function love.wheelmoved(x, y)
+	if game.state["level_select"] and not level_choice then -- the level map scrolls in every direction
+		render.pan_map(x * 40, y * 40)
+		return
+	end
 	if scroll_offset_y + y < 0 then
 		scroll_offset_y = scroll_offset_y + y * 2
 	else
@@ -368,14 +463,35 @@ function love.wheelmoved(_, y)
 end
 
 function love.draw()
-	lg.scale(lg.getWidth() / reference_window_width)
+	lg.scale(lg.getWidth() / reference_window_width, lg.getHeight() / reference_window_height)
 
+	local shake_x, shake_y = 0, 0
+	if game.state["playing"] then
+		shake_x, shake_y = effects.screen_offset()
+	end
+	lg.translate(shake_x, shake_y)
 	render[get_game_state()]()
+	lg.translate(-shake_x, -shake_y)
+	coach.draw()
+
+	local toast = achievements.current()
+	if toast then -- an achievement banner slides down from the top
+		local slide = math.min((time - toast.t) * 4, 1)
+		local y = -80 + 95 * slide
+		lg.setColor(0.07, 0.04, 0.14, 0.95)
+		lg.rectangle("fill", 470, y, 500, 84, 10, 10)
+		lg.setColor(1, 0.85, 0.2)
+		lg.rectangle("line", 470, y, 500, 84, 10, 10)
+		lg.printf("Achievement: " .. toast.a[2], assets.font, 470, y + 2, 500, "center")
+		lg.setColor(0.85, 0.88, 1)
+		lg.printf(toast.a[3] .. "  (+ " .. achievements.PACK_NAMES[toast.a[6]] .. ")", assets.small_font, 470, y + 48, 500, "center")
+		lg.setColor(1, 1, 1)
+	end
 
 	if settings.debug then
 		lg.setColor(1, 0, 0)
 		lg.printf(tostring(debug_text), assets.debug_font, 10, 70, reference_window_width)
 		lg.setColor(1, 1, 1)
 	end
-	lg.scale(reference_window_width / lg.getWidth())
+	lg.scale(reference_window_width / lg.getWidth(), reference_window_height / lg.getHeight())
 end

@@ -4,7 +4,7 @@ local powers = require("Powers")
 local lore = require("Lore")
 
 local card_stats = {
-	Copperhead = stats(5, 10, 5, "N/A", "Basic", 3, nil, "N/A"),
+	Copperhead = stats(4, 10, 5, "N/A", "Basic", 3, nil, "N/A"),
 	Zombie_Snake = stats(3, 5, 5, "N/A", "Basic", 2, nil, "N/A"),
 	Cannibal_Snake = stats(3, 12, 3, "N/A", "Basic", 2, nil, "N/A"),
 	Cobra = stats(4, 8, 15, "N/A", "Basic", 4, nil, "N/A"),
@@ -13,7 +13,7 @@ local card_stats = {
 	Albino_Cobra = stats(4, 9, 12, "N/A", "Basic", 4, nil, "N/A"),
 	Blood_Cobra = stats(5, 12, 8, "N/A", "Basic", 4, nil, "N/A"),
 	Frost_Cobra = stats(4, 6, 14, "N/A", "Basic", 4, nil, "N/A"),
-	Rattlesnake = stats(5, 10, 5, "N/A", "Basic", 3, nil, "N/A"),
+	Rattlesnake = stats(4, 10, 5, "N/A", "Basic", 3, nil, "N/A"),
 	Coral_Snake = stats(2, 3, 2, "N/A", "Basic", 1, nil, "N/A"),
 	Garter_Snake = stats(1, 2, 3, "N/A", "Basic", 1, nil, "N/A"),
 	Kingsnake = stats(3, 5, 6, "N/A", "Basic", 2, nil, "N/A"),
@@ -21,12 +21,12 @@ local card_stats = {
 	Ball_Python = stats(3, 3, 9, "N/A", "Basic", 2, nil, "N/A"),
 	Tree_Boa = stats(4, 7, 6, "N/A", "Basic", 2, nil, "N/A"),
 	Sea_Snake = stats(2, 4, 3, "N/A", "Basic", 1, nil, "N/A"),
-	Golden_Snake = stats(6, 10, 10, "N/A", "Basic", 3, nil, "N/A"),
-	Black_Mamba = stats(4, 11, 3, "N/A", "Basic", 3, nil, "N/A"),
+	Golden_Snake = stats(5, 10, 10, "N/A", "Basic", 3, nil, "N/A"),
+	Black_Mamba = stats(3, 11, 3, "N/A", "Basic", 3, nil, "N/A"),
 	Horned_Viper = stats(3, 6, 4, "N/A", "Basic", 2, nil, "N/A"),
 	Gaboon_Viper = stats(6, 12, 11, "N/A", "Basic", 3, nil, "N/A"),
 	Vine_Snake = stats(1, 4, 1, "N/A", "Basic", 1, nil, "N/A"),
-	Lava_Snake = stats(5, 11, 6, "N/A", "Basic", 3, nil, "N/A"),
+	Lava_Snake = stats(4, 11, 6, "N/A", "Basic", 3, nil, "N/A"),
 	Shadow_Snake = stats(4, 9, 7, "N/A", "Basic", 3, nil, "N/A"),
 	Skeleton_Snake = stats(2, 5, 5, "N/A", "Basic", 2, nil, "N/A"),
 	Ghost_Snake = stats(3, 4, 8, "N/A", "Basic", 2, nil, "N/A"),
@@ -91,13 +91,20 @@ local ABILITY_OVERRIDES = {
 local HEALTH_SCALE = 1.5
 local MIN_ATTACK = 2
 
+local REMOVED_BORDERS = { Frost = true, Gold = true, Thorn = true, Leech = true, Storm = true } -- old borders: those snakes are Basic now
 local deck = {}
 for name, st in pairs(card_stats) do
 	st.kind = st.kind or "snake"
 	if st.kind == "snake" then
+		if REMOVED_BORDERS[st.border] then
+			st.border = "Basic"
+		end
 		st.attack = math.max(st.attack, MIN_ATTACK)
 		if st.rarity < 5 then
 			st.defense = math.ceil(st.defense * HEALTH_SCALE)
+		end
+		if st.border == "Shadow" then
+			st.defense = math.ceil(st.defense * 1.5)
 		end
 	end
 	table.insert(deck, name)
@@ -110,12 +117,22 @@ for name, st in pairs(card_stats) do
 		end
 		st.lore = lore[name] or st.lore
 	end
-	st.tier = lore.tiers[st.rarity]
+	st.tier = (st.kind == "snake" and lore.tiers or lore.support_tiers)[st.rarity]
 end
 table.sort(deck)
 
+-- A Shadow-border copy of a snake with another border has 1.5x defense (rounded up); cached per snake
+local shadow_stats = {}
 local function get_stats(card)
-	return card_stats[string.sub(card.card_path, 1, -5)]
+	local name = string.sub(card.card_path, 1, -5)
+	local st = card_stats[name]
+	if card.border == "Shadow" and st.border ~= "Shadow" and st.kind == "snake" then
+		if not shadow_stats[name] then
+			shadow_stats[name] = setmetatable({ defense = math.ceil(st.defense * 1.5) }, { __index = st })
+		end
+		return shadow_stats[name]
+	end
+	return st
 end
 
 local function get_type(card)
