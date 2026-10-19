@@ -114,7 +114,7 @@ for name, st in pairs(card_stats) do
 	table.insert(deck, name)
 	if st.kind == "snake" then -- (brews and spells carry their own text and lore, see Brews.lua)
 		if powers.of[name] then
-			st.ability = powers.of[name].text -- hand-made and unique, applied through Powers.lua
+			st.ability = powers.text(name) -- hand-made and unique, applied through Powers.lua
 		else
 			st.ability_code = ABILITY_OVERRIDES[name] or st.ability_code or abilities.assign(name, card_types[name], st.rarity)
 			st.ability = abilities.describe(st.ability_code)

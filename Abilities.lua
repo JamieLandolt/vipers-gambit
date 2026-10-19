@@ -1,16 +1,17 @@
 -- Snake abilities. A card's ability_code is "kind:arg:arg", several joined with "|".
---   Activated (pay venom, once per turn): strike:N:C  heal:N:C  shield:N:C  empower:N:C  drain:N:C  bolster:N:C  refresh:1:C
+--   Activated (pay venom, once per turn; every snake has one): strike:N:C  cripple:N:C  heal:N:C  shield:N:C  empower:N:C  drain:N:C  bolster:N:C  refresh:1:C
 --   Passive combos: pack:N  adj:Type:N  lone:N  first:N  lane:Type:N  guard:N  armor:N  thorns:N
 -- N is the strength and C the venom cost. Rules live here; Play.lua applies them and shows the effects.
 local abilities = {}
 
-local ACTIVE = { strike = true, heal = true, shield = true, empower = true, drain = true, bolster = true, refresh = true }
+local ACTIVE = { strike = true, heal = true, shield = true, empower = true, cripple = true, drain = true, bolster = true, refresh = true }
 
 local DESCRIPTIONS = {
 	strike = function(a) return ("Pay %d venom: hit the card ahead for %d"):format(a[2], a[1]) end,
 	heal = function(a) return ("Pay %d venom: restore %d health"):format(a[2], a[1]) end,
 	shield = function(a) return ("Pay %d venom: gain a %d point shield"):format(a[2], a[1]) end,
 	empower = function(a) return ("Pay %d venom: +%d attack for good"):format(a[2], a[1]) end,
+	cripple = function(a) return ("Pay %d venom: the card ahead loses %d attack for good"):format(a[2], a[1]) end,
 	drain = function(a) return ("Pay %d venom: hit the card ahead for %d and heal that much"):format(a[2], a[1]) end,
 	bolster = function(a) return ("Pay %d venom: neighbours get +%d attack this turn"):format(a[2], a[1]) end,
 	refresh = function(a) return ("Pay %d venom: your other snakes can use their abilities again this turn"):format(a[2]) end,
@@ -103,7 +104,7 @@ function abilities.attack(card, slot)
 	if ahead and ahead.brew == "smoke" then -- the enemy snake opposite drank a Smoke Draught: its smoke covers this lane
 		total = total - 2
 	end
-	return math.max(total + require("Powers").attack_bonus(card, slot), 0)
+	return math.max(total, 0)
 end
 
 -- Damage that gets through armor, guards, shields and the Shadow border's free dodge
@@ -112,7 +113,6 @@ function abilities.mitigate(defender, slot, damage)
 		defender.phased = true
 		return 0
 	end
-	damage = require("Powers").reduce(defender, slot, damage)
 	if defender.brew == "stone" or require("CardData").border_of(defender) == "Stone" then
 		damage = math.max(damage - 2, 1)
 	end
@@ -147,6 +147,10 @@ function abilities.thorns(card)
 end
 
 function abilities.active(card)
+	local cost = require("Powers").cost(card) -- hand-made powers are activated too
+	if cost then
+		return { kind = "power", args = { 0, cost } }
+	end
 	for _, ab in ipairs(abilities.of(card)) do
 		if ACTIVE[ab.kind] then
 			return ab
@@ -169,16 +173,26 @@ function abilities.ready(card, side)
 		end
 		return false
 	end
+	if ab.kind == "cripple" or ab.kind == "power" then -- some need a target
+		for slot, c in pairs(played_cards) do
+			if c == card then
+				if ab.kind == "power" then
+					return require("Powers").ready(card, slot)
+				end
+				return played_cards[slot > 4 and slot - 4 or slot + 4] ~= nil
+			end
+		end
+	end
 	local defense = require("CardData").get_stats(card).defense
 	return ab.kind ~= "heal" or (card.hp or defense) < defense
 end
 
 local POOLS = {
-	Land = { "strike", "pack", "bolster", "first", "lone" },
-	Water = { "heal", "drain", "lane:Water", "armor", "adj:Water" },
-	Tree = { "first", "adj:Tree", "guard", "heal", "pack" },
-	Spirit = { "thorns", "drain", "shield", "adj:Spirit", "strike" },
-	Rainbow = { "empower", "bolster", "adj:Any", "lone", "heal" },
+	Land = { "strike", "bolster", "empower", "cripple" },
+	Water = { "heal", "drain", "shield", "cripple" },
+	Tree = { "heal", "empower", "shield", "bolster" },
+	Spirit = { "drain", "cripple", "shield", "strike" },
+	Rainbow = { "empower", "bolster", "shield", "strike", "heal", "drain" },
 }
 
 -- Strength and venom cost per tier (1-5), tuned with tools/sim.lua so every kind is worth about the same.
@@ -189,6 +203,7 @@ local HEAL = { { 2, 1 }, { 5, 1 }, { 11, 1 }, { 14, 1 }, { 24, 2 } }
 local SHIELD = { { 1, 1 }, { 3, 1 }, { 9, 1 }, { 13, 1 }, { 15, 2 } }
 local EMPOWER = { { 1, 5 }, { 2, 2 }, { 3, 2 }, { 7, 2 }, { 5, 3 } }
 local BOLSTER = { { 1, 4 }, { 2, 1 }, { 3, 1 }, { 8, 2 }, { 8, 2 } }
+local CRIPPLE = EMPOWER
 local PACK = { 1, 1, 1, 2, 2 }
 local FIRST = { 1, 3, 3, 4, 4 }
 local LONE = { 3, 3, 4, 4, 6 }
@@ -208,7 +223,7 @@ local function build(kind, t)
 	end
 	local codes = {
 		strike = act("strike", STRIKE), drain = act("drain", DRAIN), heal = act("heal", HEAL),
-		shield = act("shield", SHIELD), empower = act("empower", EMPOWER), bolster = act("bolster", BOLSTER),
+		shield = act("shield", SHIELD), empower = act("empower", EMPOWER), cripple = act("cripple", CRIPPLE), bolster = act("bolster", BOLSTER),
 		pack = t == 1 and "lone:3" or "pack:" .. PACK[t], first = "first:" .. FIRST[t], lone = "lone:" .. LONE[t],
 		armor = "armor:" .. ARMOR[t], guard = "guard:" .. GUARD[t], thorns = "thorns:" .. THORNS[t],
 	}

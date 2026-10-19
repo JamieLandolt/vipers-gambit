@@ -79,7 +79,6 @@ local function place_effect(placed, sector)
 	end
 	local cx, cy = play.slot_centre(sector)
 	effects.add("place", { card = placed, cx = cx, cy = cy })
-	powers.trigger("play", placed, sector)
 	play.check_end()
 end
 
@@ -263,7 +262,6 @@ local function destroy(slot, delay)
 	effects.shake(6, delay)
 	effects.add("dead", { card = dead, sector = slot, cx = cx, cy = cy, delay = delay or 0 })
 	played_cards[slot] = nil
-	powers.trigger("death", dead, slot)
 end
 play.destroy = destroy
 
@@ -362,7 +360,6 @@ function play.start_turn()
 		local c = played_cards[slot]
 		if c then
 			c.used = nil
-			powers.trigger("turn", c, slot)
 			require("Brews").turn(play, c, slot)
 			local border = data.border_of(c)
 			if border == "Rainbow" then
@@ -650,7 +647,6 @@ function play.hit_now(attacker, slot, attack, delay)
 	effects.add("sound", { name = "hit", delay = delay })
 	play.note(play.name_of(attacker) .. " hits " .. play.name_of(defender) .. (damage > 0 and " for " .. damage or " (blocked)"))
 	if damage > 0 then
-		powers.trigger("hurt", defender, slot, attacker)
 	end
 
 	local border = data.border_of(attacker)
@@ -673,11 +669,6 @@ function play.hit_now(attacker, slot, attack, delay)
 			play.hurt(owner, math.ceil(-defender.hp * (attacker.brew == "fire" and 1.5 or 1)), delay)
 		end
 		destroy(slot, delay)
-		for s, c in pairs(played_cards) do
-			if c == attacker then
-				powers.trigger("kill", attacker, s)
-			end
-		end
 	end
 
 	local thorns = abilities.thorns(defender)
@@ -707,7 +698,6 @@ function play.resolve_combat(side)
 				attacker.frozen = nil
 				float(slot, "frozen", delay)
 			else
-				powers.trigger("attack", attacker, slot)
 				effects.add("lunge", { card = attacker, dir = side == "Player" and -1 or 1, delay = delay })
 				play.hit(attacker, side == "Player" and column or column + 4, abilities.attack(attacker, slot), delay + 0.17)
 			end
@@ -724,7 +714,7 @@ end
 
 local ABILITY_COLOUR = {
 	strike = { 1, 0.35, 0.3 }, drain = { 0.85, 0.2, 0.5 }, heal = { 0.4, 1, 0.55 }, shield = { 0.55, 0.8, 1 },
-	empower = { 1, 0.6, 0.2 }, refresh = { 1, 0.95, 0.4 }, bolster = { 1, 0.8, 0.3 },
+	empower = { 1, 0.6, 0.2 }, cripple = { 0.6, 0.4, 0.9 }, power = { 0.9, 0.5, 1 }, refresh = { 1, 0.95, 0.4 }, bolster = { 1, 0.8, 0.3 },
 }
 
 -- Pay venom to use the snake in `slot`'s activated ability (once per turn)
@@ -758,6 +748,12 @@ function play.activate(slot)
 		card.shield = (card.shield or 0) + n
 	elseif kind == "empower" then
 		card.bonus = (card.bonus or 0) + n
+	elseif kind == "power" then
+		powers.use(card, slot)
+	elseif kind == "cripple" then
+		local foe = played_cards[ahead]
+		foe.bonus = (foe.bonus or 0) - n
+		float(ahead, "-" .. n .. " atk")
 	elseif kind == "refresh" then -- other snakes may use their abilities again (not other refreshers, so it can't loop)
 		for other = side == "Player" and 5 or 1, side == "Player" and 8 or 4 do
 			local c = played_cards[other]

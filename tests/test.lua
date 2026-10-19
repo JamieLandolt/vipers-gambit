@@ -121,13 +121,31 @@ check("fireball hits the chosen snake", played_cards[1] == nil or (played_cards[
 check("fireball leaves the other alone", (played_cards[2].hp or strong_hp) == strong_hp)
 require("Brews").by_name.Fireball.cast(play, "Player")
 check("no target picks the strongest", (played_cards[2].hp or strong_hp) < strong_hp)
--- A Zombie Snake destroyed returns to its owner's hand without pushing another card out
-play.new_game(5)
+-- Every snake has an ability paid for in venom
+local data, abilities = require("CardData"), require("Abilities")
+for _, name in ipairs(data.deck) do
+	if data.stats_by_name[name].kind == "snake" then
+		check(name .. " has a venom ability", abilities.active(card(name)) ~= nil)
+	end
+end
+
+-- A hurt Zombie Snake pays venom to return to its owner's hand without pushing another card out
+played_cards = {}
 played_cards[6] = card("Zombie_Snake")
+played_cards[6].hp = 1
+venom.Player = 5
 local before = #player_hand
-play.destroy(6)
-check("zombie joins the hand", #player_hand == before + 1)
+check("zombie is ready when hurt", abilities.ready(played_cards[6], "Player"))
+play.activate(6)
+check("zombie joins the hand", #player_hand == before + 1 and played_cards[6] == nil)
 play.start_turn()
 check("zombie stays after the next draw", #player_hand == before + 1)
+
+-- Cripple takes attack from the snake opposite
+played_cards[5], played_cards[1] = card("Cobra"), card("Cobra")
+played_cards[5].used = nil
+local atk = abilities.attack(played_cards[1], 1)
+play.activate(5)
+check("power takes effect", played_cards[1].bonus == -4 and abilities.attack(played_cards[1], 1) == math.max(atk - 4, 0))
 print(fails == 0 and "all tests passed" or fails .. " FAILED")
 os.exit(fails == 0 and 0 or 1)
