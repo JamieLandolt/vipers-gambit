@@ -633,19 +633,31 @@ end
 local MILESTONE_TIER = { [3] = 3, [10] = 4 } -- level -> tier of the snake its first win gives
 collection.MILESTONE_TIER = MILESTONE_TIER
 
--- The three snakes a win over `level` can give: the opponent's best snakes
+-- The three snakes a win over `level` can give. All the snakes below mythic (except your starters) are ranked by attack plus
+-- health and spread evenly over the 18 levels, three each and never repeated, so every level unlocks different snakes and
+-- later levels give stronger ones.
+local reward_ladder
 function collection.level_rewards(level)
-	local snakes = {}
-	for _, name in ipairs(require("Opponents")[level].deck) do
-		if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) and not contains(snakes, name) then
-			snakes[#snakes + 1] = name
+	if not reward_ladder then
+		local ranked = {}
+		for tier = 1, 4 do
+			for _, name in ipairs(obtainable("snake")[tier]) do
+				if not contains(STARTERS, name) then
+					ranked[#ranked + 1] = name
+				end
+			end
+		end
+		table.sort(ranked, function(a, b)
+			local ta, tb = stat(a, "attack") + stat(a, "defense"), stat(b, "attack") + stat(b, "defense")
+			return ta < tb or (ta == tb and a < b)
+		end)
+		local slots = 3 * #require("Opponents")
+		reward_ladder = {}
+		for i = 1, slots do
+			reward_ladder[i] = ranked[math.floor(1 + (i - 1) * (#ranked - 1) / (slots - 1) + 0.5)]
 		end
 	end
-	table.sort(snakes, function(a, b)
-		local ta, tb = stat(a, "attack") + stat(a, "defense"), stat(b, "attack") + stat(b, "defense")
-		return ta > tb or (ta == tb and a < b)
-	end)
-	return { unpack(snakes, 1, 3) }
+	return { unpack(reward_ladder, 3 * level - 2, 3 * level) }
 end
 
 -- Every win drops one of the level's three reward snakes (a third each) with a random border. The first win over level 3 or
