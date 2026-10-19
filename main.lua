@@ -137,7 +137,7 @@ function update_game_state(state)
 	animation = false
 	game.state[state] = true
 	if state == "menu" then
-		hub.return_to = nil
+		hub.return_to, hub.entered = nil, time
 	end
 end
 
@@ -219,7 +219,7 @@ function love.update(dt)
 	end
 	settings.update()
 	versus.update()
-	if field_press and love.mouse.isDown(1) and not field_press.drag then -- dragging a snake off its slot retreats it, not a click
+	if field_press and love.mouse.isDown(1) and not field_press.drag then -- dragging a snake off its slot sacrifices it, not a click
 		local mx, my = love.mouse.getPosition()
 		field_press.drag = math.abs(mx - field_press.x) + math.abs(my - field_press.y) > 12
 	end
@@ -285,6 +285,9 @@ function love.mousepressed(x, y, button)
 	if game.state["menu"] then
 		local spot = hub.spotlight()
 		if #spot > 0 then -- something new is highlighted: clicking it opens it, clicking elsewhere just dismisses the note
+			if time - (hub.entered or 0) < 0.5 then -- ignore clicks for the first half second so it is not dismissed by accident
+				return
+			end
 			local hit = hub.at(x, y)
 			if hit and contains(spot, hit) then
 				hub.click(hit)
@@ -412,7 +415,7 @@ function love.mousepressed(x, y, button)
 		map_press = { x = x, y = y, moved = 0 } -- a click opens the level, a drag pans the map (see love.mousereleased)
 	end
 
-	-- A snake on the field: a quick click uses its ability (on release); dragging it onto the hand retreats it
+	-- A snake on the field: a quick click uses its ability (on release); dragging it onto the hand sacrifices it
 	if game.state["playing"] and not play.ending and not held_card then
 		for slot = 1, 8 do
 			if played_cards[slot] and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
@@ -460,10 +463,10 @@ function love.mousereleased(x, y, button)
 		local press = field_press
 		field_press = nil
 		local mine = press.slot > 4 and played_cards[press.slot] and turn == "Player" and not play.ending
-		if mine and press.drag then -- let go over the hand: the snake retreats
+		if mine and press.drag then -- let go over the hand: the snake is sacrificed
 			local tray = buttons.playing["Card Background"]
 			if play.is_hitbox(x, y, { tray.x, tray.y, tray.width, tray.height }) then
-				play.retreat(press.slot)
+				play.sacrifice(press.slot)
 			end
 		elseif mine and tutorial.allows("ability") then
 			play.activate(press.slot)

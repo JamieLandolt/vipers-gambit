@@ -2773,7 +2773,7 @@ function render.playing()
 		lg.setColor(0, 0, 0, 0.8)
 		lg.rectangle("fill", mx + 18, my + 10, 300, 34, 6, 6)
 		lg.setColor(over and 1 or 0.8, over and 0.85 or 0.8, over and 0.3 or 0.9)
-		lg.printf(over and "Let go to retreat it (it is lost)" or "Drop on your hand to retreat", assets.debug_font, mx + 26, my + 18, 290, "left")
+		lg.printf(over and "Let go to sacrifice it (it dies)" or "Drop on your hand to sacrifice", assets.debug_font, mx + 26, my + 18, 290, "left")
 		lg.setColor(1, 1, 1)
 	end
 

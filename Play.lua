@@ -211,13 +211,22 @@ local function sort_hand(hand)
 end
 play.sort_hand = sort_hand
 
-local function fill_hand(hand, deck, size, deck_borders)
-	local chosen = {}
-	while #hand < (size or HAND_SIZE) do
-		local index = math.random(1, #deck)
-		if not contains(chosen, index) then
+-- Each side draws from a shuffled pile of its deck: up to `size` cards, but always at least one a turn
+-- (hands hold up to 8), until the pile runs out
+local function fill_hand(side, hand, deck, size, deck_borders)
+	play.pile = play.pile or {}
+	local pile = play.pile[side]
+	if not pile then
+		pile = {}
+		for i = 1, #deck do
+			table.insert(pile, math.random(1, #pile + 1), i)
+		end
+		play.pile[side] = pile
+	end
+	for _ = 1, math.max((size or HAND_SIZE) - #hand, 1) do
+		local index = #hand < 8 and table.remove(pile)
+		if index then
 			table.insert(hand, card(deck[index] .. ".png", img_widths, img_heights, deck_borders and deck_borders[index] or nil))
-			table.insert(chosen, index)
 		end
 	end
 	sort_hand(hand)
@@ -265,16 +274,14 @@ local function destroy(slot, delay)
 end
 play.destroy = destroy
 
--- Pulls one of your snakes off the field. It does not come back to your hand, and nothing triggers.
-function play.retreat(slot)
-	local c = played_cards[slot]
-	if not c or slot <= 4 or play.versus then
+-- Sacrifice one of your snakes for free: it dies (a choice, so it does not count as a snake lost in battle)
+function play.sacrifice(slot)
+	if not played_cards[slot] or slot <= 4 or play.versus then
 		return
 	end
-	local cx, cy = play.slot_centre(slot)
-	played_cards[slot] = nil
-	effects.add("float", { x = cx, y = cy, text = "retreat" })
-	play.note("You retreat " .. play.name_of(c))
+	local lost = play.lost_snake
+	destroy(slot)
+	play.lost_snake = lost
 end
 
 -- Has either side run out of health? Ends the match if so.
@@ -351,9 +358,9 @@ function play.start_turn()
 	venom[turn] = math.min(venom[turn] + max_venom[turn], MAX_VENOM) -- unspent venom carries over
 	if turn == "Player" then
 		local deck, deck_borders = player_deck()
-		fill_hand(player_hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
+		fill_hand("Player", player_hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
 	else
-		fill_hand(opponent_hand, profile.deck, nil, profile.deck_borders)
+		fill_hand("Opponent", opponent_hand, profile.deck, nil, profile.deck_borders)
 	end
 
 	for slot = turn == "Player" and 5 or 1, turn == "Player" and 8 or 4 do
@@ -440,7 +447,7 @@ function play.new_game(level, challenge)
 	health = { Player = mine, Opponent = theirs }
 	max_venom = { Player = 1, Opponent = 1 + (profile.venom or 0) + (c.opp_venom or 0) } -- start_turn adds the first point, so turn 1 has 2
 	venom = { Player = 0, Opponent = 0 }
-	played_cards, player_hand, opponent_hand = {}, {}, {}
+	played_cards, player_hand, opponent_hand, play.pile = {}, {}, {}, {}
 	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited = nil, nil, false, nil, nil, false
 	play.log, play.lost_snake, play.started = {}, false, time
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
@@ -470,7 +477,7 @@ function play.new_guest(host_charmer)
 	turn = "Opponent"
 	max_health, health = { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }, { Player = STARTING_HEALTH, Opponent = STARTING_HEALTH }
 	max_venom, venom = { Player = 1, Opponent = 1 }, { Player = 0, Opponent = 0 }
-	played_cards, player_hand, opponent_hand = {}, {}, {}
+	played_cards, player_hand, opponent_hand, play.pile = {}, {}, {}, {}
 	held_card, winner, confirm_forfeit, play.ending, play.ai_hold, play.forfeited = nil, nil, false, nil, nil, false
 	play.log, play.lost_snake = {}, false
 	play.charm_used, play.charm_cd = { Player = false, Opponent = false }, { Player = 0, Opponent = 0 }
@@ -595,18 +602,14 @@ function play.wound(slot, amount)
 end
 
 -- Discards a side's hand and draws a fresh one
--- Draws one more card into a side's hand (hands hold up to 8)
+-- Draws one more card into a side's hand (hands hold up to 8), if its pile has any left
 function play.draw_extra(side)
-	local hand = hand_of(side)
-	if #hand < 8 then
-		local deck, deck_borders = profile.deck, nil
-		if side == "Player" then
-			deck, deck_borders = player_deck()
-		end
-		local index = math.random(#deck)
-		table.insert(hand, card(deck[index] .. ".png", img_widths, img_heights, deck_borders and deck_borders[index] or nil))
-		sort_hand(hand)
+	local deck, deck_borders = profile.deck, profile.deck_borders
+	if side == "Player" then
+		deck, deck_borders = player_deck()
 	end
+	local hand = hand_of(side)
+	fill_hand(side, hand, deck, #hand + 1, deck_borders)
 end
 
 function play.redraw(side)
@@ -615,11 +618,13 @@ function play.redraw(side)
 		hand[i] = nil
 	end
 	card_hitboxes = {}
+	play.pile = play.pile or {}
+	play.pile[side] = nil -- a redraw reshuffles the whole deck
 	if side == "Player" then
 		local deck, deck_borders = player_deck()
-		fill_hand(hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
+		fill_hand(side, hand, deck, play.challenge and play.challenge.hand_size or nil, deck_borders)
 	else
-		fill_hand(hand, profile.deck, nil, profile.deck_borders)
+		fill_hand(side, hand, profile.deck, nil, profile.deck_borders)
 	end
 end
 
