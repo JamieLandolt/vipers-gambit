@@ -59,6 +59,46 @@ local function weakest(side)
 	return best
 end
 
+-- What a spell would hit right now, read from its text: the field slots of the snakes it affects, and the sides whose charmer
+-- it hits. (The field highlights these while the spell is dragged.)
+function brews.targets(def, side)
+	local text, slots, bars = def.text, {}, {}
+	local function add(list)
+		for _, s in ipairs(list) do
+			slots[#slots + 1] = s[1]
+		end
+	end
+	if text:find("all your snakes") then
+		add(snakes(side))
+	end
+	if text:find("every enemy snake") or text:find("enemy snakes") then
+		add(snakes(foe(side)))
+	end
+	if text:find("enemy snake with the most attack") and strongest(side) then
+		add({ strongest(side) })
+	end
+	local weak = weakest(side)
+	if text:find("enemy snake with the least health") and weak and (weak[2].hp or defense(weak[2])) <= 5 then
+		add({ weak })
+	end
+	if text:find("your most hurt snake") then
+		local best, gap = nil, 0
+		for _, s in ipairs(snakes(side)) do
+			local missing = defense(s[2]) - (s[2].hp or defense(s[2]))
+			if missing > gap then
+				best, gap = s, missing
+			end
+		end
+		if best then
+			add({ best })
+		end
+	end
+	if text:find("enemy charmer") then
+		bars[#bars + 1] = foe(side)
+	end
+	return slots, bars
+end
+
 local function stat(play, slot, card, atk, hp)
 	card.bonus = (card.bonus or 0) + atk
 	card.hp = math.max((card.hp or defense(card)) + hp, 1)

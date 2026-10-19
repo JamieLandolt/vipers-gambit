@@ -2576,6 +2576,29 @@ function render.playing()
 	end
 	lg.setColor(1, 1, 1)
 
+	local held_spell = held_card and data.get_stats(held_card).kind == "spell" and require("Brews").by_name[held_card.card_path:sub(1, -5)]
+	if held_spell then -- dragging a spell: what it would hit glows
+		local slots, bars = require("Brews").targets(held_spell, "Player")
+		local col, pulse = held_spell.colour, 0.5 + 0.5 * math.sin(time * 8)
+		local function glow(x, y, w, h)
+			lg.setBlendMode("add")
+			lg.setColor(col[1], col[2], col[3], 0.2 + 0.2 * pulse)
+			lg.rectangle("fill", x, y, w, h, 12, 12)
+			lg.setBlendMode("alpha")
+			lg.setColor(col[1], col[2], col[3], 0.7 + 0.3 * pulse)
+			lg.setLineWidth(5)
+			lg.rectangle("line", x, y, w, h, 12, 12)
+			lg.setLineWidth(1)
+		end
+		for _, slot in ipairs(slots) do
+			local box = play.field_hitboxes[slot]
+			glow(box[1] + 2, box[2] + 2, box[3] - 4, box[4] - 4)
+		end
+		for _, side in ipairs(bars) do
+			glow(1210, play.bar_y[side], 210, 40)
+		end
+		lg.setColor(1, 1, 1)
+	end
 	if held_card then
 		local hx = mouse.x * reference_window_width / lg.getWidth() - img_widths / 2
 		local hy = mouse.y * reference_window_height / lg.getHeight() - img_heights / 2
