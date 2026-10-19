@@ -2392,7 +2392,7 @@ function render.playing()
 	lg.setColor(1, 1, 1)
 
 	-- Positions are in reference-window units; love.draw scales everything
-	local y_pos = reference_window_height * 16.6 / 24 - 5
+	local y_pos = tray.y + (tray.height - img_heights * HAND_SCALE) / 2 -- the same space above and below the cards
 	card_hitboxes = {} -- only the cards in the hand now (leftover boxes of played cards would be picked up as ghosts)
 	for i, card in ipairs(player_hand) do
 		local x, x_offset = hand_x(i)
