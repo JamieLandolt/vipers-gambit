@@ -477,7 +477,7 @@ end
 
 function love.wheelmoved(x, y)
 	if game.state["level_select"] and not level_choice then -- the level map scrolls in every direction
-		render.pan_map(x * 40, y * 40)
+		render.pan_map(-x * 40, y * 40)
 		return
 	end
 	if scroll_offset_y + y < 0 then
