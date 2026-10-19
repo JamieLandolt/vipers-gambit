@@ -2266,9 +2266,10 @@ end
 local LANE_X, LANE_Y = { 20, 250, 490, 720 }, { 20, 280 } -- where each lane's cells sit inside the field image
 
 -- Attack (sword) and defense (heart) sit in the bottom corners of the card's lane cell
-local function draw_stats(sector)
-	local card, lane = played_cards[sector], (sector - 1) % 4 + 1
-	require("CardText").lane(play.shown_attack(card, sector), play.shown_hp(card), 245 + LANE_X[lane], 15 + LANE_Y[sector > 4 and 2 or 1])
+local function draw_stats(sector, ghost) -- (a snake that has just died keeps its numbers while it bursts)
+	local card, lane = ghost or played_cards[sector], (sector - 1) % 4 + 1
+	local attack = ghost and data.get_stats(card).attack or play.shown_attack(card, sector)
+	require("CardText").lane(attack, math.max(play.shown_hp(card), 0), 245 + LANE_X[lane], 15 + LANE_Y[sector > 4 and 2 or 1])
 end
 
 -- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
@@ -2596,6 +2597,9 @@ function render.playing()
 		if played_cards[sector] then
 			draw_stats(sector)
 		end
+	end
+	for _, ghost in ipairs(effects.ghosts()) do
+		draw_stats(ghost.sector, ghost.card)
 	end
 
 	-- A golden glow with sparks circling it marks your snakes whose activated ability you can afford right now

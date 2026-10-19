@@ -121,5 +121,13 @@ check("fireball hits the chosen snake", played_cards[1] == nil or (played_cards[
 check("fireball leaves the other alone", (played_cards[2].hp or strong_hp) == strong_hp)
 require("Brews").by_name.Fireball.cast(play, "Player")
 check("no target picks the strongest", (played_cards[2].hp or strong_hp) < strong_hp)
+-- A Zombie Snake destroyed returns to its owner's hand without pushing another card out
+play.new_game(5)
+played_cards[6] = card("Zombie_Snake")
+local before = #player_hand
+play.destroy(6)
+check("zombie joins the hand", #player_hand == before + 1)
+play.start_turn()
+check("zombie stays after the next draw", #player_hand == before + 1)
 print(fails == 0 and "all tests passed" or fails .. " FAILED")
 os.exit(fails == 0 and 0 or 1)
