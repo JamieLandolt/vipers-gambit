@@ -595,6 +595,8 @@ local function random_border(name)
 	return choices[math.random(#choices)]
 end
 
+local MILESTONE_TIER = { [3] = 3, [10] = 4 }
+
 -- A win can drop one of the opponent's snakes with a random border: always on the first win, sometimes after
 function collection.drop_snake(level, first)
 	collection.last_snake = nil
@@ -602,9 +604,13 @@ function collection.drop_snake(level, first)
 		return
 	end
 	local snakes = {}
-	for _, name in ipairs(require("Opponents")[level].deck) do
-		if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) then
-			snakes[#snakes + 1] = name
+	if first and MILESTONE_TIER[level] then -- beating level 3 or 10 for the first time gives a snake of a set tier instead
+		snakes = obtainable("snake")[MILESTONE_TIER[level]]
+	else
+		for _, name in ipairs(require("Opponents")[level].deck) do
+			if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) then
+				snakes[#snakes + 1] = name
+			end
 		end
 	end
 	if #snakes > 0 then

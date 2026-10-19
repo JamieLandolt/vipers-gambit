@@ -19,7 +19,7 @@ local list = {
 	{ "Garden Keeper", "opponents/garden_keeper.png", "Tide Priestess", "defensive", 2 },
 	{ "Pond Skulker", "opponents/pond_skulker.png", "Yuki Frostveil", "balanced", 2 },
 	{ "Venom Rookie", "opponents/venom_rookie.png", "Dr. Fang", "aggro", 6 },
-	{ "Dune Wanderer", "opponents/dune_wanderer.png", "Warden Basalt", "balanced", 4 },
+	{ "Dune Wanderer", "opponents/dune_wanderer.png", "Ember Queen", "balanced", 4 },
 	{ "Crypt Warden", "opponents/crypt_warden.png", "Yuki Frostveil", "defensive", 1 },
 	{ "Reed Stalker", "opponents/reed_stalker.png", "Ember Queen", "balanced", 4 },
 	{ "Fang Brawler", "opponents/fang_brawler.png", "Dr. Fang", "aggro", 1 },
