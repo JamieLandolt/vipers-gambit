@@ -2151,16 +2151,20 @@ function render.ended()
 	lg.setColor(1, 0.85, 0.2)
 	draw_eyes("+", collection.last_reward or 0, 0, 480, reference_window_width, "center", assets.font)
 	lg.setColor(1, 1, 1)
-	local drop = won and collection.last_snake
-	if drop then -- one of the opponent's snakes, with a random border
-		local scale = 0.5
-		lg.printf("New snake: " .. drop.name:gsub("_", " ") .. " (" .. drop.border .. ")", assets.small_font, 0, 540, reference_window_width, "center")
-		lg.push()
-		lg.translate(reference_window_width / 2 - img_widths * scale / 2, 580)
-		lg.scale(scale)
-		lg.draw(assets.card_by_name[drop.name])
-		borders.draw(drop.border, 0, 0, img_widths, img_heights, data.stats_by_name[drop.name].rarity)
-		lg.pop()
+	local drops = won and { collection.last_snake, collection.last_bonus } or {}
+	if #drops > 0 then -- one of the level's reward snakes, and on a first win of level 3 or 10 a bonus snake, each with a random border
+		local scale, gap = 0.5, 420
+		for i, drop in ipairs(drops) do
+			local cx = reference_window_width / 2 + (i - 1 - (#drops - 1) / 2) * gap
+			lg.setColor(1, 1, 1)
+			lg.printf((i == 2 and "Bonus snake: " or "New snake: ") .. drop.name:gsub("_", " ") .. " (" .. drop.border .. ")", assets.small_font, cx - gap / 2, 540, gap, "center")
+			lg.push()
+			lg.translate(cx - img_widths * scale / 2, 580)
+			lg.scale(scale)
+			lg.draw(assets.card_by_name[drop.name])
+			borders.draw(drop.border, 0, 0, img_widths, img_heights, data.stats_by_name[drop.name].rarity)
+			lg.pop()
+		end
 	elseif won and play.challenge then
 		lg.printf((play.challenge.endless and "Endless: " or "Challenge: ") .. play.challenge.name .. " (x" .. play.challenge.mult .. " reward)", assets.small_font, 0, 560, reference_window_width, "center")
 	end

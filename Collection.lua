@@ -490,7 +490,7 @@ end
 -- A win over `level` (`challenge` is the fight's challenge table, if it was one)
 function collection.record_win(level, challenge)
 	local r = rival(level)
-	collection.drop_snake(level)
+	collection.drop_snake(level, r.wins == 0)
 	r.wins = r.wins + 1
 	if challenge and challenge.endless then
 		r.endless = r.endless + 1
@@ -630,18 +630,15 @@ local function random_border(name)
 	return choices[math.random(#choices)]
 end
 
-local MILESTONE_TIER = { [3] = 3, [10] = 4 }
+local MILESTONE_TIER = { [3] = 3, [10] = 4 } -- level -> tier of the snake its first win gives
+collection.MILESTONE_TIER = MILESTONE_TIER
 
--- The three snakes a win over `level` can give: the opponent's best snakes (or three of the set tier on levels 3 and 10)
+-- The three snakes a win over `level` can give: the opponent's best snakes
 function collection.level_rewards(level)
 	local snakes = {}
-	if MILESTONE_TIER[level] then
-		snakes = { unpack(obtainable("snake")[MILESTONE_TIER[level]]) }
-	else
-		for _, name in ipairs(require("Opponents")[level].deck) do
-			if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) and not contains(snakes, name) then
-				snakes[#snakes + 1] = name
-			end
+	for _, name in ipairs(require("Opponents")[level].deck) do
+		if stat(name, "kind") == "snake" and not contains(UNOBTAINABLE, name) and not contains(snakes, name) then
+			snakes[#snakes + 1] = name
 		end
 	end
 	table.sort(snakes, function(a, b)
@@ -651,17 +648,24 @@ function collection.level_rewards(level)
 	return { unpack(snakes, 1, 3) }
 end
 
--- Every win drops one of the level's three reward snakes (a third each) with a random border
-function collection.drop_snake(level)
+-- Every win drops one of the level's three reward snakes (a third each) with a random border. The first win over level 3 or
+-- 10 also gives a snake of a set tier, on top of that.
+function collection.drop_snake(level, first)
 	local snakes = collection.level_rewards(level)
-	collection.last_snake = nil
-	if #snakes > 0 then
-		local name = snakes[math.random(#snakes)]
+	collection.last_snake, collection.last_bonus = nil, nil
+	local function give(name)
 		local border = random_border(name)
 		add_copy(name, border)
-		collection.last_snake = { name = name, border = border }
-		collection.save()
+		return { name = name, border = border }
 	end
+	if #snakes > 0 then
+		collection.last_snake = give(snakes[math.random(#snakes)])
+	end
+	if first and MILESTONE_TIER[level] then
+		local pool = obtainable("snake")[MILESTONE_TIER[level]]
+		collection.last_bonus = give(pool[math.random(#pool)])
+	end
+	collection.save()
 end
 
 local function random_of(pool, rarity, floor)
