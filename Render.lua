@@ -1247,12 +1247,13 @@ end
 local skin_images = {}
 
 -- Draws a charmer's portrait cropped to fill w x h
+local LOWER_CROP = { ["Yuki Frostveil"] = 0.5, ["Ember Queen"] = 0.5, ["Warden Basalt"] = 0.5 } -- how far down the spare height the crop starts, so these portraits sit higher in the frame
 local function portrait(name, x, y, w, h)
 	local image = assets.avatars[name]
 	local iw, ih = image:getDimensions()
 	if not crops[name] then
 		local cw, ch = math.min(iw, ih * w / h), math.min(ih, iw * h / w)
-		crops[name] = lg.newQuad((iw - cw) / 2, 0, cw, ch, iw, ih)
+		crops[name] = lg.newQuad((iw - cw) / 2, (ih - ch) * (LOWER_CROP[name] or 0), cw, ch, iw, ih)
 	end
 	local _, _, cw = crops[name]:getViewport()
 	lg.draw(image, crops[name], x, y, 0, w / cw)
