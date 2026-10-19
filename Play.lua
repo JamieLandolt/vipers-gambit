@@ -780,7 +780,18 @@ function play.end_turn()
 	if play.check_end() then
 		return
 	end
-	turn = turn == "Player" and "Opponent" or "Player"
+	local next_side = turn == "Player" and "Opponent" or "Player"
+	if effects.settled and not play.versus then
+		-- the new turn only starts (venom, hand, border effects like Rainbow's) once the attacks have finished playing
+		play.next_turn = { side = next_side, at = effects.settled() + 0.4 }
+		turn = "Waiting"
+		return
+	end
+	play.begin_turn(next_side)
+end
+
+function play.begin_turn(side)
+	turn = side
 	if turn == "Opponent" then -- let the player's attacks finish before the opponent plays anything
 		play.ai_hold = effects.settled and effects.settled() + 0.8 or nil -- (headless tests and the sim have no effects to wait for)
 	end
@@ -873,6 +884,14 @@ local ai_timer = 0
 
 -- One action per play.ai_delay so the player can follow what the opponent does
 function play.opponent_turn(dt)
+	local waiting = play.next_turn
+	if turn == "Waiting" and waiting then -- between turns: the next one starts when the attacks have finished playing
+		if time >= waiting.at then
+			play.next_turn = nil
+			play.begin_turn(waiting.side)
+		end
+		return
+	end
 	if time < (play.ai_hold or 0) then
 		return
 	end

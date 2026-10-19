@@ -34,6 +34,12 @@ local builders = {
 	burst = function() return make({ { 500, 80, 0.5, 0.6, 0.7 } }) end,
 	summon = function() return make({ { 200, 900, 0.9, 0.45, 0.05 } }) end,
 	hint = function() return make({ { 660, 660, 0.08, 0.3 }, { 880, 880, 0.12, 0.3 } }) end,
+	heal = function() return make({ { 523, 523, 0.07, 0.3 }, { 659, 659, 0.07, 0.3 }, { 880, 880, 0.2, 0.3 } }) end, -- a soft rising chime
+	buff = function() return make({ { 300, 700, 0.1, 0.35, 0.05 }, { 700, 1100, 0.18, 0.3 } }) end, -- a sharp power-up
+	shield = function() return make({ { 900, 650, 0.1, 0.3, 0.15 }, { 1300, 900, 0.18, 0.25, 0.1 } }) end, -- a metal ring
+	block = function() return make({ { 1300, 350, 0.1, 0.5, 0.45 }, { 900, 300, 0.2, 0.4, 0.2 } }) end, -- a hard clang
+	poison = function() return make({ { 420, 160, 0.22, 0.35, 0.12 }, { 300, 120, 0.2, 0.3, 0.2 } }) end, -- a wet bubbling drop
+	freeze = function() return make({ { 1500, 2300, 0.1, 0.22 }, { 1900, 1200, 0.25, 0.22, 0.05 } }) end, -- glassy crackle
 }
 for rarity = 1, 5 do -- a rising arpeggio, one note longer for each rarity
 	builders["reveal" .. rarity] = function()

@@ -11,8 +11,28 @@ local list = {}
 local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9, sound = 0.3, shake = 0.35 }
 local FALL = 0.25 -- how long a placed card takes to land
 
+-- Floating texts that mean something get an icon, colour, particles and a sound of their own
+local STYLES = {
+	{ "blocked", { icon = "shield", colour = { 0.78, 0.84, 0.95 }, sound = "block", burst = "ring" } },
+	{ "shield", { icon = "shield", colour = { 0.55, 0.8, 1 }, sound = "shield", burst = "ring" } },
+	{ "poison", { icon = "drop", colour = { 0.6, 0.95, 0.3 }, sound = "poison", burst = "drip" } },
+	{ "frozen", { icon = "flake", colour = { 0.65, 0.92, 1 }, sound = "freeze", burst = "ring" } },
+	{ "^%+%d+/%+%d+", { icon = "star", colour = "rainbow", sound = "buff", burst = "sparkle" } },
+	{ "atk", { icon = "sword", colour = { 1, 0.55, 0.25 }, sound = "buff", burst = "sparkle" } },
+	{ "^%+%d+ hp", { icon = "heart", colour = { 0.4, 1, 0.55 }, sound = "heal", burst = "sparkle" } },
+}
+
 function effects.add(kind, fields)
 	fields.kind, fields.t0 = kind, time + (fields.delay or 0)
+	if kind == "float" and not fields.colour then
+		for _, s in ipairs(STYLES) do
+			if fields.text:find(s[1]) then
+				fields.style = s[2]
+				table.insert(list, { kind = "sound", name = s[2].sound, t0 = fields.t0 })
+				break
+			end
+		end
+	end
 	table.insert(list, fields)
 end
 
@@ -103,6 +123,97 @@ function effects.bar(side)
 	return dx, flash
 end
 
+-- Small icons for styled floating texts, about 28 units across with (x, y) at the middle
+local ICONS = {
+	heart = function(x, y)
+		lg.circle("fill", x - 7, y - 4, 8)
+		lg.circle("fill", x + 7, y - 4, 8)
+		lg.polygon("fill", x - 14.5, y - 1, x + 14.5, y - 1, x, y + 15)
+	end,
+	sword = function(x, y)
+		lg.polygon("fill", x - 3, y - 15, x + 3, y - 15, x + 3, y + 6, x - 3, y + 6)
+		lg.rectangle("fill", x - 10, y + 6, 20, 4)
+		lg.rectangle("fill", x - 3, y + 10, 6, 6)
+	end,
+	shield = function(x, y)
+		lg.polygon("fill", x - 13, y - 13, x + 13, y - 13, x + 13, y + 2, x, y + 16, x - 13, y + 2)
+	end,
+	drop = function(x, y)
+		lg.circle("fill", x, y + 4, 10)
+		lg.polygon("fill", x, y - 15, x - 9, y + 1, x + 9, y + 1)
+	end,
+	flake = function(x, y)
+		lg.setLineWidth(4)
+		for k = 0, 2 do
+			local a = k * math.pi / 3
+			lg.line(x - math.cos(a) * 14, y - math.sin(a) * 14, x + math.cos(a) * 14, y + math.sin(a) * 14)
+		end
+		lg.setLineWidth(1)
+	end,
+	star = function(x, y)
+		for k = 0, 4 do
+			local a, b = k * 1.2566 - 1.5708, k * 1.2566 + 1.5708 * 0.2
+			lg.polygon("fill", x, y, x + math.cos(a - 0.3) * 14, y + math.sin(a - 0.3) * 14, x + math.cos(a + 0.3) * 14, y + math.sin(a + 0.3) * 14)
+		end
+	end,
+}
+
+-- A floating text with a style: pops in, an icon and glow beside it, and particles of its own kind
+local function styled_float(e, age)
+	local u = age / LIFE.float
+	local c = e.style.colour
+	if c == "rainbow" then
+		c = { 0.6 + 0.4 * math.sin(time * 8), 0.6 + 0.4 * math.sin(time * 8 + 2.1), 0.6 + 0.4 * math.sin(time * 8 + 4.2) }
+	end
+	local pop = 1 + 0.5 * math.max(0, 1 - age * 6)
+	local scale = 1.5 * pop
+	local width = assets.font:getWidth(e.text) * scale
+	local x, y = e.x - (width + 36) / 2, e.y - 60 * u
+	local fade = 1 - u * u
+	local ix, iy = x + 14, y + assets.font:getHeight() * scale / 2
+	lg.setBlendMode("add") -- a glow behind the icon
+	lg.setColor(c[1], c[2], c[3], 0.35 * fade)
+	lg.circle("fill", ix, iy, 26 + 20 * (1 - u))
+	lg.setBlendMode("alpha")
+	local burst = e.style.burst
+	if burst == "ring" then
+		lg.setLineWidth(5 * (1 - u))
+		lg.setColor(c[1], c[2], c[3], fade)
+		lg.circle("line", e.x, e.y, 20 + 90 * u)
+		lg.setLineWidth(1)
+	elseif burst == "sparkle" then
+		for k = 0, 5 do
+			local a = k * 1.047 + 0.4
+			local d = (30 + 40 * (k % 2)) * u + 10
+			local sx, sy = ix + math.cos(a) * d, iy + math.sin(a) * d - 20 * u
+			lg.setColor(1, 1, 0.85, fade)
+			lg.rectangle("fill", sx - 1.5, sy - 6, 3, 12)
+			lg.rectangle("fill", sx - 6, sy - 1.5, 12, 3)
+		end
+	elseif burst == "drip" then
+		for k = 0, 3 do
+			lg.setColor(c[1], c[2], c[3], fade)
+			lg.circle("fill", ix - 18 + k * 12, iy + 10 + 40 * u * (0.6 + 0.2 * k), 4 * (1 - u))
+		end
+	end
+	lg.setColor(0, 0, 0, fade) -- icon outline, then the icon
+	lg.push()
+	lg.translate(ix, iy)
+	lg.scale(1.25 * pop)
+	ICONS[e.style.icon](0, 0)
+	lg.pop()
+	lg.setColor(c[1], c[2], c[3], fade)
+	lg.push()
+	lg.translate(ix, iy)
+	lg.scale(pop)
+	ICONS[e.style.icon](0, 0)
+	lg.pop()
+	lg.setColor(0, 0, 0, fade)
+	lg.print(e.text, assets.font, x + 36 + 3, y + 3, 0, scale)
+	lg.setColor(c[1], c[2], c[3], fade)
+	lg.print(e.text, assets.font, x + 36, y, 0, scale)
+end
+
 local function sparks(cx, cy, u, count, colour, reach)
 	local size = 12 * (1 - u) + 2
 	for k = 0, count - 1 do
@@ -139,6 +250,8 @@ function effects.draw()
 				require("Sounds").play(e.name)
 			elseif e.kind == "dead" then
 				sparks(e.cx, e.cy, math.min(age / 0.5, 1), 14, { 0.9, 0.2, 0.2 }, 200)
+			elseif e.kind == "float" and e.style then
+				styled_float(e, age)
 			elseif e.kind == "float" then
 				local u = age / LIFE.float
 				local x, y = e.x - assets.font:getWidth(e.text) * 0.8, e.y - 70 * u
