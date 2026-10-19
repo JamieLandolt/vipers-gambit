@@ -114,7 +114,12 @@ settings.items = {
 	{
 		label = "Achievements",
 		text = function() return require("Achievements").count() .. "/" .. #require("Achievements").list end,
-		click = function() achievements_return = "settings"; update_animation_screen("achievements") end,
+		click = function()
+			if collection.achievements_unlocked() then
+				achievements_return = "settings"
+				update_animation_screen("achievements")
+			end
+		end,
 	},
 	{ label = "Progress", text = function() return "Reset" end, click = function() settings.confirm_reset = true end },
 }

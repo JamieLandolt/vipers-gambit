@@ -33,6 +33,7 @@ end
 -- The icons that get a "New!" tooltip when something inside them opens up: { key, text, test } in order
 local RULES = {
 	packs = { tips = { { "tip_packs", "New: Packs! Spend the snake eyes you win on new cards.", function() return unlocked >= 2 end } } },
+	trophy = { tips = { { "tip_achievements", "New: Achievements! Complete them to win packs.", function() return collection.achievements_unlocked() end } } },
 	play = { tips = { { "tip_versus", "New: Versus!", function() return collection.unlock_all or unlocked >= 11 end } } },
 	book = { tips = { { "tip_charmers", "New: Charmers!", function() return collection.unlock_all or unlocked >= 3 end },
 		{ "tip_lanes", "New: Lanes!", function() return collection.unlock_all or unlocked >= 4 end },
@@ -43,7 +44,7 @@ local RULES = {
 }
 
 local function item_open(item)
-	return true
+	return item.id ~= "trophy" or collection.achievements_unlocked()
 end
 
 -- The tooltip waiting on an icon, if it is open and its tip has not been dismissed
@@ -94,6 +95,10 @@ end
 function hub.click(item)
 	play_sound(hover_sound)
 	hub.note = nil
+	if not item_open(item) then
+		hub.note, hub.note_t = "Beat the 7th opponent to unlock Achievements", time
+		return
+	end
 	for _, tip in ipairs(RULES[item.id] and RULES[item.id].tips or {}) do -- opening an icon dismisses its tooltips
 		if tip[3]() then
 			collection.mark_hint(tip[1])

@@ -485,6 +485,11 @@ function collection.deck_unlocked()
 	return collection.unlock_all or unlocked >= 4
 end
 
+-- Achievements open after the 7th opponent
+function collection.achievements_unlocked()
+	return collection.unlock_all or unlocked >= 8
+end
+
 -- The collection opens on a page of sections (snakes, brews, spells, borders); `section` is the kind being browsed
 collection.section, collection.return_to = nil, nil
 function collection.landing()
