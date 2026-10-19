@@ -523,7 +523,38 @@ function play.versus_card(index, name, slot)
 end
 
 -- Damages a side's health directly
+-- Damage is worked out at once, but the numbers on screen only drop when the blow lands: each pending loss is kept here
+-- until its time, and shown_health / shown_hp add it back meanwhile
+local lag = {}
+
+local function lose_later(who, amount, delay)
+	if delay and delay > 0 and amount > 0 then
+		lag[#lag + 1] = { who = who, amount = amount, at = time + delay }
+	end
+end
+
+local function pending(who)
+	local total = 0
+	for i = #lag, 1, -1 do
+		if lag[i].at <= time then
+			table.remove(lag, i)
+		elseif lag[i].who == who then
+			total = total + lag[i].amount
+		end
+	end
+	return total
+end
+
+function play.shown_health(side)
+	return health[side] + pending(side)
+end
+
+function play.shown_hp(card)
+	return (card.hp or data.get_stats(card).defense) + pending(card)
+end
+
 function play.hurt(side, amount, delay)
+	lose_later(side, amount, delay)
 	health[side] = health[side] - amount
 	play.note((side == "Player" and "You take " or "Opponent takes ") .. amount .. " damage")
 	if amount >= 3 then
@@ -585,6 +616,7 @@ function play.hit(attacker, slot, attack, delay)
 	end
 
 	local damage = abilities.mitigate(defender, slot, attack)
+	lose_later(defender, damage, delay)
 	defender.hp = (defender.hp or data.get_stats(defender).defense) - damage
 	effects.add("hit", { card = defender, cx = cx, cy = cy, delay = delay, border = data.border_of(attacker) })
 	effects.add("float", { x = cx, y = cy, text = damage > 0 and "-" .. damage or "blocked", delay = delay })

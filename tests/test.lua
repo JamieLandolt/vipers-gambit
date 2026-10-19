@@ -96,5 +96,20 @@ ach.reset()
 ach.add("wins")
 check("achievement toast", ach.queue[1] and ach.queue[1][1] == "first_win" and ach.count() == 1)
 
+
+-- damage shows when the blow lands
+time = 100
+play.new_game(2)
+played_cards[1] = card("Garter_Snake")
+local hp0 = data.get_stats(played_cards[1]).defense
+play.hit(card("Garter_Snake"), 1, 2, 1)
+check("hp worked out at once", played_cards[1].hp == hp0 - 2)
+check("shown hp lags until the hit", play.shown_hp(played_cards[1]) == hp0)
+local was = health.Opponent
+play.hurt("Opponent", 3, 0.5)
+check("health shown lags", play.shown_health("Opponent") == was and health.Opponent == was - 3)
+time = 101.2
+check("shown hp catches up", play.shown_hp(played_cards[1]) == hp0 - 2 and play.shown_health("Opponent") == was - 3)
+time = 0
 print(fails == 0 and "all tests passed" or fails .. " FAILED")
 os.exit(fails == 0 and 0 or 1)

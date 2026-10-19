@@ -2129,7 +2129,7 @@ local LANE_X, LANE_Y = { 20, 250, 490, 720 }, { 20, 280 } -- where each lane's c
 -- Attack (sword) and defense (heart) sit in the bottom corners of the card's lane cell
 local function draw_stats(sector)
 	local card, lane = played_cards[sector], (sector - 1) % 4 + 1
-	require("CardText").lane(abilities.attack(card, sector), card.hp or data.get_stats(card).defense, 245 + LANE_X[lane], 15 + LANE_Y[sector > 4 and 2 or 1])
+	require("CardText").lane(abilities.attack(card, sector), play.shown_hp(card), 245 + LANE_X[lane], 15 + LANE_Y[sector > 4 and 2 or 1])
 end
 
 -- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
@@ -2499,7 +2499,7 @@ function render.playing()
 				end
 				local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
 				local px = mx > 720 and mx - POPUP_W - 24 or mx + 24 -- flips to the left over the right half of the field
-				target, draw = card, function() card_popup(card, px, my - 130, card.hp, status) end
+				target, draw = card, function() card_popup(card, px, my - 130, card.hp and play.shown_hp(card), status) end
 			end
 		end
 		for card, box in pairs(card_hitboxes) do -- snakes in the hand too
@@ -2538,11 +2538,11 @@ function render.playing()
 		lg.setColor(0, 0, 0)
 		lg.rectangle("fill", 1210 + shake, y, 210, 40)
 		lg.setColor(0.8, 0.1, 0.1)
-		lg.rectangle("fill", 1215 + shake, y + 5, 200 * health[side] / max_health[side], 30)
+		lg.rectangle("fill", 1215 + shake, y + 5, 200 * math.max(0, play.shown_health(side)) / max_health[side], 30)
 		lg.setColor(1, 1, 1, flash * 0.7)
 		lg.rectangle("fill", 1210 + shake, y, 210, 40)
 		lg.setColor(1, 1, 1)
-		lg.printf(health[side] .. " HP", assets.debug_font, 1215 + shake, y + 8, 200, "center")
+		lg.printf(math.max(0, play.shown_health(side)) .. " HP", assets.debug_font, 1215 + shake, y + 8, 200, "center")
 	end
 	effects.draw()
 	if play.flash and time - play.flash.t < 0.5 then -- a screen-wide flash when a spell is cast
@@ -2626,34 +2626,34 @@ function render.ended()
 	background()
 	lg.setColor(1, 1, 1)
 	local won = winner == "Player"
-	lg.printf(won and (play.versus and "Victory!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 220, reference_window_width / 3, "center", 0, 3, 3)
+	lg.printf(won and (play.versus and "Victory!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 70, reference_window_width / 3, "center", 0, 3, 3)
 	if won then
 		local message = play.versus and (require("Versus").status == "The other player left" and "The other player left" or "") or level_unlocked and ("Level " .. level_unlocked .. " unlocked!") or (play.level == #opponents and "You beat every opponent!" or "")
-		lg.printf(message, assets.font, 0, 400, reference_window_width, "center")
+		lg.printf(message, assets.font, 0, 230, reference_window_width, "center")
 		if charmer_unlocked then
 			lg.setColor(0.4, 1, 0.5)
-			lg.printf("New charmer unlocked: " .. charmer_unlocked .. "!", assets.font, 0, 440, reference_window_width, "center")
+			lg.printf("New charmer unlocked: " .. charmer_unlocked .. "!", assets.font, 0, 275, reference_window_width, "center")
 		end
 	end
 	lg.setColor(1, 0.85, 0.2)
-	draw_eyes("+", collection.last_reward or 0, 0, 480, reference_window_width, "center", assets.font)
+	draw_eyes("+", collection.last_reward or 0, 0, 330, reference_window_width, "center", assets.font)
 	lg.setColor(1, 1, 1)
 	local drops = won and { collection.last_snake, collection.last_bonus } or {}
 	if #drops > 0 then -- one of the level's reward snakes, and on a first win of level 3 or 10 a bonus snake, each with a random border
-		local scale, gap = 0.5, 420
+		local scale, gap = 0.6, 420
 		for i, drop in ipairs(drops) do
 			local cx = reference_window_width / 2 + (i - 1 - (#drops - 1) / 2) * gap
 			lg.setColor(1, 1, 1)
-			lg.printf((i == 2 and "Bonus snake: " or "New snake: ") .. drop.name:gsub("_", " ") .. " (" .. drop.border .. ")", assets.small_font, cx - gap / 2, 540, gap, "center")
+			lg.printf((i == 2 and "Bonus snake: " or "New snake: ") .. drop.name:gsub("_", " ") .. " (" .. drop.border .. ")", assets.small_font, cx - gap / 2, 395, gap, "center")
 			lg.push()
-			lg.translate(cx - img_widths * scale / 2, 580)
+			lg.translate(cx - img_widths * scale / 2, 435)
 			lg.scale(scale)
 			lg.draw(assets.card_by_name[drop.name])
 			borders.draw(drop.border, 0, 0, img_widths, img_heights, data.stats_by_name[drop.name].rarity)
 			lg.pop()
 		end
 	elseif won and play.challenge then
-		lg.printf((play.challenge.endless and "Endless: " or "Challenge: ") .. play.challenge.name .. " (x" .. play.challenge.mult .. " reward)", assets.small_font, 0, 560, reference_window_width, "center")
+		lg.printf((play.challenge.endless and "Endless: " or "Challenge: ") .. play.challenge.name .. " (x" .. play.challenge.mult .. " reward)", assets.small_font, 0, 420, reference_window_width, "center")
 	end
 	buttons.ended["Continue"]:draw()
 end
