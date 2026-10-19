@@ -206,8 +206,8 @@ brews.list = {
 			play.hurt(foe(side), 10)
 			return true
 		end },
-	{ name = "Spark", kind = "spell", cost = 1, rarity = 1, colour = { 1, 0.95, 0.5 }, text = "Cast: 3 damage to the enemy charmer", lore = "Small, bright and rude.",
-		cast = function(play, side) play.hurt(foe(side), 3); return true end },
+	{ name = "Spark", kind = "spell", cost = 1, rarity = 1, colour = { 1, 0.95, 0.5 }, text = "Cast: 8 damage to the enemy charmer", lore = "Small, bright and rude.",
+		cast = function(play, side) play.hurt(foe(side), 8); return true end },
 	{ name = "Mend", kind = "spell", cost = 1, rarity = 1, colour = { 0.5, 0.95, 0.6 }, text = "Cast: your most hurt snake heals 6", lore = "A stitch in time.",
 		cast = function(play, side)
 			local best, gap = nil, 0
