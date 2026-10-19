@@ -74,8 +74,8 @@ function brews.targets(def, side)
 	if text:find("every enemy snake") or text:find("enemy snakes") then
 		add(snakes(foe(side)))
 	end
-	if text:find("enemy snake with the most attack") and strongest(side) then
-		add({ strongest(side) })
+	if def.target == "enemy" then -- drop it on one of these
+		add(snakes(foe(side)))
 	end
 	local weak = weakest(side)
 	if text:find("enemy snake with the least health") and weak and (weak[2].hp or defense(weak[2])) <= 5 then
@@ -97,6 +97,15 @@ function brews.targets(def, side)
 		bars[#bars + 1] = foe(side)
 	end
 	return slots, bars
+end
+
+-- The enemy snake a targeted spell hits: the one it was dropped on, else (for the opponent's AI) the strongest
+local function chosen(side, slot)
+	local c = slot and played_cards[slot]
+	if c and (slot <= 4) == (side == "Player") then
+		return { slot, c }
+	end
+	return strongest(side)
 end
 
 local function stat(play, slot, card, atk, hp)
@@ -269,27 +278,27 @@ brews.list = {
 		end },
 	{ name = "Mist_Veil", kind = "spell", cost = 1, rarity = 1, colour = { 0.75, 0.85, 0.95 }, text = "Cast: all your snakes gain a 2 point shield", lore = "A cool fog that softens the first blow.",
 		cast = function(play, side) return every(side, function(slot, c) c.shield = (c.shield or 0) + 2; play.float(slot, "+2 shield") end) end },
-	{ name = "Poison_Dart", kind = "spell", cost = 1, rarity = 1, colour = { 0.5, 0.9, 0.2 }, text = "Cast: poison the enemy snake with the most attack", lore = "Thrown by someone who would rather not be bitten.",
-		cast = function(play, side)
-			local s = strongest(side)
+	{ name = "Poison_Dart", kind = "spell", cost = 1, rarity = 1, colour = { 0.5, 0.9, 0.2 }, text = "Cast: poison an enemy snake you choose", lore = "Thrown by someone who would rather not be bitten.",
+		target = "enemy", cast = function(play, side, slot)
+			local s = chosen(side, slot)
 			if s then
 				s[2].poison = 2
 				play.float(s[1], "poison")
 			end
 			return s ~= nil
 		end },
-	{ name = "Cold_Snap", kind = "spell", cost = 2, rarity = 2, colour = { 0.6, 0.9, 1 }, text = "Cast: freeze the enemy snake with the most attack for a turn", lore = "The air goes still and a little blue.",
-		cast = function(play, side)
-			local s = strongest(side)
+	{ name = "Cold_Snap", kind = "spell", cost = 2, rarity = 2, colour = { 0.6, 0.9, 1 }, text = "Cast: freeze an enemy snake you choose for a turn", lore = "The air goes still and a little blue.",
+		target = "enemy", cast = function(play, side, slot)
+			local s = chosen(side, slot)
 			if s then
 				s[2].frozen = true
 				play.float(s[1], "frozen")
 			end
 			return s ~= nil
 		end },
-	{ name = "Fireball", kind = "spell", cost = 2, rarity = 2, colour = { 1, 0.5, 0.15 }, text = "Cast: 5 damage to the enemy snake with the most attack", lore = "It has a name and a target.",
-		cast = function(play, side)
-			local s = strongest(side)
+	{ name = "Fireball", kind = "spell", cost = 2, rarity = 2, colour = { 1, 0.5, 0.15 }, text = "Cast: 5 damage to an enemy snake you choose", lore = "It has a name and a target.",
+		target = "enemy", cast = function(play, side, slot)
+			local s = chosen(side, slot)
 			if s then
 				play.wound(s[1], 5)
 			end

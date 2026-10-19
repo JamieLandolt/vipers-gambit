@@ -111,5 +111,15 @@ check("health shown lags", play.shown_health("Opponent") == was and health.Oppon
 time = 101.2
 check("shown hp catches up", play.shown_hp(played_cards[1]) == hp0 - 2 and play.shown_health("Opponent") == was - 3)
 time = 0
+
+-- Fireball hits the enemy snake it is dropped on (the AI still picks the strongest)
+play.new_game(5)
+played_cards[1], played_cards[2] = card("Garter_Snake"), card("Colossus_Python")
+local weak_hp, strong_hp = data.get_stats(played_cards[1]).defense, data.get_stats(played_cards[2]).defense
+require("Brews").by_name.Fireball.cast(play, "Player", 1)
+check("fireball hits the chosen snake", played_cards[1] == nil or (played_cards[1].hp or weak_hp) < weak_hp)
+check("fireball leaves the other alone", (played_cards[2].hp or strong_hp) == strong_hp)
+require("Brews").by_name.Fireball.cast(play, "Player")
+check("no target picks the strongest", (played_cards[2].hp or strong_hp) < strong_hp)
 print(fails == 0 and "all tests passed" or fails .. " FAILED")
 os.exit(fails == 0 and 0 or 1)

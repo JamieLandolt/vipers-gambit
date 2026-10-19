@@ -957,10 +957,16 @@ local function use_consumable(held, sector)
 		effects.add("sound", { name = "brew" })
 		play.note("You use " .. play.name_of(held))
 	else
+		if def.target == "enemy" and not (sector and sector <= 4 and played_cards[sector]) then
+			if sector or (mx > 245 and my < 560) then
+				refuse("drop it on an enemy snake")
+			end
+			return false
+		end
 		if not (sector or (mx > 245 and my < 560)) then
 			return false -- dropped away from the field
 		end
-		if def.cast(play, "Player") == false then
+		if def.cast(play, "Player", sector) == false then
 			refuse("no effect")
 			return false
 		end

@@ -2838,7 +2838,7 @@ function render.info()
 	else
 		stat_chip("Use", info.kind == "brew" and "Drink" or "Cast", x + 170, y, 320, { 0.7, 0.5, 1 })
 		lg.setColor(0.8, 0.85, 1)
-		lg.printf(info.kind == "brew" and "Drop it on one of your snakes" or "Drop it anywhere on the field", assets.small_font, x + 510, y + 22, w - 510)
+		lg.printf(info.kind == "brew" and "Drop it on one of your snakes" or ((require("Brews").by_name[name] or {}).target == "enemy" and "Drop it on an enemy snake" or "Drop it anywhere on the field"), assets.small_font, x + 510, y + 22, w - 510)
 	end
 	y = y + 112
 

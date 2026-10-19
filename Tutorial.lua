@@ -105,7 +105,7 @@ local tips = {
 			point = function() return { { 245, 15, 950, 270 } } end } },
 	[5] = { { text = "Brews and spells are cards too. A brew goes onto one of your snakes and lasts while it lives.", next = true,
 			point = function() local r = hand_rect(function(c) return require("CardData").get_stats(c).kind == "brew" end); return r and { r } or { TRAY } end },
-		{ text = "A spell works at once, anywhere on the field, and the card is used up.", next = true,
+		{ text = "A spell works at once, and the card is used up. Most work anywhere on the field; some, like Fireball, are dropped on the enemy snake you choose.", next = true,
 			point = function() local r = hand_rect(function(c) return require("CardData").get_stats(c).kind == "spell" end); return r and { r } or { TRAY } end } },
 	[6] = { { text = "Enemies have a charm too. Watch their charmer: it can strike in the middle of a turn.", next = true,
 			point = function() return { { 1215, 78, 215, 72 } } end } },
