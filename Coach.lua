@@ -5,7 +5,7 @@ local lg = love.graphics
 -- beside it; any click moves to the next step. coach.start(key, steps) plays a lesson once (remembered in hints.txt).
 -- A step is { rect = { x, y, w, h } (or a function returning one), text = "a few words" } in reference-window units.
 local coach = { steps = nil, i = 1, t = 0 }
-local READ_TIME = 3 -- each step has to be read for 3 seconds before a click moves on
+local READ_TIME = 0.5 -- a click only moves on after half a second, so a double click does not skip a step
 
 function coach.start(key, steps)
 	local collection = require("Collection")
@@ -63,8 +63,7 @@ function coach.draw()
 	lg.setColor(1, 1, 1)
 	lg.printf(step.text, font, tx + 20, ty + 6, tw - 40, "left")
 	lg.setColor(1, 1, 1, 0.6)
-	local wait = math.ceil(READ_TIME - (time - coach.t))
-	lg.printf((wait > 0 and "read this... " .. wait or "click to continue") .. "  " .. coach.i .. "/" .. #coach.steps, assets.debug_font, 0, reference_window_height - 30, reference_window_width, "center")
+	lg.printf(coach.i .. "/" .. #coach.steps, assets.debug_font, 0, reference_window_height - 30, reference_window_width, "center")
 	lg.setColor(1, 1, 1)
 end
 

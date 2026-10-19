@@ -156,8 +156,8 @@ function tutorial.update()
 	end
 end
 
--- Each lesson step has to be read for 3 seconds before it can be skipped
-local READ_TIME = 3
+-- Each lesson step shows for half a second before it can be skipped
+local READ_TIME = 0.5
 local shown, shown_at = nil, 0
 
 local function wait_left()
@@ -204,10 +204,6 @@ function tutorial.draw()
 	lg.setColor(1, 1, 1)
 	lg.printf("Tutorial " .. tutorial.step .. "/" .. #steps, assets.debug_font, x + 10, y + 8, w - 20, "center")
 	lg.printf(step.text, assets.debug_font, x + 12, y + 36, w - 24)
-	if step.next and wait_left() > 0 then
-		lg.setColor(1, 1, 1, 0.6)
-		lg.printf("Read this... " .. math.ceil(wait_left()), assets.debug_font, x + 10, y + h - 30, w - 20, "center")
-	end
 end
 
 -- Pulsing rings and a bobbing arrow on whatever the current step is talking about (drawn over the board)
