@@ -145,8 +145,12 @@ local function card_popup(card, x, y, hp, status)
 		return #lines * font:getHeight()
 	end
 	local border_text = border and border ~= "Basic" and borders.describe(border)
+	local status_h = 0
+	for _, line in ipairs(status or {}) do
+		status_h = status_h + height(line) + 6
+	end
 	local body_h = 34 + 34 + 52 + (border_text and height(border_text, tw - 18) + 20 or 0) + height(st.ability or "None") + 12
-		+ (st.lore and height(st.lore) + 12 or 0) + (status and #status > 0 and 30 or 0)
+		+ (st.lore and height(st.lore) + 12 or 0) + status_h
 	local h = math.max(ch + 40, body_h + 28)
 	x = math.max(10, math.min(x, reference_window_width - POPUP_W - 10))
 	y = math.max(10, math.min(y, reference_window_height - h - 10))
@@ -219,9 +223,10 @@ local function card_popup(card, x, y, hp, status)
 		lg.printf(st.lore, font, tx, ty, tw)
 		ty = ty + height(st.lore) + 12
 	end
-	if status and #status > 0 then
-		lg.setColor(1, 0.6, 0.5)
-		lg.print(table.concat(status, ", "), font, tx, ty)
+	lg.setColor(1, 0.6, 0.5)
+	for _, line in ipairs(status or {}) do
+		lg.printf(line, font, tx, ty, tw)
+		ty = ty + height(line) + 6
 	end
 end
 
@@ -2513,16 +2518,30 @@ function render.playing()
 		end
 	end
 
+	-- The first time one of your snakes suffers a bad effect, explain it
+	for sector, card in pairs(played_cards) do
+		local box = sector > 4 and play.field_hitboxes[sector]
+		if box and card.poison then
+			coach.start("fx_poison", { { rect = box, text = "Poisoned! It loses 1 health at the start of each of your turns, for 2 turns. An Antidote cures it." } })
+		elseif box and card.frozen then
+			coach.start("fx_frozen", { { rect = box, text = "Frozen! It skips its next attack, then it thaws." } })
+		end
+	end
+
 	-- Hovering a snake (on the field or in the hand) explains it once the mouse has rested on it for half a second
 	if not held_card and not (field_press and field_press.drag) then
 		local target, draw
 		for sector, card in pairs(played_cards) do
 			if play.is_hitbox(mouse.x, mouse.y, play.field_hitboxes[sector]) then
 				local status = {}
-				for _, flag in ipairs({ "poison", "frozen", "shield" }) do
-					if card[flag] then
-						table.insert(status, flag == "shield" and ("shield " .. card.shield) or flag)
-					end
+				if card.poison then
+					table.insert(status, "Poisoned: loses 1 health at the start of its turn (" .. card.poison .. " left)")
+				end
+				if card.frozen then
+					table.insert(status, "Frozen: skips its next attack")
+				end
+				if card.shield then
+					table.insert(status, "Shield " .. card.shield .. ": soaks up that much damage")
 				end
 				local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
 				local px = mx > 720 and mx - POPUP_W - 24 or mx + 24 -- flips to the left over the right half of the field
