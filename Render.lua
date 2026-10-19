@@ -2672,7 +2672,7 @@ end
 function render.ended()
 	background()
 	lg.setColor(0, 0, 0, 0.55)
-	lg.rectangle("fill", 200, 55, reference_window_width - 400, 560, 16, 16)
+	lg.rectangle("fill", 200, 55, reference_window_width - 400, 690, 16, 16)
 	lg.setColor(1, 1, 1)
 	local won = winner == "Player"
 	lg.printf(won and (play.versus and "Victory!" or "Level " .. play.level .. " Complete!") or "Defeat", assets.font, 0, 70, reference_window_width / 3, "center", 0, 3, 3)
@@ -2689,7 +2689,7 @@ function render.ended()
 	lg.setColor(1, 1, 1)
 	local drops = won and { collection.last_snake, collection.last_bonus } or {}
 	if #drops > 0 then -- one of the level's reward snakes, and on a first win of level 3 or 10 a bonus snake, each with a random border
-		local scale, gap = 0.6, 420
+		local scale, gap = 0.8, 420
 		for i, drop in ipairs(drops) do
 			local cx = reference_window_width / 2 + (i - 1 - (#drops - 1) / 2) * gap
 			lg.setColor(1, 1, 1)
