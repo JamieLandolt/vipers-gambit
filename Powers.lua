@@ -393,6 +393,12 @@ function powers.trigger(event, card, slot, extra)
 	if power and power[event] then
 		power[event](context(card, slot), extra)
 	end
+	if event == "play" and power and power.bonus then -- a passive attack bonus shows when the snake lands, like the other play effects
+		local n = power.bonus(context(card, slot))
+		if n ~= 0 then
+			float(slot, (n > 0 and "+" or "") .. n .. " atk", n > 0)
+		end
+	end
 end
 
 -- Extra attack from a snake's own passive and from the card opposite it
