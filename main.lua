@@ -38,7 +38,7 @@ held_card = nil
 held_index = nil -- where the held snake sat in the hand
 info_card = nil
 popup_card, popup_t, popup_x, popup_y = nil, 0, 0, 0 -- the info popup of a clicked hand snake (window position of the click)
-field_press = nil -- { slot, at }: a snake on the field being pressed; a short press uses its ability, holding opens its info
+field_press = nil -- { slot, at, x, y, drag }: a snake on the field being pressed; a short press uses its ability, holding opens its info
 HOLD_TIME = 0.4 -- seconds to hold a snake before its info opens
 info_return = "playing" -- screen the info page's Back button returns to
 level_unlocked = nil -- level opened by the last win
@@ -222,7 +222,11 @@ function love.update(dt)
 	end
 	settings.update()
 	versus.update()
-	if field_press and love.mouse.isDown(1) and time - field_press.at >= HOLD_TIME and game.state["playing"] then
+	if field_press and love.mouse.isDown(1) and not field_press.drag then -- dragging a snake off its slot (to retreat it) is not a hold
+		local mx, my = love.mouse.getPosition()
+		field_press.drag = math.abs(mx - field_press.x) + math.abs(my - field_press.y) > 12
+	end
+	if field_press and love.mouse.isDown(1) and not field_press.drag and time - field_press.at >= HOLD_TIME and game.state["playing"] then
 		local card = played_cards[field_press.slot]
 		field_press = nil
 		if card then
@@ -412,7 +416,7 @@ function love.mousepressed(x, y, button)
 	if game.state["playing"] and not play.ending and not held_card then
 		for slot = 1, 8 do
 			if played_cards[slot] and play.is_hitbox(x, y, play.field_hitboxes[slot]) then
-				field_press = { slot = slot, at = time }
+				field_press = { slot = slot, at = time, x = x, y = y }
 			end
 		end
 	end
@@ -455,7 +459,13 @@ function love.mousereleased(x, y, button)
 	if button == 1 and field_press then
 		local press = field_press
 		field_press = nil
-		if press.slot > 4 and played_cards[press.slot] and turn == "Player" and not play.ending and tutorial.allows("ability") then
+		local mine = press.slot > 4 and played_cards[press.slot] and turn == "Player" and not play.ending
+		if mine and press.drag then -- let go over the hand: the snake retreats
+			local tray = buttons.playing["Card Background"]
+			if play.is_hitbox(x, y, { tray.x, tray.y, tray.width, tray.height }) then
+				play.retreat(press.slot)
+			end
+		elseif mine and tutorial.allows("ability") then
 			play.activate(press.slot)
 		end
 	end

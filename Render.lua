@@ -2463,7 +2463,7 @@ function render.playing()
 
 	-- Hovering a snake (on the field or in the hand) explains it once the mouse has rested on it for half a second;
 	-- a clicked hand snake shows the same popup for a few seconds
-	if not held_card then
+	if not held_card and not (field_press and field_press.drag) then
 		local target, draw
 		for sector, card in pairs(played_cards) do
 			if play.is_hitbox(mouse.x, mouse.y, play.field_hitboxes[sector]) then
@@ -2567,6 +2567,16 @@ function render.playing()
 		buttons.playing["Yes"]:draw()
 		buttons.playing["No"]:draw()
 	end
+	if field_press and field_press.drag and love.mouse.isDown(1) then -- dragging one of your snakes off the field
+		local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
+		local over = play.is_hitbox(mouse.x, mouse.y, { tray.x, tray.y, tray.width, tray.height })
+		lg.setColor(0, 0, 0, 0.8)
+		lg.rectangle("fill", mx + 18, my + 10, 300, 34, 6, 6)
+		lg.setColor(over and 1 or 0.8, over and 0.85 or 0.8, over and 0.3 or 0.9)
+		lg.printf(over and "Let go to retreat it (it is lost)" or "Drop on your hand to retreat", assets.debug_font, mx + 26, my + 18, 290, "left")
+		lg.setColor(1, 1, 1)
+	end
+
 	if charm_tip then -- hovering a charmer shows its charm
 		local side, c, spot = charm_tip[1], charm_tip[2], charm_tip[3]
 		local w = 440

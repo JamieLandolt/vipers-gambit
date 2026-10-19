@@ -258,6 +258,18 @@ local function destroy(slot, delay)
 end
 play.destroy = destroy
 
+-- Pulls one of your snakes off the field. It does not come back to your hand, and nothing triggers.
+function play.retreat(slot)
+	local c = played_cards[slot]
+	if not c or slot <= 4 or play.versus then
+		return
+	end
+	local cx, cy = play.slot_centre(slot)
+	played_cards[slot] = nil
+	effects.add("float", { x = cx, y = cy, text = "retreat" })
+	play.note("You retreat " .. play.name_of(c))
+end
+
 -- Has either side run out of health? Ends the match if so.
 -- The end screen waits for the last attack's effects to play out (play.ending is when it opens)
 local function end_match()
