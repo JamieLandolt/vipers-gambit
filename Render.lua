@@ -1525,9 +1525,9 @@ local function side_panel(x, who, charmer, level, rim)
 	lg.print(charmer.name, assets.font, x + 116, 160)
 	if play.charms_open(level) then
 		lg.setColor(0.6, 0.9, 0.4)
-		lg.print(charmer.charm .. "  (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. ")", assets.debug_font, x + 116, 200)
+		lg.print(charmer.charm .. "  (" .. charmer.cost .. " venom, cooldown " .. charmer.cooldown .. ")", assets.debug_font, x + 116, 214)
 		lg.setColor(0.85, 0.85, 0.95)
-		lg.printf(charmer.text, assets.debug_font, x + 116, 220, 500)
+		lg.printf(charmer.text, assets.debug_font, x + 116, 238, 500)
 	end
 end
 
@@ -1544,7 +1544,7 @@ function render.briefing(level)
 	coach.start("coach_briefing", {
 		{ rect = { reference_window_width / 2 - 250, 76, 520, 36 }, text = "Win a match to earn snake eyes. Spend them on packs." },
 		{ rect = { 740, 120, 640, 340 }, text = "You see their charmer, but their deck stays hidden until they play the cards." },
-		{ rect = { 60, 570, 1320, 140 }, text = "Beat a level to unlock harder challenges here, worth bigger rewards." },
+		{ rect = { 740, 472, 640, 190 }, text = "Beat a level to unlock harder challenges here, worth bigger rewards." },
 	})
 	draw_eyes("Win: +", collection.payout(true, level), 0, 76, reference_window_width / 2 - 20, "right")
 	draw_eyes("Lose: +", collection.payout(false, level), reference_window_width / 2 + 20, 76, 400, "left")
@@ -1553,37 +1553,41 @@ function render.briefing(level)
 	local shown = { unpack(deck, 1, 20) } -- a deck is at most 20; before one is chosen every owned snake is in it
 	side_panel(60, "YOU", charmers.by_name[chosen_avatar], level, { 0.45, 0.8, 0.3 })
 	lg.setColor(1, 1, 1)
-	lg.print("Your deck (" .. #deck .. ")" .. (#deck > 20 and ", first 20 shown" or ""), assets.small_font, 80, 256)
-	deck_thumbs(shown, 80, 290, 10, nil, 0.23)
+	lg.print("Your deck (" .. #deck .. ")" .. (#deck > 20 and ", first 20 shown" or ""), assets.small_font, 80, 268)
+	deck_thumbs(shown, 80, 300, 10, nil, 0.23)
 	side_panel(740, "OPPONENT", charmers.of("Opponent", level), level, { 0.9, 0.35, 0.35 })
 	lg.setColor(1, 1, 1)
-	lg.print("Their deck (" .. #opponent.deck .. ")", assets.small_font, 760, 256)
-	deck_thumbs(opponent.deck, 760, 290, 10, level, 0.23)
+	lg.print("Their deck (" .. #opponent.deck .. ")", assets.small_font, 760, 268)
+	deck_thumbs(opponent.deck, 760, 300, 10, level, 0.23)
 	lg.setColor(0.7, 0.7, 0.8)
 	lg.print("Cards show once they are played against you", assets.debug_font, 760, 432)
 
-	panel(60, 468, 640, 96, { 1, 0.85, 0.2 })
+	panel(60, 472, 640, 190, { 1, 0.85, 0.2 })
 	lg.setColor(1, 0.85, 0.2)
-	lg.print("Win a snake: one of these, a third each, with a random border", assets.debug_font, 80, 472)
-	deck_thumbs(collection.level_rewards(level), 80, 492, 3, nil, 0.21)
+	lg.print("Win a snake", assets.font, 80, 484)
+	lg.setColor(0.85, 0.85, 0.95)
+	lg.printf("One of these, a third each, with a random border", assets.debug_font, 80, 526, 600)
+	deck_thumbs(collection.level_rewards(level), 80, 556, 3, nil, 0.3)
 
-	-- What the next fight is: the plain match, one of the level's challenges, or an endless rematch
+	-- What the next fight is: the plain match, one of the level's challenges, or an endless rematch (beside the reward)
 	local fight = play.next_fight(level)
-	panel(60, 570, 1320, 140, { 1, 0.85, 0.2 })
+	panel(740, 472, 640, 190, { 1, 0.85, 0.2 })
 	local wins = collection.wins(level)
 	lg.setColor(1, 0.85, 0.2)
 	if not fight then
-		lg.printf("The first fight", assets.font, 60, 585, 1320, "center")
+		lg.printf("The first fight", assets.font, 760, 484, 600, "left")
 		lg.setColor(1, 1, 1)
-		lg.printf("Beat them to unlock their challenges", assets.small_font, 60, 650, 1320, "center")
+		lg.printf("Beat them to unlock their challenges", assets.small_font, 760, 570, 600, "left")
 	else
-		local label = fight.endless and ("Endless rematch " .. fight.endless) or ("Challenge " .. fight.tier .. "/" .. #challenges[level] .. ": " .. fight.name)
-		lg.printf(label .. " (x" .. string.format("%.4g", fight.mult) .. " reward)", assets.font, 60, 585, 1320, "center")
+		local label = fight.endless and ("Endless rematch " .. fight.endless) or ("Challenge " .. fight.tier .. "/" .. #challenges[level])
+		lg.printf(label, assets.font, 760, 484, 600, "left")
 		lg.setColor(1, 1, 1)
-		lg.printf(fight.text, assets.small_font, 60, 650, 1320, "center")
+		lg.printf((fight.endless and "" or fight.name .. "  ") .. "(x" .. string.format("%.4g", fight.mult) .. " reward)", assets.small_font, 760, 526, 600, "left")
+		lg.setColor(0.85, 0.85, 0.95)
+		lg.printf(fight.text, assets.small_font, 760, 576, 600, "left")
 	end
 	lg.setColor(0.7, 0.9, 1)
-	lg.printf("Your wins against them: " .. wins, assets.small_font, 60, 720, 1320, "center")
+	lg.printf("Your wins against them: " .. wins, assets.small_font, 60, 690, 1320, "center")
 	lg.setColor(1, 1, 1)
 	buttons.level_choice["Play"]:draw()
 	buttons.level_choice["Cancel"]:draw()
