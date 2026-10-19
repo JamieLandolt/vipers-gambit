@@ -48,7 +48,7 @@ function hub.ring(x, y, w, h)
 	local pulse = 0.5 + 0.5 * math.sin(time * 5)
 	lg.setColor(1, 0.9, 0.2, 0.7 + 0.3 * pulse)
 	lg.setLineWidth(5)
-	lg.circle("line", x + w / 2, y + h / 2, math.max(w, h) / 2 + 12 + 4 * pulse)
+	lg.circle("line", x + w / 2, y + h / 2, math.sqrt(w * w + h * h) / 2 + 8 + 4 * pulse) -- reaches past the corners, so the whole target is inside
 	lg.setLineWidth(1)
 	lg.setColor(1, 1, 1)
 end
