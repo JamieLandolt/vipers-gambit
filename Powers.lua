@@ -156,14 +156,7 @@ P.Grey_Snake = {
 		end
 	end,
 }
-P.Sand_Snake = {
-	text = "Neighbours gain 1 attack when it is destroyed",
-	death = function(c)
-		for _, n in ipairs(neighbours(c.slot)) do
-			buff(n.card, 1, 0)
-		end
-	end,
-}
+P.Sand_Snake = { text = "Deals 2 damage to the enemy's health when it is destroyed", death = function(c) hurt_side(other(c.side), 2) end }
 P.Mud_Snake = { text = "Gain 1 attack each time it is hit", hurt = function(c) buff(c.card, 1, 0) end }
 P.Pale_Snake = { text = "Deals 2 damage to the enemy's health when played", play = function(c) hurt_side(other(c.side), 2) end }
 P.Worm_Snake = { text = "Gain 1 venom when it is destroyed", death = function(c) add_venom(c.side, 1) end }
