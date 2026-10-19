@@ -1616,7 +1616,7 @@ local function draw_stats(sector)
 end
 
 -- A played card, drawn at 0.8 scale around its slot centre with any active effects applied
-local ART_CENTRE = 100 -- the middle of the art area in a card image (rows 2-37 of its 5 pixel grid); snakes are drawn about this point
+local ART_CENTRE = 120 -- the middle of the art area in a card image (rows 2-37 of its 5 pixel grid); snakes are drawn about this point
 local SNAKE_SCALE = 0.95 -- cut-out snakes sit in the cell above the attack and defense badges
 
 -- Snakes on the board are cut out of their card (no purple frame or corner numbers).

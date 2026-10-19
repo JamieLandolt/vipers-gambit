@@ -145,7 +145,7 @@ P.Sea_Snake = {
 P.Vine_Snake = { text = "While it lives, the card ahead has 2 less attack", foe_attack = 2 }
 P.Corn_Snake = { text = "Gain 1 venom when it is played", play = function(c) add_venom(c.side, 1) end }
 P.Grass_Snake = { text = "Deals 1 damage to the card ahead at the start of your turn", turn = function(c) hurt_card(c.foe, 1) end }
-P.Brown_Snake = { text = "Takes 1 less damage", reduce = function(_, damage) return math.max(damage - 1, 1) end }
+P.Brown_Snake = { text = "+1 attack", bonus = function() return 1 end }
 P.Grey_Snake = {
 	text = "Hardens: +1 defense each turn, up to 3 times",
 	turn = function(c)

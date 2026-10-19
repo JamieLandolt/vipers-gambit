@@ -2,7 +2,7 @@ local love = require("love")
 local lg = love.graphics
 local data = require("CardData")
 
--- The name written in the text panel of a card, in card-image units (165 x 320, panel from y = 190).
+-- The name written in the text panel of a card, in card-image units (165 x 320, name plate from y = 212).
 -- Abilities are not printed on the card: they are on the info page and the hover tooltip.
 -- The name is drawn with a font made at its real on-screen size, at whole pixels. Scaling a pixel font up or down
 -- smears it and drops its thin lines, so the font size changes with the card instead.
@@ -134,7 +134,7 @@ function cardtext.draw(name, x, y)
 		stats_row(st.attack, st.defense, x + 14, x + 151, y + 320 - 14 - 16)
 	end
 	lg.setColor(0, 0, 0, 0.45)
-	lg.rectangle("fill", x + 11, y + 192, 143, 30, 4, 4)
+	lg.rectangle("fill", x + 11, y + 212, 143, 30, 4, 4)
 	lg.setColor(1, 1, 1)
 	local title = name:gsub("_", " ")
 	local k = unit()
@@ -144,7 +144,7 @@ function cardtext.draw(name, x, y)
 		size = size - 1
 		font = font_at(size)
 	end
-	local sx, sy = lg.transformPoint(x + 82.5, y + 193 + (NAME_SIZE * k - font:getHeight()) / k / 2)
+	local sx, sy = lg.transformPoint(x + 82.5, y + 213 + (NAME_SIZE * k - font:getHeight()) / k / 2)
 	lg.push()
 	lg.origin()
 	lg.print(title, font, math.floor(sx - font:getWidth(title) / 2 + 0.5), math.floor(sy + 0.5))
