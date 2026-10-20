@@ -554,6 +554,13 @@ function love.draw()
 	if settings.debug then
 		lg.setColor(1, 0, 0)
 		lg.printf(tostring(debug_text), assets.debug_font, 10, 70, reference_window_width)
+		local uw, uh = love.window.getMode()
+		local rx, ry = love.mouse.getPosition()
+		local dw, dh = love.window.getDesktopDimensions()
+		lg.printf(("LOVE %s  window units %dx%d  pixels %dx%d  dpi %.2f  desktop %dx%d\nraw mouse %d,%d  used %d,%d"):format(
+			love._version, uw, uh, lg.getPixelWidth(), lg.getPixelHeight(), love.window.getDPIScale(), dw, dh, rx, ry, mouse.x, mouse.y),
+			assets.debug_font, 10, 100, reference_window_width)
+		lg.circle("fill", mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight(), 6) -- where the game thinks the mouse is
 		lg.setColor(1, 1, 1)
 	end
 	lg.scale(reference_window_width / lg.getWidth(), reference_window_height / lg.getHeight())

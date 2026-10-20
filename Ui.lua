@@ -25,7 +25,7 @@ end
 
 -- If adding a new button, remember to draw it, may need to add game state too
 return function()
-	local w, h = lg.getWidth(), lg.getHeight()
+	local w, h = reference_window_width, reference_window_height -- buttons are laid out and hit-tested in reference units, whatever size the window is
 	local back_width = button_width * 5 / 8
 
 	local hand = {
