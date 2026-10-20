@@ -30,4 +30,4 @@ love .
 ```
 
 On Mac, if `love` is not found: `open -n -a love .`
-On Windows, if `love` is not found: `"C:\Program Files\LOVE\love.exe" .`
+On Windows (PowerShell), if `love` is not found: `& "C:\Program Files\LOVE\love.exe" .`
