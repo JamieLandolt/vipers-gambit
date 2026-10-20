@@ -158,8 +158,19 @@ local function get_game_state()
 	end
 end
 
+-- Mouse positions come in window units; the drawing is in pixels. They differ when the OS scales the window
+-- (e.g. Windows display scaling), so convert before comparing against anything drawn
+local function window_to_pixels(x, y)
+	local units_w, units_h = love.window.getMode()
+	return x * lg.getWidth() / units_w, y * lg.getHeight() / units_h
+end
+
+local function mouse_position()
+	return window_to_pixels(love.mouse.getPosition())
+end
+
 local function handle_animations(dt)
-	mouse.x, mouse.y = love.mouse.getPosition()
+	mouse.x, mouse.y = mouse_position()
 
 	if animation then
 		animation_time = animation_time + dt
@@ -181,13 +192,13 @@ end
 
 function love.load()
 	math.randomseed(os.time())
-	mouse.x, mouse.y = love.mouse.getPosition()
+	mouse.x, mouse.y = mouse_position()
 
 	img_widths = assets.cards[1]:getWidth()
 	img_heights = assets.cards[1]:getHeight()
 	hover_sound = la.newSource("assets/audio/hover.mp3", "static")
 
-	love.window.setMode(reference_window_width, reference_window_height, { resizable = true, vsync = 0 })
+	love.window.setMode(settings.window_size(), select(2, settings.window_size()), { resizable = true, vsync = 0 })
 	collection.load()
 	collection.load_vials()
 	require("Achievements").load()
@@ -202,7 +213,8 @@ function love.update(dt)
 
 	-- Keep the window at the reference aspect ratio
 	local aspect_ratio = 1440 / 872
-	if not settings.fullscreen and math.abs(w / h - aspect_ratio) > 0.008 then
+	if not settings.fullscreen and math.abs(w / h - aspect_ratio) > 0.008 and fixed_aspect ~= w .. "x" .. h then
+		fixed_aspect = w .. "x" .. h -- (once per size: a window the OS will not shrink to the ratio is left as it is)
 		h = w / aspect_ratio
 		love.window.setMode(w, h, { resizable = true })
 	end
@@ -212,7 +224,7 @@ function love.update(dt)
 
 	handle_animations(dt)
 	if map_press and love.mouse.isDown(1) and game.state["level_select"] and not level_choice then -- dragging the level map
-		local mx, my = love.mouse.getPosition()
+		local mx, my = mouse_position()
 		local dx, dy = (mx - map_press.x) * reference_window_width / w, (my - map_press.y) * reference_window_height / h
 		map_press.x, map_press.y, map_press.moved = mx, my, map_press.moved + math.abs(dx) + math.abs(dy)
 		render.pan_map(dx, dy)
@@ -220,7 +232,7 @@ function love.update(dt)
 	settings.update()
 	versus.update()
 	if field_press and love.mouse.isDown(1) and not field_press.drag then -- dragging a snake off its slot sacrifices it, not a click
-		local mx, my = love.mouse.getPosition()
+		local mx, my = mouse_position()
 		field_press.drag = math.abs(mx - field_press.x) + math.abs(my - field_press.y) > 12
 	end
 	if game.state["playing"] then
@@ -244,6 +256,7 @@ function love.mousepressed(x, y, button)
 	if button ~= 1 then
 		return
 	end
+	x, y = window_to_pixels(x, y)
 
 	if coach.active() then -- a mini tutorial is showing: a click moves it on
 		coach.click()
@@ -459,6 +472,7 @@ function love.keypressed(key)
 end
 
 function love.mousereleased(x, y, button)
+	x, y = window_to_pixels(x, y)
 	if button == 1 and field_press then
 		local press = field_press
 		field_press = nil

@@ -17,13 +17,20 @@ local big_window = false
 
 -- "Fullscreen" is a borderless window as big as the desktop; the game is drawn stretched to fill it (see love.draw),
 -- so there are no gaps at the top and bottom
+-- The reference window, shrunk (keeping its shape) to fit smaller desktops
+function settings.window_size()
+	local dw, dh = love.window.getDesktopDimensions()
+	local fit = math.min(1, dw * 0.95 / reference_window_width, dh * 0.85 / reference_window_height)
+	return math.floor(reference_window_width * fit), math.floor(reference_window_height * fit)
+end
+
 local function set_big_window(big)
 	big_window = big
 	if big then
 		local dw, dh = love.window.getDesktopDimensions()
 		love.window.setMode(dw, dh, { borderless = true, vsync = 0 })
 	else
-		love.window.setMode(reference_window_width, reference_window_height, { resizable = true, vsync = 0 })
+		love.window.setMode(settings.window_size(), select(2, settings.window_size()), { resizable = true, vsync = 0 })
 	end
 end
 
