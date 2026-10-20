@@ -116,8 +116,10 @@ for name, st in pairs(card_stats) do
 		if powers.of[name] then
 			st.ability = powers.text(name) -- hand-made and unique, applied through Powers.lua
 		else
-			st.ability_code = ABILITY_OVERRIDES[name] or st.ability_code or abilities.assign(name, card_types[name], st.rarity)
-			st.ability = abilities.describe(st.ability_code)
+			if name ~= "One_Eyed_Python" then -- the one snake with no ability
+				st.ability_code = ABILITY_OVERRIDES[name] or st.ability_code or abilities.assign(name, card_types[name], st.rarity)
+				st.ability = abilities.describe(st.ability_code)
+			end
 		end
 		st.lore = lore[name] or st.lore
 	end

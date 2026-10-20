@@ -124,10 +124,13 @@ check("no target picks the strongest", (played_cards[2].hp or strong_hp) < stron
 -- Every snake has an ability paid for in venom
 local data, abilities = require("CardData"), require("Abilities")
 for _, name in ipairs(data.deck) do
-	if data.stats_by_name[name].kind == "snake" then
+	if data.stats_by_name[name].kind == "snake" and name ~= "One_Eyed_Python" then
 		check(name .. " has a venom ability", abilities.active(card(name)) ~= nil)
 	end
 end
+
+local py = data.stats_by_name.One_Eyed_Python
+check("One Eyed Python is 100/69 with no ability", py.attack == 100 and py.defense == 69 and abilities.active(card("One_Eyed_Python")) == nil)
 
 -- A hurt Zombie Snake pays venom to return to its owner's hand without pushing another card out
 played_cards = {}
