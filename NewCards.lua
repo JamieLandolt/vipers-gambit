@@ -92,6 +92,5 @@ return {
 	{ name = "Ouroboros", cost = 6, attack = 6, defense = 18, rarity = 5, type = "Rainbow", border = "Rainbow", lore = "It devours its own tail and is reborn in every colour of light." },
 	{ name = "Nagaraja", cost = 7, attack = 7, defense = 26, rarity = 5, type = "Land", border = "Gold", lore = "The golden serpent king whose many hoods shelter the mountain of the sun." },
 	{ name = "Skinny_Snake", cost = 1, attack = 2, defense = 1, rarity = 1, type = "Land", border = "Basic", lore = "So thin it slips through the cracks of the Dustwild roads." },
-	{ name = "Spiral_Snake", cost = 3, attack = 4, defense = 5, rarity = 2, type = "Water", border = "Basic", lore = "Coils into a whirlpool that pulls its prey under." },
-	{ name = "One_Eyed_Python", cost = 10, attack = 100, defense = 69, rarity = 5, type = "Land", border = "Basic", lore = "Nobody will say what it is, and nobody has dared look closer." },
+	{ name = "Spiral_Snake", cost = 2, attack = 4, defense = 5, rarity = 2, type = "Water", border = "Basic", lore = "Coils into a whirlpool that pulls its prey under." },
 }
