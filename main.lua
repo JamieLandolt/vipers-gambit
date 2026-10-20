@@ -211,16 +211,14 @@ end
 function love.update(dt)
 	time = time + dt
 
+	w, h = lg.getWidth(), lg.getHeight()
+
 	-- Keep the window at the reference aspect ratio
 	local aspect_ratio = 1440 / 872
 	if not settings.fullscreen and math.abs(w / h - aspect_ratio) > 0.008 and fixed_aspect ~= w .. "x" .. h then
 		fixed_aspect = w .. "x" .. h -- (once per size: a window the OS will not shrink to the ratio is left as it is)
-		h = w / aspect_ratio
-		love.window.setMode(w, h, { resizable = true })
+		love.window.setMode(w, math.floor(w / aspect_ratio), { resizable = true })
 	end
-
-	w = lg.getWidth()
-	h = lg.getHeight()
 
 	handle_animations(dt)
 	if map_press and love.mouse.isDown(1) and game.state["level_select"] and not level_choice then -- dragging the level map
