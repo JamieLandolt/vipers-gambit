@@ -1775,6 +1775,22 @@ local skin_images = {}
 
 -- Draws a charmer's portrait cropped to fill w x h
 local LOWER_CROP = { ["Yuki Frostveil"] = 0.5, ["Ember Queen"] = 0.5, ["Warden Basalt"] = 0.5 } -- how far down the spare height the crop starts, so these portraits sit higher in the frame
+-- Draws the first `fraction` of a rectangle's outline, clockwise from its top left corner
+local function edge_line(x, y, w, h, fraction)
+	local corners = { { x, y }, { x + w, y }, { x + w, y + h }, { x, y + h }, { x, y } }
+	local left = fraction * 2 * (w + h)
+	for i = 1, 4 do
+		local a, b = corners[i], corners[i + 1]
+		local length = math.abs(b[1] - a[1]) + math.abs(b[2] - a[2])
+		local part = math.min(left, length) / length
+		if part <= 0 then
+			break
+		end
+		lg.line(a[1], a[2], a[1] + (b[1] - a[1]) * part, a[2] + (b[2] - a[2]) * part)
+		left = left - length
+	end
+end
+
 local function portrait(name, x, y, w, h)
 	local image = assets.avatars[name]
 	local iw, ih = image:getDimensions()
@@ -2551,10 +2567,16 @@ function render.playing()
 			lg.setBlendMode("alpha")
 		end
 		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
-		if play.charms_open() and play.charm_ready(side) then -- a ready charm makes its charmer's panel glow
+		if play.charms_open() then -- the panel's edge glows in the charmer's colour, filling round it as the cooldown runs down
+			local fill = 1 - play.charm_cd[side] / (c.cooldown + 1)
+			local glow = fill >= 1 and 0.7 + 0.3 * math.sin(time * 4) or 1
 			lg.setBlendMode("add")
-			lg.setColor(rim[1], rim[2], rim[3], 0.12 + 0.12 * math.sin(time * 4))
-			lg.rectangle("fill", spot[1] - 7, spot[2] - 7, 229, 86, 10, 10)
+			for _, line in ipairs({ { 9, 0.18 }, { 4, 0.5 }, { 2, 1 } }) do
+				lg.setLineWidth(line[1])
+				lg.setColor(rim[1], rim[2], rim[3], line[2] * glow)
+				edge_line(spot[1] - 7, spot[2] - 7, 229, 86, fill)
+			end
+			lg.setLineWidth(1)
 			lg.setBlendMode("alpha")
 		end
 	end
