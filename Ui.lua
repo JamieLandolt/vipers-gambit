@@ -243,7 +243,7 @@ return function()
 		end
 	end, nil, w / 2 - button_width - 20, h / 2, button_width, button_height)
 	buttons.playing["No"] = b("No", function() confirm_forfeit = false end, nil, w / 2 + 20, h / 2, button_width, button_height)
-	buttons.playing["Charm"] = b("Charm", function() play.use_charm("Player") end, nil, 1210, 640, 210, button_height)
+	buttons.playing["Charm"] = b("Charm", function() play.use_charm("Player") end, nil, 1208, 640, 229, button_height)
 	buttons.playing["Tutorial Next"] = b("Next", function()
 		tutorial.advance()
 	end, nil, 20, 410, 200, 50)
@@ -253,7 +253,7 @@ return function()
 			play.end_turn()
 		end
 	end
-	buttons.playing["End Turn"] = b("End Turn", end_player_turn, nil, 1215, 255, button_width, button_height)
+	buttons.playing["End Turn"] = b("End Turn", end_player_turn, nil, 1208, 255, 229, button_height)
 
 	buttons.ended["Continue"] = b("Continue", function()
 		if play.versus then

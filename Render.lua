@@ -2551,9 +2551,11 @@ function render.playing()
 			lg.setBlendMode("alpha")
 		end
 		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
-		if play.charms_open() then
-			lg.setColor(0.6, 0.9, 0.4)
-			lg.printf(c.charm .. " (" .. c.cost .. ")", assets.debug_font, spot[1] + 68, spot[2] + 44, 145, "left")
+		if play.charms_open() and play.charm_ready(side) then -- a ready charm makes its charmer's panel glow
+			lg.setBlendMode("add")
+			lg.setColor(rim[1], rim[2], rim[3], 0.12 + 0.12 * math.sin(time * 4))
+			lg.rectangle("fill", spot[1] - 7, spot[2] - 7, 229, 86, 10, 10)
+			lg.setBlendMode("alpha")
 		end
 	end
 	local charm = buttons.playing["Charm"]
