@@ -350,15 +350,37 @@ function collection.deck_kinds(name)
 end
 
 -- A click adds a copy with the given border (false: its own), or removes them all once every such copy you own is in;
--- returns a message when it isn't allowed
-function collection.toggle_deck(name, key)
+-- mode "remove" takes one copy out and mode "all" puts every copy you own in (as far as the deck has room).
+-- Returns a message when it isn't allowed
+function collection.toggle_deck(name, key, mode)
 	local kinds = collection.deck_kinds(name)
 	local kind = kinds[1]
 	for _, k in ipairs(kinds) do
 		kind = k.key == (key or false) and k or kind
 	end
 	local size = collection.deck_count()
-	if kind.n < kind.avail then
+	if mode == "all" then
+		local room = collection.MAX_DECK - size
+		for _, k in ipairs(kinds) do
+			local add = math.min(k.avail - k.n, room)
+			k.n, room = k.n + add, room - add
+		end
+		if room == collection.MAX_DECK - size then
+			return "Your deck is full (" .. collection.MAX_DECK .. " snakes)"
+		end
+	elseif mode == "remove" then
+		if not key then -- no border chosen: take out the last kind that is in the deck
+			for _, k in ipairs(kinds) do
+				kind = k.n > 0 and k or kind
+			end
+		end
+		if kind.n == 0 then
+			return
+		elseif size <= collection.MIN_DECK then
+			return "A deck needs at least " .. collection.MIN_DECK .. " snakes"
+		end
+		kind.n = kind.n - 1
+	elseif kind.n < kind.avail then
 		if size >= collection.MAX_DECK then
 			return "Your deck is full (" .. collection.MAX_DECK .. " snakes)"
 		end

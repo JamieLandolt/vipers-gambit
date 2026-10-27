@@ -247,7 +247,7 @@ local function each_collection_card(fn)
 		shown = shown + (collection.shown(name) and 1 or 0)
 	end
 	local rows = math.ceil(shown / per_row)
-	local top = math.max(math.min(scroll_offset_y * 5, 0), GRID_BOTTOM - GRID_Y - rows * (ch + CELL_GAP)) + GRID_Y
+	local top = math.max(math.min(scroll_offset_y * 5, 0), math.min(0, GRID_BOTTOM - GRID_Y - rows * (ch + CELL_GAP))) + GRID_Y
 	local n = 0
 	for _, i in ipairs(collection.order(assets.card_names)) do
 		if collection.shown(assets.card_names[i]) then
@@ -785,7 +785,7 @@ function render.collection()
 	end
 	if collection.deck_mode then
 		coach.start("coach_deck", {
-			{ rect = { 20, 130, 860, 690 }, text = "Click to add or remove" },
+			{ rect = { 20, 130, 860, 690 }, text = "Click to add one, right click to remove one, shift click to add all" },
 			{ rect = function() local c = buttons.collection["Collection Header"]; return { c.x, c.y, c.width, c.height } end, text = "Deck size" },
 			{ rect = function() local c = buttons.collection["Sacrifice"]; return { c.x, c.y, c.width, c.height } end, text = "Auto-fill: your best 3 snakes of each lane type" },
 		})
@@ -842,7 +842,7 @@ local function altar_rows()
 end
 
 local function altar_top(count)
-	return math.max(math.min(scroll_offset_y * 5, 0), ALTAR_BOTTOM - ALTAR_Y - count * ROW_H) + ALTAR_Y
+	return math.max(math.min(scroll_offset_y * 5, 0), math.min(0, ALTAR_BOTTOM - ALTAR_Y - count * ROW_H)) + ALTAR_Y
 end
 
 -- The reward of the recipe row under the given window position, if any

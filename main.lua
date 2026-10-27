@@ -251,6 +251,14 @@ function love.update(dt)
 end
 
 function love.mousepressed(x, y, button)
+	if button == 2 and game.state["collection"] and collection.deck_mode and not collection.landing() and not collection.picker then
+		local name = render.collection_card_at(window_to_pixels(x, y)) -- editing the deck: a right click takes one copy out
+		if name then
+			collection.message, collection.message_t = collection.toggle_deck(name, nil, "remove"), time
+			play_sound(hover_sound)
+		end
+		return
+	end
 	if button ~= 1 then
 		return
 	end
@@ -372,7 +380,9 @@ function love.mousepressed(x, y, button)
 			play_sound(hover_sound)
 		elseif name and collection.deck_mode then
 			-- Editing the deck: a click adds or removes the snake (the message says why it didn't work); with several borders you pick one
-			if #collection.deck_kinds(name) > 1 then
+			if love.keyboard.isDown("lshift", "rshift") then -- shift puts every copy you own in
+				collection.message, collection.message_t = collection.toggle_deck(name, nil, "all"), time
+			elseif #collection.deck_kinds(name) > 1 then
 				collection.picker = name
 			else
 				collection.message, collection.message_t = collection.toggle_deck(name), time
