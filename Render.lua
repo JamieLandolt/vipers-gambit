@@ -2703,7 +2703,19 @@ function render.playing()
 				end
 				local mx, my = mouse.x * reference_window_width / lg.getWidth(), mouse.y * reference_window_height / lg.getHeight()
 				local px = mx > 720 and mx - POPUP_W - 24 or mx + 24 -- flips to the left over the right half of the field
-				target, draw = card, function() card_popup(card, px, my - 130, card.hp and play.shown_hp(card), status) end
+				target, draw = card, function()
+					card_popup(card, px, my - 130, card.hp and play.shown_hp(card), status)
+					if sector > 4 and not play.versus then -- your own snake: how to sacrifice it
+						local label = "Hold shift and click to sacrifice"
+						local w = assets.small_font:getWidth(label) + 24
+						local ly = math.max(4, my - 130 - 40)
+						lg.setColor(0, 0, 0, 0.85)
+						lg.rectangle("fill", px, ly, w, 34, 8, 8)
+						lg.setColor(1, 0.85, 0.2)
+						lg.print(label, assets.small_font, px + 12, ly + 5)
+						lg.setColor(1, 1, 1)
+					end
+				end
 			end
 		end
 		for card, box in pairs(card_hitboxes) do -- snakes in the hand too

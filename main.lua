@@ -490,6 +490,8 @@ function love.mousereleased(x, y, button)
 			if play.is_hitbox(x, y, { tray.x, tray.y, tray.width, tray.height }) then
 				play.sacrifice(press.slot)
 			end
+		elseif mine and love.keyboard.isDown("lshift", "rshift") then -- shift and click sacrifices it
+			play.sacrifice(press.slot)
 		elseif mine and tutorial.allows("ability") then
 			play.activate(press.slot)
 		end
