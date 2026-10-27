@@ -1678,9 +1678,24 @@ function render.pack()
 				lg.rectangle("fill", img_widths / 2 - 3, img_heights / 2 - 22, 6, 44)
 			end
 			lg.pop()
-			if collection.pack_new[name] and face then
-				lg.setColor(1, 0.85, 0.2, math.min(1, (age - 0.5) * 4))
-				lg.printf("NEW!", assets.font, px - 100, 135, 200, "center")
+			if collection.pack_new[name] and age > 0.5 then -- a snake you did not own: "New!" on the card's top left corner, with a shine behind it
+				local fade = math.min(1, (age - 0.5) * 4)
+				local bx, by = px - img_widths * scale / 2 + 6, py - img_heights * scale / 2 + 4
+				local shine = 0.5 + 0.5 * math.sin(time * 5)
+				lg.setBlendMode("add")
+				for ray = 1, 8 do
+					local angle = ray / 8 * 6.283 + time * 1.5
+					lg.setColor(1, 0.85, 0.3, fade * (0.25 + 0.15 * shine))
+					lg.polygon("fill", bx + 50, by + 24, bx + 50 + math.cos(angle - 0.12) * 70, by + 24 + math.sin(angle - 0.12) * 70, bx + 50 + math.cos(angle + 0.12) * 70, by + 24 + math.sin(angle + 0.12) * 70)
+				end
+				lg.setColor(1, 0.9, 0.4, fade * (0.2 + 0.2 * shine))
+				lg.circle("fill", bx + 50, by + 24, 46)
+				lg.setBlendMode("alpha")
+				lg.setColor(0.1, 0.06, 0.02, 0.9 * fade)
+				lg.rectangle("fill", bx, by, 100, 48, 10, 10)
+				lg.setColor(1, 0.85, 0.2, fade)
+				lg.rectangle("line", bx, by, 100, 48, 10, 10)
+				lg.printf("New!", assets.font, bx, by + 6, 100, "center")
 			end
 			local pulled_border = collection.pack_borders and collection.pack_borders[i]
 			if face and pulled_border and pulled_border ~= st.border then -- a variant: its new border
