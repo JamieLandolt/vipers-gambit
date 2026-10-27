@@ -1714,10 +1714,11 @@ function render.pack()
 	end
 	lg.setColor(1, 1, 1)
 	collection.pack_revealed = t > REVEAL_START + n * REVEAL_GAP
+	collection.pack_revealed_at = pack_t + REVEAL_START + n * REVEAL_GAP
 	if collection.pack_revealed then
-		buttons.pack["Done"]:draw()
 		local pack = collection.PACKS[collection.pack_kind]
 		if pack then
+			buttons.pack["Done"]:draw()
 			local price = collection.price(collection.pack_kind)
 			local again = buttons.pack["Again"]
 			again:update_text("")

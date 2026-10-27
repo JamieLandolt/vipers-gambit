@@ -264,6 +264,13 @@ function love.mousepressed(x, y, button)
 	end
 	x, y = window_to_pixels(x, y)
 
+	if game.state["pack"] and collection.pack_kind == 0 then -- a summon has no buttons: a click, half a second after the last card turns, goes back
+		if collection.pack_revealed and time - collection.pack_revealed_at >= 0.5 then
+			update_animation_screen(buttons.pack["Done"].func_params)
+		end
+		return
+	end
+
 	if coach.active() then -- a mini tutorial is showing: a click moves it on
 		coach.click()
 		return
