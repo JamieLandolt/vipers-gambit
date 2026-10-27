@@ -672,7 +672,7 @@ function render.collection()
 
 	local under = card_under(mouse.x, mouse.y) -- the pane shows any hovered card, owned or not
 	pane_name = under or pane_name
-	local sc = lg.getWidth() / reference_window_width
+	local sc, sy = lg.getWidth() / reference_window_width, lg.getHeight() / reference_window_height -- (the window may be stretched, so the two differ)
 	-- a panel under the grid: green felt for the deck page, deep purple with a gold rim for the collection
 	local felt = collection.deck_mode and { 0.04, 0.22, 0.1 } or { 0.1, 0.05, 0.2 }
 	local rim = collection.deck_mode and { 0.35, 0.8, 0.4 } or { 0.82, 0.66, 0.25 }
@@ -695,7 +695,7 @@ function render.collection()
 		lg.setColor(1, 1, 1, 0.35)
 		lg.rectangle("fill", GRID_X - 15, 132, (GRID_W + 30) * have / total, 3, 2, 2)
 	end
-	lg.setScissor(0, GRID_Y * sc, (GRID_X + GRID_W + CELL_GAP) * sc, (GRID_BOTTOM - GRID_Y) * sc)
+	lg.setScissor(0, GRID_Y * sy, (GRID_X + GRID_W + CELL_GAP) * sc, (GRID_BOTTOM - GRID_Y) * sy)
 	each_collection_card(function(i, gx, gy)
 		lg.push()
 		lg.translate(gx, gy)
@@ -889,8 +889,8 @@ function render.altar()
 	end
 
 	-- the list
-	local sc = lg.getWidth() / reference_window_width
-	lg.setScissor(0, ALTAR_Y * sc, (ALTAR_X + ALTAR_W + 10) * sc, (ALTAR_BOTTOM - ALTAR_Y) * sc)
+	local sc, sy = lg.getWidth() / reference_window_width, lg.getHeight() / reference_window_height
+	lg.setScissor(0, ALTAR_Y * sy, (ALTAR_X + ALTAR_W + 10) * sc, (ALTAR_BOTTOM - ALTAR_Y) * sy)
 	local top = altar_top(#rows)
 	for i, recipe in ipairs(rows) do
 		local y = top + (i - 1) * ROW_H
