@@ -285,16 +285,20 @@ function effects.draw()
 				lg.setColor(c[1], c[2], c[3], 1 - u)
 				lg.circle("line", e.cx, e.cy, 20 + 150 * math.min(u * 1.6, 1))
 				lg.setLineWidth(1)
-				local font = assets.small_font
-				local w = font:getWidth(e.text) + 30
-				local x, y = math.max(10, math.min(e.cx - w / 2, reference_window_width - w - 10)), math.max(10, e.cy - 150 - 12 * u)
-				local fade = u < 0.8 and 1 or (1 - u) / 0.2
-				lg.setColor(0, 0, 0, 0.8 * fade)
-				lg.rectangle("fill", x, y, w, 34, 8, 8)
-				lg.setColor(c[1], c[2], c[3], fade)
-				lg.rectangle("line", x, y, w, 34, 8, 8)
-				lg.setColor(1, 1, 1, fade)
-				lg.print(e.text, font, x + 15, y + 5)
+				if not e.text then -- (an ability use is a ring and sparks in its colour, with no label)
+					sparks(e.cx, e.cy, u, 10, c, 150)
+				else
+					local font = assets.small_font
+					local w = font:getWidth(e.text) + 30
+					local x, y = math.max(10, math.min(e.cx - w / 2, reference_window_width - w - 10)), math.max(10, e.cy - 150 - 12 * u)
+					local fade = u < 0.8 and 1 or (1 - u) / 0.2
+					lg.setColor(0, 0, 0, 0.8 * fade)
+					lg.rectangle("fill", x, y, w, 34, 8, 8)
+					lg.setColor(c[1], c[2], c[3], fade)
+					lg.rectangle("line", x, y, w, 34, 8, 8)
+					lg.setColor(1, 1, 1, fade)
+					lg.print(e.text, font, x + 15, y + 5)
+				end
 			elseif e.kind == "float" and e.style then
 				styled_float(e, age)
 			elseif e.kind == "float" then

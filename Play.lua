@@ -746,7 +746,7 @@ function play.activate(slot)
 	card.used = true
 	play.note(play.name_of(card) .. " uses its ability")
 	local ax, ay = play.slot_centre(slot)
-	play.callout(play.name_of(card):gsub("_", " ") .. ": " .. kind, ax, ay, ABILITY_COLOUR[kind])
+	play.callout(nil, ax, ay, ABILITY_COLOUR[kind])
 
 	local ahead = slot > 4 and slot - 4 or slot + 4
 	if kind == "strike" or kind == "drain" then
@@ -780,7 +780,6 @@ function play.activate(slot)
 			float(f.slot, "+" .. n .. " atk")
 		end
 	end
-	float(slot, kind)
 	play_sound(hover_sound)
 	play.check_end()
 	return true
