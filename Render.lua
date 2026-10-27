@@ -2581,6 +2581,11 @@ function render.playing()
 			draw_x, draw_y = card.glide_x + (x - card.glide_x) * ease, card.glide_y + (y_pos - card.glide_y) * ease
 		end
 		card:draw(draw_x, draw_y, 0, HAND_SCALE)
+		if turn ~= "Player" or data.get_stats(card).cost > venom.Player then -- a card you cannot play right now is darker
+			lg.setColor(0, 0, 0, 0.5)
+			lg.rectangle("fill", draw_x, draw_y, img_widths * HAND_SCALE, img_heights * HAND_SCALE, 6, 6)
+			lg.setColor(1, 1, 1)
+		end
 		card_hitboxes[card] = { x, y_pos, i ~= #player_hand and x_offset or img_widths * HAND_SCALE, img_heights * HAND_SCALE }
 	end
 
