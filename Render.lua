@@ -1624,6 +1624,22 @@ function render.pack()
 	local hovered_pull
 	local n = #pack_cards
 	local x0 = (reference_window_width - n * img_widths * scale - (n - 1) * gap) / 2
+	lg.setBlendMode("add") -- rays shine behind every card (new snakes only), stronger for rarer snakes
+	for i, name in ipairs(pack_cards) do
+		local age = t - (REVEAL_START + (i - 1) * REVEAL_GAP)
+		if age > 0 and collection.pack_new[name] then
+			local st = data.stats_by_name[name]
+			local c = RARITY_COLOUR[st.rarity]
+			local px = x0 + (i - 1) * (img_widths * scale + gap) + img_widths * scale / 2
+			local py = 190 + img_heights * scale / 2
+			for ray = 1, 6 + st.rarity * 2 do
+				local angle = ray / (6 + st.rarity * 2) * 6.283 + time * 0.4
+				lg.setColor(c[1], c[2], c[3], math.min(1, age * 2) * (0.1 + 0.03 * st.rarity))
+				lg.polygon("fill", px, py, px + math.cos(angle - 0.06) * 700, py + math.sin(angle - 0.06) * 700, px + math.cos(angle + 0.06) * 700, py + math.sin(angle + 0.06) * 700)
+			end
+		end
+	end
+	lg.setBlendMode("alpha")
 	for i, name in ipairs(pack_cards) do
 		local age = t - (REVEAL_START + (i - 1) * REVEAL_GAP)
 		if age > 0 then
@@ -1632,14 +1648,6 @@ function render.pack()
 			local c = RARITY_COLOUR[st.rarity]
 			local px = x0 + (i - 1) * (img_widths * scale + gap) + img_widths * scale / 2
 			local py = 190 + img_heights * scale / 2
-			-- rays behind the card, stronger for rarer snakes
-			lg.setBlendMode("add")
-			for ray = 1, 6 + st.rarity * 2 do
-				local angle = ray / (6 + st.rarity * 2) * 6.283 + time * 0.4
-				lg.setColor(c[1], c[2], c[3], math.min(1, age * 2) * (0.04 + 0.02 * st.rarity))
-				lg.polygon("fill", px, py, px + math.cos(angle - 0.06) * 700, py + math.sin(angle - 0.06) * 700, px + math.cos(angle + 0.06) * 700, py + math.sin(angle + 0.06) * 700)
-			end
-			lg.setBlendMode("alpha")
 			lg.setColor(c[1], c[2], c[3], math.max(0, 0.8 - age * 1.6)) -- a ring spreads out as it turns over
 			lg.setLineWidth(5)
 			lg.circle("line", px, py, 40 + age * 500)
@@ -1681,16 +1689,6 @@ function render.pack()
 			if collection.pack_new[name] and age > 0.5 then -- a snake you did not own: "New!" on the card's top left corner, with a shine behind it
 				local fade = math.min(1, (age - 0.5) * 4)
 				local bx, by = px - img_widths * scale / 2 + 6, py - img_heights * scale / 2 + 4
-				local shine = 0.5 + 0.5 * math.sin(time * 5)
-				lg.setBlendMode("add")
-				for ray = 1, 8 do
-					local angle = ray / 8 * 6.283 + time * 1.5
-					lg.setColor(1, 0.85, 0.3, fade * (0.25 + 0.15 * shine))
-					lg.polygon("fill", bx + 50, by + 24, bx + 50 + math.cos(angle - 0.12) * 70, by + 24 + math.sin(angle - 0.12) * 70, bx + 50 + math.cos(angle + 0.12) * 70, by + 24 + math.sin(angle + 0.12) * 70)
-				end
-				lg.setColor(1, 0.9, 0.4, fade * (0.2 + 0.2 * shine))
-				lg.circle("fill", bx + 50, by + 24, 46)
-				lg.setBlendMode("alpha")
 				lg.setColor(0.1, 0.06, 0.02, 0.9 * fade)
 				lg.rectangle("fill", bx, by, 100, 48, 10, 10)
 				lg.setColor(1, 0.85, 0.2, fade)
