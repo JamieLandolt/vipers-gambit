@@ -1816,20 +1816,32 @@ local function portrait(name, x, y, w, h)
 	lg.draw(image, crops[name], x, y, 0, w / cw)
 end
 
-function render.character_select()
-	background()
+-- The charmer screen's lesson: what a charmer is, how it levels up, its charm, and the looks (the ? button plays it again)
+local function charmer_lesson()
 	local x1, y1 = card_pos(1)
 	local charm_known = collection.unlock_all or unlocked >= 4 -- charm powers are taught at level 4, so stay hidden until then
-	local lesson = { { rect = { x1, y1, CARD_W, CARD_H }, text = "A charmer is your hero. Pick one to fight beside you." } }
+	local lesson = {
+		{ rect = { x1, y1, CARD_W, CARD_H }, text = "A charmer is your hero. Pick one to fight beside you." },
+		{ rect = { x1 + 11, y1 + PORTRAIT_H - 11, CARD_W - 22, 20 }, text = "Win matches with a charmer to level it up: every " .. collection.WINS_PER_LEVEL .. " wins is a level. The bar fills with each win." },
+		{ rect = { x1 + CARD_W - 84, y1 + 10, 72, 24 }, text = "Each level gives that charmer +" .. collection.BONUS_HEALTH .. " health in battle, up to level " .. collection.MAX_LEVEL .. "." },
+	}
 	if charm_known then
-		lesson[2] = { rect = { x1, y1 + PORTRAIT_H + LOOKS_H + 44, CARD_W, 110 }, text = "Each charmer has a charm: a power you can use for venom, then it needs time to recharge" }
+		lesson[#lesson + 1] = { rect = { x1, y1 + PORTRAIT_H + LOOKS_H + 44, CARD_W, 110 }, text = "Each charmer has a charm: a power you can use for venom, then it needs time to recharge" }
 	end
 	lesson[#lesson + 1] = { rect = { x1, y1, PER_ROW * CARD_W + (PER_ROW - 1) * CARD_GAP, 2 * CARD_H + 20 }, text = "Click a card to choose. Some have small pictures to pick a different look" }
-	coach.start("coach_charmers", lesson) -- first visit
-	lg.setColor(1, 0.85, 0.3)
-	lg.printf("Every " .. collection.WINS_PER_BONUS .. " wins with a charmer gives all your charmers +" .. collection.BONUS_HEALTH .. " health. Bonus now: +" .. collection.health_bonus() .. " health. (The number in brackets is wins to go.)", assets.small_font, 0, 800, reference_window_width, "center")
+	return lesson
+end
+
+function render.charmer_help()
+	coach.replay(charmer_lesson())
+end
+
+function render.character_select()
+	background()
+	coach.start("coach_charmers2", charmer_lesson()) -- first visit
 	lg.setColor(1, 1, 1)
 	buttons.character_select["Charmers Header"]:draw()
+	buttons.character_select["Help"]:draw()
 	buttons.universal["Back"]:draw()
 	local hovered = render.charmer_at(mouse.x, mouse.y)
 	for i = 1, charmers.PICKABLE do
@@ -1844,9 +1856,9 @@ function render.character_select()
 		portrait(c.name, x + 10, y + 10, CARD_W - 20, PORTRAIT_H)
 		if selected then
 			lg.setColor(green)
-			lg.rectangle("fill", x + 10, y + 10, 90, 24)
+			lg.rectangle("fill", x + 10, y + 10, 76, 24)
 			lg.setColor(1, 1, 1)
-			lg.printf("Selected", assets.debug_font, x + 10, y + 12, 90, "center")
+			lg.printf("Selected", assets.debug_font, x + 10, y + 12, 76, "center")
 		end
 		local looks = charmers.skin_count(c)
 		for _, b in ipairs(charmers.is_unlocked(i) and skin_boxes(i) or {}) do -- the looks to choose from
@@ -1868,12 +1880,25 @@ function render.character_select()
 		end
 		lg.setColor(1, 1, 1)
 		lg.printf(c.name, assets.debug_font, x + 6, y + PORTRAIT_H + LOOKS_H + 24, CARD_W - 12, "center")
-		if charmers.is_unlocked(i) then -- wins with this charmer, and how many more until the next health bonus
-			local wins = collection.charmer_wins(c.name)
-			lg.setColor(0, 0, 0, 0.75)
-			lg.rectangle("fill", x + CARD_W - 86, y + PORTRAIT_H - 18, 76, 24, 4, 4)
+		if charmers.is_unlocked(i) then -- the charmer's level (top right of its picture) and a bar of wins towards the next one along its bottom
+			local level, got, need = collection.charmer_level(c.name), collection.level_progress(c.name)
+			lg.setColor(0, 0, 0, 0.8)
+			lg.rectangle("fill", x + CARD_W - 84, y + 10, 72, 24, 6, 6)
 			lg.setColor(1, 0.85, 0.3)
-			lg.printf("Wins " .. wins .. " (" .. (collection.WINS_PER_BONUS - wins % collection.WINS_PER_BONUS) .. ")", assets.debug_font, x + CARD_W - 86, y + PORTRAIT_H - 15, 76, "center")
+			lg.rectangle("line", x + CARD_W - 84, y + 10, 72, 24, 6, 6)
+			lg.printf("Lv " .. level, assets.debug_font, x + CARD_W - 84, y + 12, 72, "center")
+			local bx, by, bw = x + 14, y + PORTRAIT_H - 8, CARD_W - 28
+			lg.setColor(0, 0, 0, 0.8)
+			lg.rectangle("fill", bx - 3, by - 3, bw + 6, 20, 5, 5)
+			for seg = 1, need or 1 do
+				local sw = (bw - ((need or 1) - 1) * 4) / (need or 1)
+				local sx = bx + (seg - 1) * (sw + 4)
+				local full = not need or seg <= got
+				lg.setColor(full and 1 or 0.25, full and 0.8 or 0.22, full and 0.25 or 0.3)
+				lg.rectangle("fill", sx, by, sw, 14, 3, 3)
+			end
+			lg.setColor(0.5, 1, 0.6)
+			lg.printf("+" .. collection.health_bonus(c.name) .. " HP", assets.debug_font, x + 6, y + PORTRAIT_H + LOOKS_H + 2, CARD_W - 12, "center")
 			lg.setColor(1, 1, 1)
 		end
 		if not charmers.is_unlocked(i) then
@@ -2873,6 +2898,10 @@ function render.ended()
 		if charmer_unlocked then
 			lg.setColor(0.4, 1, 0.5)
 			lg.printf("New charmer unlocked: " .. charmer_unlocked .. "!", assets.font, 0, 275, reference_window_width, "center")
+		end
+		if collection.last_level_up and not play.versus then
+			lg.setColor(1, 0.85, 0.3)
+			lg.printf(collection.last_level_up.name .. " reached level " .. collection.last_level_up.level .. "!", assets.font, 0, charmer_unlocked and 320 or 275, reference_window_width, "center")
 		end
 	end
 	lg.setColor(1, 0.85, 0.2)

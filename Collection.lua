@@ -537,9 +537,9 @@ function collection.border_holders(border)
 	return list
 end
 
--- Wins with each of your charmers (charmer_wins.txt, one "name wins" line each): every 3 wins with any charmer gives
--- all your charmers 5 more health in battle
-collection.WINS_PER_BONUS, collection.BONUS_HEALTH = 3, 5
+-- Charmer levels: wins with each charmer (charmer_wins.txt, one "name wins" line each). Every 3 wins with a charmer is a
+-- level for that charmer (up to level 10), and each level gives it 5 more health in battle.
+collection.WINS_PER_LEVEL, collection.BONUS_HEALTH, collection.MAX_LEVEL = 3, 5, 10
 local charmer_wins
 
 local function load_charmer_wins()
@@ -556,18 +556,28 @@ function collection.charmer_wins(name)
 	return load_charmer_wins()[name] or 0
 end
 
--- The extra health every charmer has from all those wins
-function collection.health_bonus()
-	local milestones = 0
-	for _, wins in pairs(load_charmer_wins()) do
-		milestones = milestones + math.floor(wins / collection.WINS_PER_BONUS)
+function collection.charmer_level(name)
+	return math.min(1 + math.floor(collection.charmer_wins(name) / collection.WINS_PER_LEVEL), collection.MAX_LEVEL)
+end
+
+-- Wins towards the next level, out of how many it takes (nil at the top level)
+function collection.level_progress(name)
+	if collection.charmer_level(name) >= collection.MAX_LEVEL then
+		return nil
 	end
-	return milestones * collection.BONUS_HEALTH
+	return collection.charmer_wins(name) % collection.WINS_PER_LEVEL, collection.WINS_PER_LEVEL
+end
+
+-- The extra health a charmer has from its level
+function collection.health_bonus(name)
+	return (collection.charmer_level(name or "") - 1) * collection.BONUS_HEALTH
 end
 
 function collection.add_charmer_win(name)
 	local all = load_charmer_wins()
+	local before = collection.charmer_level(name)
 	all[name] = (all[name] or 0) + 1
+	collection.last_level_up = collection.charmer_level(name) > before and { name = name, level = collection.charmer_level(name) } or nil
 	local lines = {}
 	for n, wins in pairs(all) do
 		lines[#lines + 1] = n .. " " .. wins

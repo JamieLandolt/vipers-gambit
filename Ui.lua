@@ -217,6 +217,7 @@ return function()
 	buttons.level_select["Select Opponent"] = b("Select Opponent", nil, nil, 5, 5, back_width, button_height)
 
 	buttons.character_select["Charmers Header"] = b("Charmers", nil, nil, w / 2 - button_width / 2, 5, button_width, button_height)
+	buttons.character_select["Help"] = b("?", function() require("Render").charmer_help() end, nil, w - 5 - button_height, 5, button_height, button_height)
 
 	-- Replaces Back during a match; asks for confirmation before conceding
 	buttons.playing["Forfeit"] = b("Forfeit", function()

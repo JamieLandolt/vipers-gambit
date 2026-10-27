@@ -16,6 +16,11 @@ function coach.start(key, steps)
 	coach.steps, coach.i, coach.t = steps, 1, time
 end
 
+-- Plays a lesson again on request (the ? buttons)
+function coach.replay(steps)
+	coach.steps, coach.i, coach.t = steps, 1, time
+end
+
 function coach.active()
 	return coach.steps ~= nil
 end
