@@ -69,8 +69,15 @@ end
 local function place_effect(placed, sector)
 	play.note((sector > 4 and "You play " or "Opponent plays ") .. play.name_of(placed))
 	if sector <= 4 then
-		local x, y = play.slot_centre(sector)
-		play.callout("Opponent plays " .. play.name_of(placed):gsub("_", " "), x, y)
+		local seen = "seen_" .. placed.card_path:sub(1, -5)
+		if collection.hint_seen(seen) then
+			local x, y = play.slot_centre(sector)
+			play.callout("Opponent plays " .. play.name_of(placed):gsub("_", " "), x, y)
+		else -- first time you see this snake: a close-up with its stats and ability
+			collection.mark_hint(seen)
+			effects.add("spotlight", { card = placed })
+			play.ai_hold = effects.settled and effects.settled() + 0.3 or nil
+		end
 	end
 	play.reveal(sector <= 4, placed)
 	placed.fresh = true -- some abilities only work the turn a snake is played

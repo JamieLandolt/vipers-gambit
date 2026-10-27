@@ -10,7 +10,7 @@ package.preload["Effects"] = function() return { add = function() end, clear = f
 package.preload["Card"] = function() return function(p, _, _, border) return { card_path = p, border = border } end end
 package.preload["Collection"] = function()
 	return { deck = function() return { "Sand_Snake", "Dirt_Snake", "Garter_Snake", "Mud_Snake", "Grass_Snake", "Brown_Snake" } end,
-		save = function() end, mark_hint = function() end, give_pack = function() end, record_win = function() end, health_bonus = function() return 0 end, beaten_base = function() return true end, challenges_done = function() return 3 end, endless = function() return 2 end, wins = function() return 0 end, reward = function() return 0 end, mark_challenge = function() end, challenge_done = function() return false end }
+		save = function() end, mark_hint = function() end, hint_seen = function() return true end, give_pack = function() end, record_win = function() end, health_bonus = function() return 0 end, beaten_base = function() return true end, challenges_done = function() return 3 end, endless = function() return 2 end, wins = function() return 0 end, reward = function() return 0 end, mark_challenge = function() end, challenge_done = function() return false end }
 end
 local data, play = require("CardData"), require("Play")
 function contains(t, v) for _, x in ipairs(t) do if x == v then return true end end return false end

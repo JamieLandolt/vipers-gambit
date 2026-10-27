@@ -8,7 +8,7 @@ local assets = require("Assets")
 local effects = {}
 local list = {}
 
-local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9, sound = 0.3, shake = 0.35, callout = 1.4 }
+local LIFE = { place = 0.7, lunge = 0.35, hit = 0.5, dead = 0.6, hp = 0.5, float = 0.9, sound = 0.3, shake = 0.35, callout = 1.4, spotlight = 3 }
 local FALL = 0.25 -- how long a placed card takes to land
 
 -- Floating texts that mean something get an icon, colour, particles and a sound of their own
@@ -250,6 +250,34 @@ function effects.draw()
 				require("Sounds").play(e.name)
 			elseif e.kind == "dead" then
 				sparks(e.cx, e.cy, math.min(age / 0.5, 1), 14, { 0.9, 0.2, 0.2 }, 200)
+			elseif e.kind == "spotlight" then -- an opponent snake seen for the first time: the card close up on the left, its stats and ability on the right
+				local data = require("CardData")
+				local st = data.get_stats(e.card)
+				local fade = math.min(age / 0.25, (LIFE.spotlight - age) / 0.4, 1)
+				local slide = (1 - math.min(age / 0.3, 1)) * 120
+				lg.setColor(0, 0, 0, 0.6 * fade)
+				lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
+				lg.push()
+				lg.setColor(1, 1, 1, fade)
+				e.card:draw(110 - slide, 110, 0, 2)
+				lg.pop()
+				local px, py, pw, ph = 600, 190, 760, 440
+				lg.setColor(0.07, 0.04, 0.14, 0.95 * fade)
+				lg.rectangle("fill", px + slide, py, pw, ph, 14, 14)
+				lg.setColor(1, 0.85, 0.2, fade)
+				lg.rectangle("line", px + slide, py, pw, ph, 14, 14)
+				lg.setColor(1, 1, 1, fade)
+				lg.print((e.card.card_path:sub(1, -5):gsub("_", " ")), assets.font, px + 35 + slide, py + 25)
+				lg.setColor(0.4, 0.85, 0.4, fade)
+				lg.print("Cost " .. st.cost, assets.small_font, px + 35 + slide, py + 130)
+				lg.setColor(1, 0.4, 0.4, fade)
+				lg.print("Attack " .. st.attack, assets.small_font, px + 235 + slide, py + 130)
+				lg.setColor(0.45, 0.6, 1, fade)
+				lg.print("Health " .. st.defense, assets.small_font, px + 465 + slide, py + 130)
+				lg.setColor(1, 0.85, 0.2, fade)
+				lg.print("Ability", assets.small_font, px + 35 + slide, py + 205)
+				lg.setColor(1, 1, 1, fade)
+				lg.printf(st.ability or "None", assets.small_font, px + 35 + slide, py + 255, pw - 70)
 			elseif e.kind == "callout" then -- who did what: a ring bursting from the snake and a label above it
 				local u = math.min(age / LIFE.callout, 1)
 				local c = e.colour or { 1, 0.85, 0.3 }
