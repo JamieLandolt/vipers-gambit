@@ -155,7 +155,7 @@ local function card_popup(card, x, y, hp, status)
 	x = math.max(10, math.min(x, reference_window_width - POPUP_W - 10))
 	y = math.max(10, math.min(y, reference_window_height - h - 10))
 	tx = x + cw + 36
-	local pulse = 0.5 + 0.5 * math.sin(time * 2.5)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 2.5)
 
 	lg.setColor(0.07, 0.04, 0.14, 0.96)
 	lg.rectangle("fill", x, y, POPUP_W, h, 14, 14)
@@ -748,7 +748,7 @@ function render.collection()
 		end
 		if name == under then
 			-- Hover: a pulsing glow and border kept inside the card so neighbours are untouched
-			local pulse = 0.5 + 0.5 * math.sin(time * 6)
+			local pulse = 0.5 + 0.5 * math.sin(motion_time * 6)
 			lg.setBlendMode("add")
 			lg.setColor(1, 1, 1, 0.1 + 0.1 * pulse)
 			lg.draw(assets.cards[i], x, y)
@@ -958,14 +958,14 @@ function render.altar()
 		lg.printf((name:gsub("_", " ")), assets.card_text_font, x - 4, py + 314, 96, "center")
 		lg.printf(have and ("you own " .. collection.count(name)) or "missing", assets.card_text_font, x - 4, py + 362, 96, "center")
 	end
-	lg.setColor(1, 0.85, 0.2, 0.5 + 0.5 * math.sin(time * 4))
+	lg.setColor(1, 0.85, 0.2, 0.5 + 0.5 * math.sin(motion_time * 4))
 	lg.printf(">", assets.font, px + 420, py + 250, 50, "center")
 	lg.setColor(1, 0.85, 0.2)
 	lg.print("You receive:", assets.small_font, px + 490, py + 115)
 	-- a flame glow behind the reward
 	lg.setBlendMode("add")
 	for i = 1, 4 do
-		lg.setColor(1, 0.45, 0.1, (0.05 + 0.03 * math.sin(time * 3)) * (5 - i))
+		lg.setColor(1, 0.45, 0.1, (0.05 + 0.03 * math.sin(motion_time * 3)) * (5 - i))
 		lg.rectangle("fill", px + 490 - i * 8, py + 150 - i * 8, 148 + i * 16, 288 + i * 16, 14, 14)
 	end
 	lg.setBlendMode("alpha")
@@ -2255,7 +2255,7 @@ function render.level_select()
 		local x, y = level_node(i)
 		local fill = not play.level_open(i) and { 0.3, 0.3, 0.3 } or (hovered == i and green or purple)
 		if i == unlocked then -- the level you are up to pulses
-			fill = { 0.45 + 0.35 * math.sin(time * 5), 0.8, 0.3 }
+			fill = { 0.45 + 0.35 * math.sin(motion_time * 5), 0.8, 0.3 }
 		end
 		lg.setColor(fill[1], fill[2], fill[3], fade)
 		lg.circle("fill", x, y, NODE_RADIUS)
@@ -2461,7 +2461,7 @@ local function draw_slot(card, sector)
 	local dx, dy, sx, sy, alpha, flash = effects.card(card)
 	local stats = data.get_stats(card)
 	local rim = borders.colour(stats.rarity == 5 and "Rainbow" or data.border_of(card))
-	local pulse = 0.5 + 0.5 * math.sin(time * 4)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 4)
 	card.card_object:setFilter("nearest", "nearest")
 	local style = card_styles[data.get_type(card)]
 	local bgs = {}
@@ -2494,7 +2494,7 @@ end
 
 -- A drop slot while a snake is held: a pulsing venom pool with scales, a glowing rim and bubbles rising from it
 local function draw_venom_slot(x, y, w, h, seed)
-	local pulse = 0.5 + 0.5 * math.sin(time * 4 + seed)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 4 + seed)
 	lg.stencil(function() lg.rectangle("fill", x, y, w, h, 10, 10) end, "replace", 1)
 	lg.setStencilTest("greater", 0)
 	lg.setColor(0.1, 0.5, 0.15, 0.35 + 0.15 * pulse)
@@ -2608,7 +2608,7 @@ function render.playing()
 		lg.printf(c.name, assets.debug_font, spot[1] + 68, spot[2], 145, "left")
 		if play.charms_open() then -- the panel's edge glows in the charmer's colour, filling round it as the cooldown runs down
 			local fill = 1 - play.charm_cd[side] / (c.cooldown + 1)
-			local glow = fill >= 1 and 0.7 + 0.3 * math.sin(time * 4) or 1
+			local glow = fill >= 1 and 0.7 + 0.3 * math.sin(motion_time * 4) or 1
 			lg.setBlendMode("add")
 			for _, line in ipairs({ { 9, 0.18 }, { 4, 0.5 }, { 2, 1 } }) do
 				lg.setLineWidth(line[1])
@@ -2675,7 +2675,7 @@ function render.playing()
 	end
 
 	-- A golden glow with sparks circling it marks your snakes whose activated ability you can afford right now
-	local pulse = 0.5 + 0.5 * math.sin(time * 5)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 5)
 	for sector = 5, 8 do
 		if played_cards[sector] and turn == "Player" and tutorial.allows("ability") and abilities.ready(played_cards[sector], "Player") then
 			local box = play.field_hitboxes[sector]
@@ -2792,7 +2792,7 @@ function render.playing()
 	local held_spell = held_card and data.get_stats(held_card).kind == "spell" and require("Brews").by_name[held_card.card_path:sub(1, -5)]
 	if held_spell then -- dragging a spell: what it would hit glows
 		local slots, bars = require("Brews").targets(held_spell, "Player")
-		local col, pulse = held_spell.colour, 0.5 + 0.5 * math.sin(time * 8)
+		local col, pulse = held_spell.colour, 0.5 + 0.5 * math.sin(motion_time * 8)
 		local function glow(x, y, w, h)
 			lg.setBlendMode("add")
 			lg.setColor(col[1], col[2], col[3], 0.2 + 0.2 * pulse)
@@ -2993,7 +2993,7 @@ function render.info()
 	local snake = info.kind == "snake"
 	local name = info_card.card_path:sub(1, -5)
 	local tier = RARITY_COLOUR[info.rarity]
-	local pulse = 0.5 + 0.5 * math.sin(time * 2.5)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 2.5)
 
 	-- the card, on a glow in its tier colour
 	local cx, cy, scale = 60, 70, 2.3

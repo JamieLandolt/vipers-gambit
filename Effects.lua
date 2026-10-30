@@ -163,7 +163,7 @@ local function styled_float(e, age)
 	local u = age / LIFE.float
 	local c = e.style.colour
 	if c == "rainbow" then
-		c = { 0.6 + 0.4 * math.sin(time * 8), 0.6 + 0.4 * math.sin(time * 8 + 2.1), 0.6 + 0.4 * math.sin(time * 8 + 4.2) }
+		c = { 0.6 + 0.4 * math.sin(motion_time * 8), 0.6 + 0.4 * math.sin(motion_time * 8 + 2.1), 0.6 + 0.4 * math.sin(motion_time * 8 + 4.2) }
 	end
 	local pop = 1 + 0.5 * math.max(0, 1 - age * 6)
 	local scale = 1.5 * pop

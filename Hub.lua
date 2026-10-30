@@ -45,7 +45,7 @@ local RULES = {
 
 -- A pulsing circle that points at something to click next (used after a new charmer unlocks: Back, Gameplay, Charmers)
 function hub.ring(x, y, w, h)
-	local pulse = 0.5 + 0.5 * math.sin(time * 5)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 5)
 	lg.setColor(1, 0.9, 0.2, 0.7 + 0.3 * pulse)
 	lg.setLineWidth(5)
 	lg.circle("line", x + w / 2, y + h / 2, math.sqrt(w * w + h * h) / 2 + 8 + 4 * pulse) -- reaches past the corners, so the whole target is inside
@@ -205,7 +205,7 @@ function hub.draw_screen(screen)
 		local image, scale, bx, by, bw, bh = gameplay_box(item)
 		local locked = hub.locked(item.name)
 		local grow = hovered == item and 1.06 or 1
-		local bob = math.sin(time * 1.8 + i * 1.3) * 6
+		local bob = math.sin(motion_time * 1.8 + i * 1.3) * 6
 		lg.setColor(locked and 0.35 or 1, locked and 0.35 or 1, locked and 0.4 or 1)
 		lg.draw(image, item.x - bw * grow / 2, by + bh - bh * grow + bob, 0, scale * grow)
 		if hovered == item and not locked then
@@ -240,7 +240,7 @@ function hub.draw(t)
 	local spots = {}
 	for i, item in ipairs(ITEMS) do
 		local image = image_of(item)
-		local bob = item.float and math.sin(time * 1.8 + i * 1.3) * 8 or 0
+		local bob = item.float and math.sin(motion_time * 1.8 + i * 1.3) * 8 or 0
 		local grow = hovered == item and 1.06 or 1
 		local scale = item.scale * grow
 		local x, y = item.x - image:getWidth() * scale / 2, item.y - image:getHeight() * scale + bob
@@ -276,7 +276,7 @@ function hub.draw(t)
 		lg.setColor(0, 0, 0, 0.75)
 		lg.rectangle("fill", 0, 0, reference_window_width, reference_window_height)
 		lg.setStencilTest()
-		local pulse = 0.5 + 0.5 * math.sin(time * 5)
+		local pulse = 0.5 + 0.5 * math.sin(motion_time * 5)
 		for _, s in ipairs(spots) do
 			lg.setColor(1, 0.9, 0.2, 0.7 + 0.3 * pulse)
 			lg.setLineWidth(5)
@@ -303,7 +303,7 @@ function hub.draw(t)
 		for i, item in ipairs(ITEMS) do
 			if item.id == "book" then
 				local bx, by, bw, bh = box(item)
-				hub.ring(bx, by + math.sin(time * 1.8 + i * 1.3) * 8, bw, bh)
+				hub.ring(bx, by + math.sin(motion_time * 1.8 + i * 1.3) * 8, bw, bh)
 			end
 		end
 	end

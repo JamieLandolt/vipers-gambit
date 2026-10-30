@@ -214,7 +214,7 @@ function tutorial.draw_pointers()
 	if not (tutorial.active and step and step.point) then
 		return
 	end
-	local pulse = 0.5 + 0.5 * math.sin(time * 6)
+	local pulse = 0.5 + 0.5 * math.sin(motion_time * 6)
 	for _, r in ipairs(step.point()) do
 		lg.setColor(1, 0.9, 0.2, 0.55 + 0.45 * pulse)
 		lg.setLineWidth(4)

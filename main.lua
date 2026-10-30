@@ -20,6 +20,7 @@ local versus = require("Versus")
 reference_window_width = 1440
 reference_window_height = 872
 time = 0
+motion_time = 0 -- the clock that pulses and bobbing run on: stopped by the Reduce motion setting
 
 -- Shared state (global because Button, Avatar, Play and Render read it)
 mouse = {}
@@ -210,6 +211,7 @@ end
 
 function love.update(dt)
 	time = time + dt
+	motion_time = reduce_motion and 0 or time
 
 	w, h = lg.getWidth(), lg.getHeight()
 
@@ -546,7 +548,7 @@ function love.draw()
 	local state = get_game_state()
 	if not (state == "menu" or state == "playing" or state == "ended" or state == "info" or state == "pack") and #hub.spotlight() > 0 then
 		local back = buttons.universal["Back"]
-		local pulse = 0.5 + 0.5 * math.sin(time * 5)
+		local pulse = 0.5 + 0.5 * math.sin(motion_time * 5)
 		lg.setColor(1, 0.9, 0.3, 0.6 + 0.4 * pulse)
 		lg.setLineWidth(3 + 3 * pulse)
 		lg.rectangle("line", back.x - 4, back.y - 4, back.width + 8, back.height + 8, 12, 12)

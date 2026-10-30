@@ -63,6 +63,16 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 
 		draw = function(self)
 			local hovered = self:hover()
+			-- A pressed button squeezes to 0.96 and eases back over 150 ms
+			local pressed = self.press_t and not reduce_motion and (time - self.press_t) / 0.15
+			lg.push()
+			if pressed and pressed < 1 then
+				local s = 0.96 + 0.04 * (1 - (1 - pressed) ^ 2)
+				local cx, cy = self.x + self.width / 2, self.y + self.height / 2
+				lg.translate(cx, cy)
+				lg.scale(s)
+				lg.translate(-cx, -cy)
+			end
 
 			-- Border grows outwards by `outer`, the fill by `-inset` (an inset > 0 shrinks it).
 			-- Hovering pops the button during the click animation's middle third.
@@ -116,6 +126,7 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 				lg.setColor(hovered and { 1, 1, 1 } or CREAM)
 				lg.print(self.text, self.font, math.floor(text_x), math.floor(text_y))
 			end
+			lg.pop()
 		end,
 
 		checkPressed = function(self, mouse_x, mouse_y)
@@ -123,6 +134,7 @@ function Button(text, func, func_params, x, y, width, height, font, debugger, co
 				return false
 			end
 			play_sound(hover_sound)
+			self.press_t = time
 			animation = true
 			animation_time = 0
 			if self.func_params then
